@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NEX.B</title>
+    <meta name="referrer" content="no-referrer" />
+    <link rel="stylesheet" href="src/styles.css" />
+    <link rel="stylesheet" href="src/overrides.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <h1>NEX.B</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
+        <div class="top-actions"><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
+      </header>
+      <p id="appFeedback" class="feedback" role="status" hidden></p>
+      <section id="workspace" aria-live="polite"></section>
+      <p id="emptyState" class="empty" hidden>Agrega una categoría para empezar a organizar tus accesos.</p>
+      <div class="bottom-actions"><button id="newCategory" class="add-category-button" title="Nueva categoría" aria-label="Nueva categoría">+</button></div>
+      <footer class="signature">By.kilex</footer>
+    </main>
+    <dialog id="categoryDialog"><form method="dialog" id="categoryForm" class="dialog-form">
+      <h2>Nueva categoría</h2><label>Nombre<input id="categoryName" required maxlength="40" placeholder="Trabajo, YPF, Personal" /></label>
+      <label>Dentro de<select id="categoryParent"><option value="">Categoría principal</option></select></label>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar</button></div>
+    </form></dialog>
+    <dialog id="moveSectionDialog"><form method="dialog" id="moveSectionForm" class="dialog-form">
+      <h2>Mover sección</h2>
+      <p id="moveSectionSummary" class="help"></p>
+      <label>Workspace de destino<select id="moveSectionWorkspace" required></select></label>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="moveSectionSubmit" class="button">Mover sección</button></div>
+    </form></dialog>
+    <dialog id="recaptureDialog"><form method="dialog" id="recaptureForm" class="dialog-form">
+      <h2>Volver a capturar imagen</h2>
+      <p id="recaptureSummary" class="help"></p>
+      <p class="help">1. Abre el sitio con el botón de abajo.<br />2. Cuando esté listo, haz clic derecho en la página → NEX.B → Actualizar captura del acceso. También está en el clic derecho del icono de NEX.B.<br />3. Revisa la miniatura y pulsa Guardar acceso.</p>
+      <small>Si no ves el icono naranja, abre el botón Extensiones (pieza de puzle) de Chrome y fija NEX.B con la chincheta. También puedes pulsar NEX.B desde ese listado. No es el botón Recargar página de Chrome.</small>
+      <small>La imagen se guardará en el mismo acceso, sin duplicarlo. Revisa que no incluya información privada. Si la página te lleva a iniciar sesión, vuelve al recurso antes de pulsar NEX.B.</small>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="recaptureStart" class="button">Abrir sitio para capturar</button></div>
+    </form></dialog>
+    <dialog id="accessDialog"><form method="dialog" id="accessForm" class="dialog-form">
+      <h2 id="accessDialogTitle">Nuevo acceso</h2><input id="accessId" type="hidden" />
+      <label>Nombre<input id="accessTitle" required maxlength="60" placeholder="Demanda Figma" /></label>
+      <label>URL<input id="accessUrl" required type="url" placeholder="https://..." /></label>
+      <label>URL de miniatura<input id="accessThumbnailUrl" type="url" placeholder="https://.../imagen.png" /><small>Opcional. Puedes pegar una captura debajo o usar una imagen por URL.</small></label>
+      <label>Workspace de destino<select id="accessWorkspace" required></select></label>
+      <label>Categoría<select id="accessCategory" required></select></label>
+      <label>Tags <input id="accessTags" autocomplete="off" aria-controls="tagSuggestions" placeholder="cliente, urgente, diseño" /><small>Escribe para buscar tags existentes. Selecciona uno del listado o crea uno nuevo, separado por comas.</small></label>
+      <div id="tagSuggestions" class="tag-suggestions" hidden></div>
+      <label>¿Cómo reconocer una pestaña abierta?<select id="matchType"><option value="document">El mismo documento o página</option><option value="exact">La misma URL exacta</option><option value="domain">Cualquier página de este sitio</option></select></label>
+      <small class="field-help">Esto evita abrir duplicados. Para Gmail, Drive o una aplicación completa, usa “Cualquier página de este sitio”.</small>
+      <div id="pasteBox" class="paste-box" tabindex="0">Haz clic aquí y pega una captura<br /><small>⌘V / Ctrl+V</small></div>
+      <button id="removeThumbnail" type="button" class="button secondary">Quitar miniatura</button>
+      <img referrerpolicy="no-referrer" id="preview" class="preview" alt="Vista previa" hidden />
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar acceso</button></div>
+    </form></dialog>
+    <dialog id="workspaceDialog"><form method="dialog" id="workspaceForm" class="dialog-form">
+      <h2>Nuevo Workspace</h2>
+      <label>Nombre<input id="workspaceName" required maxlength="40" placeholder="Trabajo, Personal, Cliente YPF" /></label>
+      <label>Tipo<select id="workspaceKind"><option value="principal">Principal</option><option value="standard">Estándar</option></select></label>
+      <small class="field-help">Usa Principal para tus espacios más importantes. Puedes crear todos los workspaces que necesites.</small>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Crear Workspace</button></div>
+    </form></dialog>
+    <dialog id="bookmarksDialog"><form id="bookmarksForm" class="dialog-form" method="dialog">
+      <h2>Importar favoritos de Chrome</h2>
+      <p class="help">Entra a una carpeta. Solo se importan sus enlaces directos, nunca sus subcarpetas. No se modifican tus favoritos de Chrome.</p>
+      <p id="bookmarkPath" class="bookmark-path"></p>
+      <button id="bookmarkUp" type="button" class="button secondary">↑ Carpeta superior</button>
+      <div id="bookmarkFolders" class="bookmark-folders" aria-label="Subcarpetas disponibles"></div>
+      <p id="bookmarkSummary" class="help" role="status"></p>
+      <label>Workspace de destino<select id="bookmarkWorkspace" required></select></label>
+      <label>Sección de destino<select id="bookmarkCategory"></select></label>
+      <label id="bookmarkNameLabel">Nombre de la sección<input id="bookmarkSectionName" maxlength="120" required /></label>
+      <small>Las URLs que ya existen en cualquier sección del Workspace elegido se ignoran. Si una sección principal tiene este nombre, se agregan ahí solo los enlaces nuevos.</small>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="bookmarkImportSubmit" class="button" disabled>Importar nuevos</button></div>
+    </form></dialog>
+    <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
+      <h2>Configurar NEX.B</h2>
+      <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
+      <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. NEX.B solo los lee.</small>
+      <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
+      <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>
+      <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
+      <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
+      <label>Tamaño de miniaturas<select id="thumbnailSize"><option value="small">Pequeño</option><option value="medium">Mediano</option><option value="large">Grande</option></select></label>
+      <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
+      <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
+      <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
+      <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>
+      <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar configuración</button></div>
+    </form></dialog>
+    <menu id="cardMenu" class="card-menu" hidden>
+      <button type="button" data-card-action="edit">Editar</button>
+      <button type="button" data-card-action="move">Mover a Workspace…</button>
+      <button type="button" data-card-action="capture">Volver a capturar imagen</button>
+      <button type="button" data-card-action="copy">Copiar URL</button>
+      <button type="button" data-card-action="remove" class="danger">Remover</button>
+    </menu>
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
