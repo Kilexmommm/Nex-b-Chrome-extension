@@ -42,6 +42,7 @@
     <dialog id="accessDialog"><form method="dialog" id="accessForm" class="dialog-form">
       <h2 id="accessDialogTitle">Nuevo acceso</h2><input id="accessId" type="hidden" />
       <label>Nombre<input id="accessTitle" required maxlength="60" placeholder="Demanda Figma" /></label>
+      <p id="bookmarkState" class="bookmark-state" role="status" hidden></p>
       <label>URL<input id="accessUrl" required type="url" placeholder="https://..." /></label>
       <label>URL de miniatura<input id="accessThumbnailUrl" type="url" placeholder="https://.../imagen.png" /><small>Opcional. Puedes pegar una captura debajo o usar una imagen por URL.</small></label>
       <label>Workspace de destino<select id="accessWorkspace" required></select></label>
@@ -72,12 +73,15 @@
       <label>Workspace de destino<select id="bookmarkWorkspace" required></select></label>
       <label>Sección de destino<select id="bookmarkCategory"></select></label>
       <label id="bookmarkNameLabel">Nombre de la sección<input id="bookmarkSectionName" maxlength="120" required /></label>
+      <label class="checkbox-label"><input id="bookmarkLink" type="checkbox" checked /> Vincular esta sección a la carpeta elegida</label>
+      <small>Después podrás usar ↻ para sincronizar nuevos enlaces. Los eliminados de Favoritos solo se muestran al editar el acceso.</small>
       <small>Las URLs que ya existen en cualquier sección del Workspace elegido se ignoran. Si una sección principal tiene este nombre, se agregan ahí solo los enlaces nuevos.</small>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="bookmarkImportSubmit" class="button" disabled>Importar nuevos</button></div>
     </form></dialog>
     <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
       <h2>Configurar NEX.B</h2>
       <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
+      <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar Workspace</button>
       <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. NEX.B solo los lee.</small>
       <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
       <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>

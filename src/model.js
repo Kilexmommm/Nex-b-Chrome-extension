@@ -114,15 +114,21 @@ export function normalizeData(stored = DEFAULT_DATA) {
         const workspaceId = c.workspaceId ?? workspaces[0].id;
         if (!workspaceIds.has(workspaceId))
             fail("Categoría con Workspace inexistente.");
+        const bookmarkFolderId = text(c.bookmarkFolderId ?? "", "Carpeta de favoritos", 120, true);
+        const bookmarkFolderTitle = text(c.bookmarkFolderTitle ?? "", "Nombre de carpeta de favoritos", 120, true);
         return {
             id: uniqueId(c.id, categoryIds), name: text(c.name, "Categoría", 120), workspaceId,
             parentId: text(c.parentId ?? "", "Categoría padre", 120, true),
+            ...(bookmarkFolderId ? { bookmarkFolderId, bookmarkFolderTitle } : {}),
             accesses: list(c.accesses ?? [], "Accesos", LIMITS.accesses).map((a) => {
                 record(a, "Acceso");
+                const bookmarkId = text(a.bookmarkId ?? "", "Favorito de Chrome", 120, true);
+                const accessBookmarkFolderId = text(a.bookmarkFolderId ?? "", "Carpeta de favorito", 120, true);
                 return { id: uniqueId(a.id, accessIds), title: text(a.title, "Nombre de acceso", 300),
                     url: webUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
-                    thumbnail: imageUrl(a.thumbnail ?? "") };
+                    thumbnail: imageUrl(a.thumbnail ?? ""),
+                    ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}) };
             })
         };
     });

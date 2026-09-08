@@ -8,7 +8,7 @@ export async function readBookmarkFolder(api, folderId) {
   return { folder, children };
 }
 
-export function planBookmarkImport(data, children, { workspaceId, categoryId = '', name }, uid) {
+export function planBookmarkImport(data, children, { workspaceId, categoryId = '', name, folderId = '', folderTitle = '' }, uid) {
   if (!data.workspaces.some(w => w.id === workspaceId)) throw new Error('Selecciona un Workspace válido.');
   const candidate = structuredClone(data);
   const categories = candidate.categories.filter(c => c.workspaceId === workspaceId);
@@ -29,15 +29,55 @@ export function planBookmarkImport(data, children, { workspaceId, categoryId = '
     if (seen.has(url)) { stats.duplicates++; continue; }
     seen.add(url);
     additions.push({ id: uid('access'), title: (item.title?.trim() || new URL(url).hostname).slice(0, 300),
-      url, tags: [], thumbnail: '', matchType: 'document' });
+      url, tags: [], thumbnail: '', matchType: 'document', bookmarkId: folderId ? item.id : '',
+      bookmarkFolderId: folderId, bookmarkMissing: false });
   }
   stats.added = additions.length;
-  if (additions.length) {
+  if (additions.length || folderId) {
     if (!target) {
-      target = { id: uid('category'), workspaceId, name: sectionName, parentId: '', accesses: [] };
+      target = { id: uid('category'), workspaceId, name: sectionName, parentId: '', bookmarkFolderId: '', bookmarkFolderTitle: '', accesses: [] };
       candidate.categories.push(target);
     }
+    if (folderId) {
+      target.bookmarkFolderId = folderId;
+      target.bookmarkFolderTitle = folderTitle.slice(0, 120);
+    }
     target.accesses.push(...additions);
+  }
+  return { data: normalizeData(candidate), stats };
+}
+
+export function syncBookmarkSection(data, categoryId, children, uid) {
+  const candidate = structuredClone(data);
+  const target = candidate.categories.find(category => category.id === categoryId);
+  if (!target?.bookmarkFolderId) throw new Error('Esta sección no está vinculada a una carpeta de Favoritos.');
+  const seenUrls = new Set(candidate.categories.filter(c => c.workspaceId === target.workspaceId)
+    .flatMap(c => c.accesses.map(access => webUrl(access.url))));
+  const valid = [], folderBookmarkIds = new Set();
+  const stats = { added: 0, duplicates: 0, unsupported: 0, missing: 0, restored: 0, folders: 0 };
+  for (const item of children) {
+    if (!item.url) { stats.folders++; continue; }
+    let url;
+    try { url = webUrl(item.url); } catch { stats.unsupported++; continue; }
+    folderBookmarkIds.add(item.id);
+    valid.push({ item, url });
+  }
+  for (const access of target.accesses) {
+    if (access.bookmarkFolderId !== target.bookmarkFolderId) continue;
+    const missing = !folderBookmarkIds.has(access.bookmarkId);
+    if (access.bookmarkMissing !== missing) {
+      access.bookmarkMissing = missing;
+      if (missing) stats.missing++; else stats.restored++;
+    }
+  }
+  for (const { item, url } of valid) {
+    const linked = target.accesses.find(access => access.bookmarkFolderId === target.bookmarkFolderId && access.bookmarkId === item.id);
+    if (linked) { linked.bookmarkMissing = false; continue; }
+    if (seenUrls.has(url)) { stats.duplicates++; continue; }
+    seenUrls.add(url);
+    target.accesses.push({ id: uid('access'), title: (item.title?.trim() || new URL(url).hostname).slice(0, 300), url,
+      tags: [], thumbnail: '', matchType: 'document', bookmarkId: item.id, bookmarkFolderId: target.bookmarkFolderId, bookmarkMissing: false });
+    stats.added++;
   }
   return { data: normalizeData(candidate), stats };
 }

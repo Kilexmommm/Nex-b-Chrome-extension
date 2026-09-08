@@ -1,4 +1,4 @@
-# NEX.B · 1.4.4
+# NEX.B · 1.5.0
 
 ![Icono de NEX.B](icons/nex-b-128.png)
 
@@ -26,6 +26,13 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.5.0
+
+- Una sección puede vincularse a una carpeta de Favoritos de Chrome al importarla.
+- `↻` sincroniza manualmente esa sección; **Sincronizar Workspace** ejecuta todas las secciones vinculadas del espacio actual.
+- La sincronización agrega solo URLs nuevas y conserva nombre, tags, imagen y edición de los accesos existentes.
+- Si un favorito se quitó de Chrome, NEX.B no lo borra: aparece con un aviso solo al editar ese acceso. Si vuelve a Favoritos, el aviso desaparece al sincronizar.
 
 ### Ajustes 1.4.4
 
@@ -171,7 +178,7 @@ No declara permisos generales para todos los sitios ni inyecta scripts en las p�
 
 Con Node.js 20 o posterior ejecuta `npm test` en esta carpeta. Son pruebas de lógica, APIs simuladas y estructura; no equivalen a una prueba visual de Chrome.
 
-**Versión 1.4.4: 56 pruebas automáticas aprobadas.**
+**Versión 1.5.0: pruebas automáticas de lógica, respaldo, sincronización y estructura aprobadas.**
 
 Antes de usar esta versión como definitiva, completa la lista de pruebas manuales del informe. En el entorno de auditoría no fue posible arrancar el navegador de pruebas; no se modificó ni reinstaló la extensión del perfil personal.
 

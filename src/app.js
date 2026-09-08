@@ -4,7 +4,7 @@ import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
 import { resizeImage } from './images.js';
 import { collectTags, suggestTags, insertTag } from './tags.js';
-import { planBookmarkImport, readBookmarkFolder, placeAccess } from './bookmarks.js';
+import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 
@@ -261,6 +261,7 @@ function renderCategory(category, subcategory) {
   actions.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'button quiet category-icon'),
     button('✎', 'Editar categoría', () => renameCategory(category), 'button quiet category-icon'),
     button('⇥', 'Mover sección a otro Workspace', () => openMoveSectionDialog(category), 'button quiet category-icon'));
+  if (category.bookmarkFolderId) actions.append(button('↻', 'Sincronizar sección con Favoritos de Chrome', () => syncCategoryBookmarks(category), 'button quiet category-icon'));
   const siblings = sectionSiblings(data, category);
   const position = siblings.findIndex(c => c.id === category.id);
   for (const [label, title, direction] of [['↑', 'Subir sección', -1], ['↓', 'Bajar sección', 1]]) {
@@ -350,6 +351,9 @@ function openAccessDialog(categoryId = '', access = null) {
   $('accessThumbnailUrl').value = access?.thumbnail?.startsWith('https:') ? access.thumbnail : '';
   $('accessTags').value = (access?.tags || []).join(', ');
   $('matchType').value = access?.matchType || 'document';
+  const bookmarkState = $('bookmarkState');
+  bookmarkState.hidden = !access?.bookmarkMissing;
+  if (access?.bookmarkMissing) bookmarkState.textContent = '⚠ Ya no está en Favoritos de Chrome. Se conserva en NEX.B.';
   $('accessWorkspace').replaceChildren(...data.workspaces.map(w => new Option(w.name, w.id, false, w.id === workspaceId)));
   fillAccessCategories(workspaceId, categoryId);
   $('accessTags').setSelectionRange($('accessTags').value.length, $('accessTags').value.length);
@@ -498,6 +502,8 @@ onSubmit('accessForm', async () => {
   const access = { id: existingId || uid('access'), title: $('accessTitle').value.trim(), url: $('accessUrl').value.trim(),
     tags: $('accessTags').value.split(',').map(s => s.trim()).filter(Boolean), matchType: $('matchType').value,
     thumbnail: $('accessThumbnailUrl').value.trim() || pastedImage };
+  const originalAccess = existingId ? candidate.categories.flatMap(category => category.accesses).find(item => item.id === existingId) : null;
+  if (originalAccess) Object.assign(access, { bookmarkId: originalAccess.bookmarkId, bookmarkFolderId: originalAccess.bookmarkFolderId, bookmarkMissing: originalAccess.bookmarkMissing });
   if (existingId) {
     const original = candidate.categories.find(c => c.id === $('accessDialog').dataset.categoryId);
     if (!original?.accesses.some(a => a.id === existingId)) throw new Error('El acceso ya no existe; cancela y vuelve a abrirlo.');
@@ -546,6 +552,37 @@ onClick('downloadData', () => {
 onClick('importData', () => $('zipImportInput').click());
 
 let bookmarkPath = [], bookmarkChildren = [], bookmarkGeneration = 0, bookmarkBusy = false;
+async function requestBookmarkPermission() {
+  // Permission request is reached directly from an explicit button or section icon.
+  const granted = await chrome.permissions.request({ permissions: ['bookmarks'] });
+  if (!granted) throw new Error('No se concedió acceso a Favoritos. No se modificó NEX.B.');
+}
+function syncSummary(stats) {
+  return stats.added + ' nuevos · ' + stats.duplicates + ' repetidos ignorados · ' + stats.missing + ' ya no están en Favoritos · ' + stats.restored + ' restaurados · ' + stats.unsupported + ' URLs no compatibles.';
+}
+async function syncCategoryBookmarks(category) {
+  await requestBookmarkPermission();
+  const { children } = await readBookmarkFolder(chrome.bookmarks, category.bookmarkFolderId);
+  const result = syncBookmarkSection(data, category.id, children, uid);
+  if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+  showMessage('Sección “' + category.name + '” sincronizada: ' + syncSummary(result.stats));
+}
+async function syncWorkspaceBookmarks() {
+  await requestBookmarkPermission();
+  let candidate = data, linked = 0, unavailable = 0;
+  const total = { added: 0, duplicates: 0, unsupported: 0, missing: 0, restored: 0, folders: 0 };
+  for (const category of data.categories.filter(item => item.workspaceId === currentWorkspace().id && item.bookmarkFolderId)) {
+    try {
+      const { children } = await readBookmarkFolder(chrome.bookmarks, category.bookmarkFolderId);
+      const result = syncBookmarkSection(candidate, category.id, children, uid);
+      candidate = result.data; linked++;
+      for (const key of Object.keys(total)) total[key] += result.stats[key];
+    } catch { unavailable++; }
+  }
+  if (!linked && !unavailable) { showMessage('Este Workspace no tiene secciones vinculadas a Favoritos.'); return; }
+  if (JSON.stringify(candidate) !== JSON.stringify(data)) await commit(candidate);
+  showMessage(linked + ' secciones sincronizadas: ' + syncSummary(total) + (unavailable ? ' ' + unavailable + ' carpetas ya no están disponibles.' : ''));
+}
 function fillBookmarkCategories() {
   const workspaceId = $('bookmarkWorkspace').value;
   $('bookmarkCategory').replaceChildren(new Option('Sección con el nombre de la carpeta', ''),
@@ -587,17 +624,17 @@ async function browseBookmarkFolder(path) {
   } finally { if (generation === bookmarkGeneration) bookmarkBusy = false; }
 }
 onClick('openBookmarks', async () => {
-  // Permission request must happen directly inside this click gesture, before other awaits.
-  const granted = await chrome.permissions.request({ permissions: ['bookmarks'] });
-  if (!granted) { showMessage('No se concedió acceso a favoritos. No se importó nada.'); return; }
+  await requestBookmarkPermission();
   if (!$('settingsDialog').open) return;
   $('bookmarkWorkspace').replaceChildren(...data.workspaces.map(w => new Option(w.name, w.id, false, w.id === currentWorkspace().id)));
   fillBookmarkCategories();
+  $('bookmarkLink').checked = true;
   bookmarkPath = []; bookmarkChildren = [];
   $('bookmarkFolders').replaceChildren(); $('bookmarkPath').textContent = '';
   openDialog('bookmarksDialog');
   await browseBookmarkFolder([{ id: '0', title: 'Favoritos de Chrome' }]);
 });
+onClick('syncWorkspaceBookmarks', syncWorkspaceBookmarks);
 onClick('bookmarkUp', () => { if (bookmarkPath.length > 1) return browseBookmarkFolder(bookmarkPath.slice(0, -1)); });
 $('bookmarkWorkspace').onchange = fillBookmarkCategories;
 $('bookmarkCategory').onchange = updateBookmarkName;
@@ -609,16 +646,18 @@ onSubmit('bookmarksForm', async () => {
   const generation = bookmarkGeneration;
   bookmarkBusy = true; $('bookmarkImportSubmit').disabled = true;
   const destination = { workspaceId: $('bookmarkWorkspace').value, categoryId: $('bookmarkCategory').value,
-    name: $('bookmarkSectionName').value };
+    name: $('bookmarkSectionName').value,
+    folderId: $('bookmarkLink').checked ? bookmarkPath.at(-1).id : '',
+    folderTitle: $('bookmarkLink').checked ? bookmarkPath.at(-1).title : '' };
   try {
     // Re-read just this level at import time; do not follow subfolders.
     const { children } = await readBookmarkFolder(chrome.bookmarks, bookmarkPath.at(-1).id);
     if (generation !== bookmarkGeneration || !$('bookmarksDialog').open) return;
     const result = planBookmarkImport(data, children, destination, uid);
-    if (result.stats.added) await commit(result.data);
+    if (result.stats.added || destination.folderId) await commit(result.data);
     $('bookmarksDialog').close();
     const s = result.stats;
-    showMessage(s.added + ' nuevos importados · ' + s.duplicates + ' repetidos ignorados · ' + s.unsupported + ' URLs no compatibles · ' + s.folders + ' subcarpetas omitidas.');
+    showMessage(s.added + ' nuevos importados · ' + s.duplicates + ' repetidos ignorados · ' + s.unsupported + ' URLs no compatibles · ' + s.folders + ' subcarpetas omitidas.' + (destination.folderId ? ' Sección vinculada para sincronizar.' : ''));
   } finally {
     if (generation === bookmarkGeneration) {
       bookmarkBusy = false; $('bookmarkImportSubmit').disabled = !bookmarkChildren.some(item => item.url);

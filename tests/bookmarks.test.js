@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeData } from '../src/model.js';
-import { planBookmarkImport, readBookmarkFolder, placeAccess } from '../src/bookmarks.js';
+import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from '../src/bookmarks.js';
 let sequence = 0;
 const uid = prefix => prefix + '-' + ++sequence;
 const destination = { workspaceId: 'general', name: 'Clientes' };
@@ -52,6 +52,28 @@ test('destino puede ser sección existente y query distinta no se confunde con d
   const result = planBookmarkImport(normalizeData(), [bookmark('https://example.com/?id=1'), bookmark('https://example.com/?id=2')], { ...destination, categoryId: 'ypf' }, uid);
   assert.equal(result.stats.added, 2); assert.equal(result.data.categories.length, 1);
   assert.equal(result.data.categories[0].accesses.length, 2);
+});
+test('sincroniza una sección vinculada, agrega solo nuevos y muestra bajas sin borrar', () => {
+  const linked = planBookmarkImport(normalizeData(), [
+    { id: 'one', title: 'Uno', url: 'https://one.test/' },
+    { id: 'two', title: 'Dos', url: 'https://two.test/' }
+  ], { ...destination, folderId: 'folder-1', folderTitle: 'Clientes' }, uid).data;
+  const category = linked.categories.find(c => c.name === 'Clientes');
+  const first = category.accesses.find(a => a.bookmarkId === 'one');
+  first.title = 'Nombre personal'; first.tags = ['Importante'];
+  const result = syncBookmarkSection(linked, category.id, [
+    { id: 'one', title: 'Título cambiado', url: 'https://one.test/' },
+    { id: 'three', title: 'Tres', url: 'https://three.test/' }
+  ], uid);
+  assert.deepEqual(result.stats, { added: 1, duplicates: 0, unsupported: 0, missing: 1, restored: 0, folders: 0 });
+  const synced = result.data.categories.find(c => c.id === category.id);
+  assert.equal(synced.accesses.find(a => a.bookmarkId === 'one').title, 'Nombre personal');
+  assert.deepEqual(synced.accesses.find(a => a.bookmarkId === 'one').tags, ['Importante']);
+  assert.equal(synced.accesses.find(a => a.bookmarkId === 'two').bookmarkMissing, true);
+  assert.equal(synced.accesses.find(a => a.bookmarkId === 'three').url, 'https://three.test/');
+  const restored = syncBookmarkSection(result.data, category.id, [{ id: 'two', title: 'Dos', url: 'https://two.test/' }], uid);
+  assert.equal(restored.stats.restored, 1);
+  assert.equal(restored.data.categories.find(c => c.id === category.id).accesses.find(a => a.bookmarkId === 'two').bookmarkMissing, false);
 });
 test('mover entre Workspaces conserva acceso, ID, tags e imagen y quita el original', () => {
   const data = normalizeData();

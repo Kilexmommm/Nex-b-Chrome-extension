@@ -65,6 +65,8 @@ button:disabled { opacity: .55; cursor: wait; }
 .bookmark-path { margin: 16px 0 10px; font-size: 13px; overflow-wrap: anywhere; }
 .bookmark-folders { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin: 12px 0; }
 .bookmark-folder { text-align: left; overflow-wrap: anywhere; }
+.bookmark-state { margin: 2px 0 10px; color: #d7a35f; font-size: 12px; }
+.light-theme .bookmark-state { color: #8a5524; }
 @media (max-width: 600px) {
   .topbar { gap: 8px; flex-wrap: wrap; }
   .topbar > h1 { font-size: 21px; }

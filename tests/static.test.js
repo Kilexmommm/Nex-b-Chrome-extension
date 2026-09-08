@@ -4,6 +4,16 @@ import { readFileSync, existsSync } from 'node:fs';
 import { THEME_PRESETS, normalizeData } from '../src/model.js';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+test('vinculación y sincronización manual de Favoritos no exponen bajas en tarjetas', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.match(app, /syncCategoryBookmarks\(category\)/);
+  assert.match(app, /syncWorkspaceBookmarks/);
+  assert.match(app, /bookmarkState.hidden = !access\?\.bookmarkMissing/);
+  assert.match(html, /id="bookmarkLink"/);
+  assert.match(html, /id="syncWorkspaceBookmarks"/);
+  assert.match(html, /id="bookmarkState"/);
+  assert.doesNotMatch(app, /card-title[^\n]*bookmarkMissing/);
+});
 test('tarjetas sin imagen usan un fondo sólido sin cambiar capturas', () => {
   const css = read('src/overrides.css');
   assert.match(css, /\.card \.thumb:not\(\.has-thumbnail\) \{ background: var\(--empty-tile\); color: var\(--empty-ink\); \}/);
