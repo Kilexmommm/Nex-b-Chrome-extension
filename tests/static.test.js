@@ -4,6 +4,14 @@ import { readFileSync, existsSync } from 'node:fs';
 import { THEME_PRESETS, normalizeData } from '../src/model.js';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+test('alto de miniaturas usa bajo por defecto y tarjetas 20% más angostas', () => {
+  const app = read('src/app.js'), css = read('src/styles.css');
+  assert.match(app, /small: 174, medium: 248, large: 322/);
+  assert.equal(normalizeData().settings.thumbnailSize, 'small');
+  assert.match(css, /--card-min-width:240px/);
+  assert.match(css, /minmax\(var\(--card-min-width\),1fr\)/);
+  assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
+});
 test('vinculación y sincronización manual de Favoritos no exponen bajas en tarjetas', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(app, /syncCategoryBookmarks\(category\)/);
@@ -97,7 +105,9 @@ test('manifest MV3: sin hosts, scripts remotos, recursos públicos ni evaluació
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage']);
+  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'nativeMessaging']);
+  assert.ok(existsSync(new URL('../native-host/install-macos.sh', import.meta.url)));
+  assert.ok(existsSync(new URL('../native-host/nex_b_native_host.py', import.meta.url)));
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
   for (const key of ['host_permissions', 'content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);

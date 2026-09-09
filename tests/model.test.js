@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DATA, normalizeData, matches, imageUrl, webUrl, validateRules } from '../src/model.js';
+import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
 const access = (url, matchType = 'document') => ({ url, matchType });
@@ -27,6 +27,10 @@ test('rechaza URLs ejecutables, credenciales e imágenes no permitidas', () => {
   for (const url of ['javascript:alert(1)', 'file:///tmp/test', 'data:text/html,test', 'https://user:password@example.com']) assert.throws(() => webUrl(url));
   for (const url of ['http://example.com/image.png', 'data:image/svg+xml;base64,AAAA', 'data:image/png;base64,?']) assert.throws(() => imageUrl(url));
   assert.equal(imageUrl('https://example.com/image.png'), 'https://example.com/image.png');
+});
+test('acepta solo rutas file:// locales para accesos del asistente macOS', () => {
+  assert.equal(accessUrl('file:///Users/test/archivo.html'), 'file:///Users/test/archivo.html');
+  for (const url of ['file://server/share', 'file:///Users/test/a.html?x=1', 'file:///Users/test/a.html#x']) assert.throws(() => accessUrl(url));
 });
 test('descarta CSS arbitrario y claves no definidas sin contaminar prototipos', () => {
   const value = fixture(); value.settings.backgroundPattern = 'url(https://tracking.invalid)';

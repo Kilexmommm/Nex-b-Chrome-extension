@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "YPF", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "oscuro", accentColor: "#a9c7ff", backgroundColor: "#10131c", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "large" },
+    settings: { themeId: "oscuro", accentColor: "#a9c7ff", backgroundColor: "#10131c", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small" },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -50,6 +50,20 @@ export function webUrl(value) {
     if (!["https:", "http:"].includes(parsed.protocol) || parsed.username || parsed.password)
         fail("Usa una URL HTTP/HTTPS sin credenciales.");
     return parsed.href;
+}
+export function accessUrl(value) {
+    try {
+        return webUrl(value);
+    }
+    catch {
+        const raw = text(value, "URL", 8192);
+        let parsed;
+        try { parsed = new URL(raw); }
+        catch { fail("URL inválida."); }
+        if (parsed.protocol !== "file:" || (parsed.hostname && parsed.hostname !== "localhost") || parsed.username || parsed.password || parsed.search || parsed.hash || !parsed.pathname.startsWith("/"))
+            fail("Usa una URL HTTP/HTTPS o file:// local sin parámetros.");
+        return parsed.href;
+    }
 }
 export function imageUrl(value = "") {
     if (value === "")
@@ -125,7 +139,7 @@ export function normalizeData(stored = DEFAULT_DATA) {
                 const bookmarkId = text(a.bookmarkId ?? "", "Favorito de Chrome", 120, true);
                 const accessBookmarkFolderId = text(a.bookmarkFolderId ?? "", "Carpeta de favorito", 120, true);
                 return { id: uniqueId(a.id, accessIds), title: text(a.title, "Nombre de acceso", 300),
-                    url: webUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
+                    url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
                     thumbnail: imageUrl(a.thumbnail ?? ""),
                     ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}) };

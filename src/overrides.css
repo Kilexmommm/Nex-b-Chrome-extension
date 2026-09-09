@@ -61,6 +61,16 @@ button:disabled { opacity: .55; cursor: wait; }
 .workspace-tab, .tags-button { white-space: nowrap; flex-shrink: 0; }
 .top-actions { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
 .top-actions button { white-space: nowrap; }
+.top-actions { position: relative; }
+.quick-menu { position: absolute; right: 142px; top: 43px; z-index: 4; display: grid; gap: 2px; min-width: 108px; padding: 5px; border: 1px solid #4a5875; border-radius: 7px; background: #172035; box-shadow: 0 10px 24px #0004; }
+.quick-menu button { border: 0; border-radius: 4px; padding: 7px 9px; background: transparent; color: #e7edff; text-align: left; cursor: pointer; }
+.quick-menu button:hover, .quick-menu button[aria-pressed=true] { background: var(--accent-color); color: var(--accent-ink); }
+.access-order { position: absolute; right: 41px; top: 9px; display: flex; gap: 2px; opacity: .58; }
+.access-order button { border: 0; border-radius: 4px; padding: 4px 6px; background: #10182066; color: #fff; cursor: pointer; backdrop-filter: blur(4px); }
+.card:hover .access-order, .card:focus-within .access-order { opacity: 1; }
+.workspace-tag { background: #664e98d9 !important; color: #f1eaff !important; }
+.light-theme .quick-menu { background: #fffdf8; border-color: #a9b6c8; }
+.light-theme .quick-menu button { color: #26344b; }
 .tag-suggestions { max-height: 150px; overflow-y: auto; }
 .bookmark-path { margin: 16px 0 10px; font-size: 13px; overflow-wrap: anywhere; }
 .bookmark-folders { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin: 12px 0; }

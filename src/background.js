@@ -78,18 +78,26 @@ async function handlePageAction(tab, pageUrl = tab.url, requireRecapture = false
       await addDraft(tab.url, tab.title, tab, false, request);
       await chrome.storage.session.remove(key);
       await chrome.action.setBadgeText({ tabId: tab.id, text: '' });
-      await chrome.action.setTitle({ tabId: tab.id, title: 'NEX.B' });
+      await chrome.action.setTitle({ tabId: tab.id, title: 'nex.b' });
     } else {
-      if (requireRecapture) throw new Error('Primero elige Capturar imagen en la tarjeta de NEX.B y abre el sitio desde allí.');
+      if (requireRecapture) throw new Error('Primero elige Capturar imagen en la tarjeta de nex.b y abre el sitio desde allí.');
       await addDraft(pageUrl, tab.title, tab, false);
     }
   });
+}
+async function openHome() {
+  const url = chrome.runtime.getURL('newtab.html');
+  const [existing] = await chrome.tabs.query({ url: url + '*' });
+  if (existing?.id) {
+    await chrome.tabs.update(existing.id, { active: true });
+    if (Number.isInteger(existing.windowId) && chrome.windows?.update) await chrome.windows.update(existing.windowId, { focused: true });
+  } else await chrome.tabs.create({ url });
 }
 
 function reportFailure(error) {
   chrome.action.setBadgeText({ text: '!' }).catch(() => {});
   chrome.action.setBadgeBackgroundColor({ color: '#a32929' }).catch(() => {});
-  chrome.action.setTitle({ title: 'NEX.B: ' + (error.message || 'No se pudo agregar el acceso.') }).catch(() => {});
+  chrome.action.setTitle({ title: 'nex.b: ' + (error.message || 'No se pudo agregar el acceso.') }).catch(() => {});
 }
 
 // Top-level listeners are registered synchronously; no timers keep the worker alive.
@@ -102,7 +110,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 chrome.action.onClicked.addListener(tab => {
   chrome.action.setBadgeText({ text: '' }).catch(() => {});
-  handlePageAction(tab).catch(reportFailure);
+  openHome().catch(reportFailure);
 });
 chrome.tabs.onRemoved.addListener(tabId => {
   chrome.storage.session.remove(recaptureKey(tabId)).catch(reportFailure);

@@ -4,7 +4,8 @@
   background:#10131c;
   color-scheme:dark;
   --accent-color:#a9c7ff;
-  --thumbnail-height:320px
+  --thumbnail-height:174px;
+  --card-min-width:240px
 }
 * {
   box-sizing:border-box
@@ -152,7 +153,7 @@ h2 {
 }
 .cards {
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(var(--card-min-width),1fr));
   gap:16px
 }
 .card {

@@ -115,7 +115,8 @@ function applySettings() {
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   document.documentElement.style.setProperty('--accent-ink', luminance > 0.179 ? '#000000' : '#ffffff');
-  document.documentElement.style.setProperty('--thumbnail-height', ({ small: 180, medium: 248, large: 320 }[s.thumbnailSize]) + 'px');
+  // Mediano es la referencia: Pequeño −30% y Grande +30% de altura.
+  document.documentElement.style.setProperty('--thumbnail-height', ({ small: 174, medium: 248, large: 322 }[s.thumbnailSize]) + 'px');
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
   document.body.style.backgroundColor = s.backgroundColor;
   document.body.style.backgroundImage = s.backgroundImageUrl
@@ -184,6 +185,11 @@ function scheduleTabRefresh() {
   tabRefreshTimer = setTimeout(() => run(refreshTabs), 150);
 }
 async function openAccess(access) {
+  if (access.url.startsWith('file:')) {
+    const result = await chrome.runtime.sendNativeMessage('com.kilex.nex_b', { action: 'open', url: access.url });
+    if (!result?.ok) throw new Error(result?.error || 'No se pudo abrir el archivo local. Instala el asistente de nex.b para macOS.');
+    return;
+  }
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
 }
@@ -201,6 +207,10 @@ function render() {
     b.setAttribute('aria-pressed', String(workspace.id === currentWorkspace().id && viewMode === 'workspace'));
     $('workspaceTabs').append(b);
   }
+  const workspaceIndex = data.workspaces.findIndex(workspace => workspace.id === currentWorkspace().id);
+  $('moveWorkspaceLeft').disabled = workspaceIndex < 1;
+  $('moveWorkspaceRight').disabled = workspaceIndex < 0 || workspaceIndex === data.workspaces.length - 1;
+  document.querySelectorAll('[data-thumbnail-size]').forEach(control => control.setAttribute('aria-pressed', String(control.dataset.thumbnailSize === data.settings.thumbnailSize)));
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
   $('workspace').replaceChildren();
@@ -290,6 +300,11 @@ function makeCard(access, categoryId) {
     thumb.append(img);
   } else thumb.append(node('span', 'image-error', 'Sin miniatura'));
   const overlay = node('div', 'card-overlay');
+  if (viewMode === 'tags') {
+    const category = data.categories.find(item => item.id === categoryId);
+    const workspace = data.workspaces.find(item => item.id === category?.workspaceId);
+    if (workspace) overlay.append(node('span', 'tag workspace-tag', workspace.name));
+  }
   const tags = node('div', 'tags');
   const automatic = new Set(automaticTags(access.url));
   allTags(access).forEach(tag => tags.append(node('span', 'tag' + (automatic.has(tag) ? ' auto' : ''), tag)));
@@ -303,7 +318,15 @@ function makeCard(access, categoryId) {
   open.append(thumb, footer);
   cardStatuses.push({ access, status });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  card.append(open, edit, recapture);
+  const category = data.categories.find(item => item.id === categoryId);
+  const position = category?.accesses.findIndex(item => item.id === access.id) ?? -1;
+  const order = node('div', 'access-order');
+  for (const [symbol, label, direction] of [['←', 'Mover miniatura a la izquierda', -1], ['→', 'Mover miniatura a la derecha', 1]]) {
+    const control = button(symbol, label, () => moveAccess(categoryId, access.id, direction), '');
+    control.disabled = position + direction < 0 || position + direction >= (category?.accesses.length || 0);
+    order.append(control);
+  }
+  card.append(open, edit, order, recapture);
   card.oncontextmenu = event => { event.preventDefault(); showCardMenu(event, access, categoryId); };
   card.onkeydown = event => {
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
@@ -314,6 +337,14 @@ function makeCard(access, categoryId) {
     }
   };
   return card;
+}
+async function moveAccess(categoryId, accessId, direction) {
+  const candidate = structuredClone(data);
+  const category = candidate.categories.find(item => item.id === categoryId);
+  const index = category?.accesses.findIndex(item => item.id === accessId) ?? -1;
+  if (index < 0 || !category.accesses[index + direction]) return;
+  [category.accesses[index], category.accesses[index + direction]] = [category.accesses[index + direction], category.accesses[index]];
+  await commit(candidate);
 }
 function fillTagSuggestions() {
   const input = $('accessTags');
@@ -439,9 +470,42 @@ document.querySelectorAll('dialog').forEach(dialog => {
 document.querySelectorAll('[data-cancel]').forEach(b => {
   b.onclick = () => { if (!saving) b.closest('dialog').close(); };
 });
-document.addEventListener('click', hideCardMenu);
+document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });
+onClick('editWorkspace', () => {
+  const workspace = currentWorkspace();
+  $('editWorkspaceDialog').dataset.workspaceId = workspace.id;
+  $('editWorkspaceName').value = workspace.name;
+  $('editWorkspaceKind').value = workspace.type;
+  openDialog('editWorkspaceDialog');
+});
+async function reorderWorkspace(direction) {
+  const current = currentWorkspace();
+  const index = data.workspaces.findIndex(workspace => workspace.id === current.id);
+  if (!data.workspaces[index + direction]) return;
+  const candidate = structuredClone(data);
+  [candidate.workspaces[index], candidate.workspaces[index + direction]] = [candidate.workspaces[index + direction], candidate.workspaces[index]];
+  await commit(candidate);
+}
+onClick('moveWorkspaceLeft', () => reorderWorkspace(-1));
+onClick('moveWorkspaceRight', () => reorderWorkspace(1));
+onSubmit('editWorkspaceForm', async () => {
+  const candidate = structuredClone(data);
+  const workspace = candidate.workspaces.find(item => item.id === $('editWorkspaceDialog').dataset.workspaceId);
+  if (!workspace) throw new Error('El Workspace ya no existe.');
+  workspace.name = $('editWorkspaceName').value.trim();
+  workspace.type = $('editWorkspaceKind').value;
+  await commit(candidate); $('editWorkspaceDialog').close();
+});
+onClick('thumbnailSizeToggle', () => { $('thumbnailSizeMenu').hidden = !$('thumbnailSizeMenu').hidden; });
+document.querySelectorAll('[data-thumbnail-size]').forEach(control => {
+  control.onclick = () => run(async () => {
+    const candidate = structuredClone(data);
+    candidate.settings.thumbnailSize = control.dataset.thumbnailSize;
+    await commit(candidate); $('thumbnailSizeMenu').hidden = true;
+  });
+});
 onClick('newCategory', () => {
   $('categoryForm').reset();
   $('categoryParent').replaceChildren(new Option('Categoría principal', ''),

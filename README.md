@@ -1,6 +1,6 @@
-# NEX.B · 1.5.0
+# nex.b · 1.6.1
 
-![Icono de NEX.B](icons/nex-b-128.png)
+![Icono de nex.b](icons/nex-b-128.png)
 
 **Tu nueva pestaña, organizada por proyectos.** Un panel visual para encontrar tus recursos de trabajo, agruparlos por Workspace y volver a las pestañas que ya tienes abiertas.
 
@@ -26,6 +26,21 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.6.1
+
+- El selector rápido ahora representa el **alto**: Bajo es 30% menor, Mediano es la referencia y Alto es 30% mayor.
+- Las tarjetas son 20% más angostas para aprovechar mejor el espacio horizontal.
+- Las instalaciones nuevas comienzan en Bajo; tu preferencia guardada no se modifica.
+
+### Ajustes 1.6.0
+
+- La marca visible ahora es **nex.b**, en minúsculas.
+- Clic en el icono naranja abre o enfoca el inicio de nex.b; **Agregar sitio a nex.b** sigue disponible con clic derecho.
+- La vista Tags muestra a qué Workspace pertenece cada tarjeta.
+- Edita y ordena Workspaces con `✎`, `←` y `→`; las miniaturas también se ordenan con sus flechas laterales.
+- `▣` permite cambiar las miniaturas entre Pequeño, Mediano y Grande desde el Workspace.
+- Se incluye el asistente local opcional para macOS, que abre rutas `file://` mediante Native Messaging. Consulta [instalación macOS](native-host/INSTALAR-MACOS.md).
 
 ### Ajustes 1.5.0
 
@@ -158,6 +173,7 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | `contextMenus` | Agregar sitios y actualizar capturas desde los menús de Chrome. |
 | `activeTab` | Capturar la pestaña tras una acción del usuario. |
 | `unlimitedStorage` | Almacenar miniaturas sin la cuota estándar de la extensión. |
+| `nativeMessaging` | Comunicación opcional con el asistente macOS incluido para abrir rutas `file://` locales tras un clic. |
 | `bookmarks` — opcional | Leer favoritos al solicitar una importación; el código no modifica los favoritos. |
 
 No declara permisos generales para todos los sitios ni inyecta scripts en las páginas. No publiques respaldos personales, credenciales ni capturas privadas en este repositorio.
@@ -178,7 +194,7 @@ No declara permisos generales para todos los sitios ni inyecta scripts en las p�
 
 Con Node.js 20 o posterior ejecuta `npm test` en esta carpeta. Son pruebas de lógica, APIs simuladas y estructura; no equivalen a una prueba visual de Chrome.
 
-**Versión 1.5.0: pruebas automáticas de lógica, respaldo, sincronización y estructura aprobadas.**
+**Versión 1.6.0: pruebas automáticas de lógica, respaldo, sincronización, permisos y estructura aprobadas.**
 
 Antes de usar esta versión como definitiva, completa la lista de pruebas manuales del informe. En el entorno de auditoría no fue posible arrancar el navegador de pruebas; no se modificó ni reinstaló la extensión del perfil personal.
 

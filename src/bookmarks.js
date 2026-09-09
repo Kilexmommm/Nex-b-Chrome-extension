@@ -19,7 +19,7 @@ export function planBookmarkImport(data, children, { workspaceId, categoryId = '
     if (!sectionName) throw new Error('Escribe el nombre de la sección.');
     target = categories.find(c => !c.parentId && c.name.toLocaleLowerCase() === sectionName.toLocaleLowerCase());
   }
-  const seen = new Set(categories.flatMap(c => c.accesses.map(a => webUrl(a.url))));
+  const seen = new Set(categories.flatMap(c => c.accesses.map(a => a.url)));
   const stats = { added: 0, duplicates: 0, unsupported: 0, folders: 0 };
   const additions = [];
   for (const item of children) {
@@ -52,7 +52,7 @@ export function syncBookmarkSection(data, categoryId, children, uid) {
   const target = candidate.categories.find(category => category.id === categoryId);
   if (!target?.bookmarkFolderId) throw new Error('Esta sección no está vinculada a una carpeta de Favoritos.');
   const seenUrls = new Set(candidate.categories.filter(c => c.workspaceId === target.workspaceId)
-    .flatMap(c => c.accesses.map(access => webUrl(access.url))));
+    .flatMap(c => c.accesses.map(access => access.url)));
   const valid = [], folderBookmarkIds = new Set();
   const stats = { added: 0, duplicates: 0, unsupported: 0, missing: 0, restored: 0, folders: 0 };
   for (const item of children) {

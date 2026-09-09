@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NEX.B</title>
+    <title>nex.b</title>
     <meta name="referrer" content="no-referrer" />
     <link rel="stylesheet" href="src/styles.css" />
     <link rel="stylesheet" href="src/overrides.css" />
@@ -11,8 +11,8 @@
   <body>
     <main class="shell">
       <header class="topbar">
-        <h1>NEX.B</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
-        <div class="top-actions"><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
+        <h1>nex.b</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
+        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="moveWorkspaceLeft" class="button secondary icon-button" title="Mover Workspace a la izquierda" aria-label="Mover Workspace a la izquierda">←</button><button id="moveWorkspaceRight" class="button secondary icon-button" title="Mover Workspace a la derecha" aria-label="Mover Workspace a la derecha">→</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
       </header>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
@@ -34,16 +34,16 @@
     <dialog id="recaptureDialog"><form method="dialog" id="recaptureForm" class="dialog-form">
       <h2>Volver a capturar imagen</h2>
       <p id="recaptureSummary" class="help"></p>
-      <p class="help">1. Abre el sitio con el botón de abajo.<br />2. Cuando esté listo, haz clic derecho en la página → NEX.B → Actualizar captura del acceso. También está en el clic derecho del icono de NEX.B.<br />3. Revisa la miniatura y pulsa Guardar acceso.</p>
-      <small>Si no ves el icono naranja, abre el botón Extensiones (pieza de puzle) de Chrome y fija NEX.B con la chincheta. También puedes pulsar NEX.B desde ese listado. No es el botón Recargar página de Chrome.</small>
-      <small>La imagen se guardará en el mismo acceso, sin duplicarlo. Revisa que no incluya información privada. Si la página te lleva a iniciar sesión, vuelve al recurso antes de pulsar NEX.B.</small>
+      <p class="help">1. Abre el sitio con el botón de abajo.<br />2. Cuando esté listo, haz clic derecho en la página → nex.b → Actualizar captura del acceso. También está en el clic derecho del icono de nex.b.<br />3. Revisa la miniatura y pulsa Guardar acceso.</p>
+      <small>Si no ves el icono naranja, abre el botón Extensiones (pieza de puzle) de Chrome y fija nex.b con la chincheta. También puedes pulsar nex.b desde ese listado. No es el botón Recargar página de Chrome.</small>
+      <small>La imagen se guardará en el mismo acceso, sin duplicarlo. Revisa que no incluya información privada. Si la página te lleva a iniciar sesión, vuelve al recurso antes de pulsar nex.b.</small>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="recaptureStart" class="button">Abrir sitio para capturar</button></div>
     </form></dialog>
     <dialog id="accessDialog"><form method="dialog" id="accessForm" class="dialog-form">
       <h2 id="accessDialogTitle">Nuevo acceso</h2><input id="accessId" type="hidden" />
       <label>Nombre<input id="accessTitle" required maxlength="60" placeholder="Demanda Figma" /></label>
       <p id="bookmarkState" class="bookmark-state" role="status" hidden></p>
-      <label>URL<input id="accessUrl" required type="url" placeholder="https://..." /></label>
+      <label>URL<input id="accessUrl" required type="url" placeholder="https://... o file:///Users/..." /><small>Para archivos o carpetas locales usa file:// y el asistente macOS de nex.b.</small></label>
       <label>URL de miniatura<input id="accessThumbnailUrl" type="url" placeholder="https://.../imagen.png" /><small>Opcional. Puedes pegar una captura debajo o usar una imagen por URL.</small></label>
       <label>Workspace de destino<select id="accessWorkspace" required></select></label>
       <label>Categoría<select id="accessCategory" required></select></label>
@@ -63,6 +63,11 @@
       <small class="field-help">Usa Principal para tus espacios más importantes. Puedes crear todos los workspaces que necesites.</small>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Crear Workspace</button></div>
     </form></dialog>
+    <dialog id="editWorkspaceDialog"><form method="dialog" id="editWorkspaceForm" class="dialog-form">
+      <h2>Editar Workspace</h2><label>Nombre<input id="editWorkspaceName" required maxlength="40" /></label>
+      <label>Tipo<select id="editWorkspaceKind"><option value="principal">Principal</option><option value="standard">Estándar</option></select></label>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar Workspace</button></div>
+    </form></dialog>
     <dialog id="bookmarksDialog"><form id="bookmarksForm" class="dialog-form" method="dialog">
       <h2>Importar favoritos de Chrome</h2>
       <p class="help">Entra a una carpeta. Solo se importan sus enlaces directos, nunca sus subcarpetas. No se modifican tus favoritos de Chrome.</p>
@@ -79,15 +84,15 @@
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="bookmarkImportSubmit" class="button" disabled>Importar nuevos</button></div>
     </form></dialog>
     <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
-      <h2>Configurar NEX.B</h2>
+      <h2>Configurar nex.b</h2>
       <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
       <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar Workspace</button>
-      <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. NEX.B solo los lee.</small>
+      <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. nex.b solo los lee.</small>
       <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
       <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>
       <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
       <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
-      <label>Tamaño de miniaturas<select id="thumbnailSize"><option value="small">Pequeño</option><option value="medium">Mediano</option><option value="large">Grande</option></select></label>
+      <label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option></select></label>
       <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
       <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
       <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
