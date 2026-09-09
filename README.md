@@ -1,4 +1,4 @@
-# nex.b · 1.7.1
+# nex.b · 1.7.2
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -26,6 +26,11 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.7.2
+
+- Los avisos de archivos locales incluyen una URL completa y clicable a la guía del asistente macOS.
+- Configuración incorpora el botón **Instalar asistente macOS**, que abre directamente la guía de descarga e instalación.
 
 ### Ajustes 1.7.1
 

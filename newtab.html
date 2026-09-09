@@ -43,7 +43,7 @@
       <h2 id="accessDialogTitle">Nuevo acceso</h2><input id="accessId" type="hidden" />
       <label>Nombre<input id="accessTitle" required maxlength="60" placeholder="Demanda Figma" /></label>
       <p id="bookmarkState" class="bookmark-state" role="status" hidden></p>
-      <label>URL<input id="accessUrl" required type="url" placeholder="https://... o file:///Users/..." /><small>Para archivos o carpetas locales usa file:// y el asistente macOS de nex.b.</small></label>
+      <label>URL<input id="accessUrl" required type="url" placeholder="https://... o file:///Users/..." /><small>Para archivos o carpetas locales usa file://. Descarga e instala el asistente: github.com/Kilexmommm/Nex-b-Chrome-extension → native-host → INSTALAR-MACOS.md.</small></label>
       <label>URL de miniatura<input id="accessThumbnailUrl" type="url" placeholder="https://.../imagen.png" /><small>Opcional. Puedes pegar una captura debajo o usar una imagen por URL.</small></label>
       <label>Workspace de destino<select id="accessWorkspace" required></select></label>
       <label>Categoría<select id="accessCategory" required></select></label>
@@ -87,6 +87,7 @@
       <h2>Configurar nex.b</h2>
       <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
       <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar Workspace</button>
+      <a class="button secondary native-host-link" href="https://github.com/Kilexmommm/Nex-b-Chrome-extension/blob/main/native-host/INSTALAR-MACOS.md" target="_blank" rel="noopener noreferrer">Instalar asistente macOS</a>
       <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. nex.b solo los lee.</small>
       <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
       <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>

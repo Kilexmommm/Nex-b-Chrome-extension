@@ -20,6 +20,8 @@ test('la apertura local usa el worker para Native Messaging', () => {
   assert.doesNotMatch(app, /sendNativeMessage/);
   assert.match(worker, /runtime\.onMessage\?\.addListener/);
   assert.match(worker, /runtime\.sendNativeMessage\('com\.kilex\.nex_b'/);
+  assert.match(worker, /https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/blob\/main\/native-host\/INSTALAR-MACOS\.md/);
+  assert.match(read('newtab.html'), /class="button secondary native-host-link"/);
 });
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
