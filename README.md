@@ -1,4 +1,4 @@
-# nex.b · 1.7.2
+# nex.b · 1.7.3
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -13,21 +13,76 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 - **Accesos reconocibles:** pega una captura como miniatura; el nombre y el estado quedan debajo, sin tapar la imagen.
 - **Tags que conectan tu biblioteca:** etiquetas propias, sugerencias mientras escribes y reglas automáticas por dominio; consulta tags de todos tus Workspaces.
 - **Importación sin duplicados:** incorpora los enlaces directos de una carpeta de favoritos e ignora los que ya existen en el Workspace de destino.
-- **Tu espacio, a tu gusto:** nueve estilos, fondos, colores y tamaños de miniatura, sin necesitar una cuenta de NEX.B.
+- **Tu espacio, a tu gusto:** diez estilos, fondos, colores y tamaños de miniatura, sin necesitar una cuenta de NEX.B.
 - **Datos bajo tu control:** guardado local, respaldo ZIP e importación de configuración e imágenes incorporadas.
 
 ## Instalar desde GitHub
 
-1. Pulsa **Code → Download ZIP** en este repositorio y descomprime el archivo en una carpeta permanente.
-2. Abre `chrome://extensions` y activa **Modo de desarrollador**.
-3. Pulsa **Cargar descomprimida** y selecciona la carpeta que contiene `manifest.json`.
-4. Abre una nueva pestaña y fija el icono naranja de NEX.B desde el menú de extensiones de Chrome (puzle).
+**Solo necesitas Google Chrome 123 o posterior y la carpeta de la extensión.** Desde nex.b 1.7.3 no hace falta instalar Python, ejecutar comandos en Terminal, copiar un ID ni instalar el asistente macOS.
 
-No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
+1. Abre [el repositorio de nex.b](https://github.com/Kilexmommm/Nex-b-Chrome-extension) y pulsa **Code → Download ZIP**.
+2. Descomprime el ZIP y guarda la carpeta en una ubicación permanente. Conserva dentro todos sus archivos y subcarpetas.
+3. Escribe `chrome://extensions` en la barra de direcciones de Chrome y activa **Modo de desarrollador**.
+4. Pulsa **Cargar descomprimida** y selecciona la carpeta que contiene `manifest.json`. Selecciona la carpeta principal, no `native-host` ni el ZIP.
+5. Abre una pestaña nueva de Chrome para entrar a nex.b. También puedes fijar su icono desde el menú de extensiones (puzle) y pulsarlo.
+
+La extensión ya funciona con enlaces web. **El siguiente paso es opcional y solo hace falta si quieres abrir archivos o carpetas de tu equipo.**
+
+Mantén la carpeta de la extensión en esa ubicación mientras la uses. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP del repositorio contiene el programa, no tu configuración personal. Para usar el panel, abre una pestaña nueva o pulsa el icono: abrir `newtab.html` como un archivo local no carga las funciones de la extensión.
+
+## Opcional: abrir archivos y carpetas locales
+
+No hay que instalar nada adicional. Activa una opción de Chrome para nex.b:
+
+1. En nex.b, abre **⚙ Configurar nex.b → Configurar archivos locales**. También puedes ir a `chrome://extensions` y pulsar **Detalles** en nex.b.
+2. Activa **Permitir acceso a URLs de archivo**. En Chrome en inglés se llama **Allow access to file URLs**. El usuario debe activar esta opción manualmente.
+3. Abre una pestaña nueva de nex.b, crea o edita un acceso y pega la dirección local en el campo **URL**.
+4. Guarda el acceso y púlsalo para abrirlo.
+
+Ejemplos para macOS; reemplaza `tu-usuario` y el resto de la ruta por una ubicación que exista en tu equipo:
+
+| Quieres abrir | Ejemplo de URL | Qué verás |
+| --- | --- | --- |
+| Una página HTML | `file:///Users/tu-usuario/Documents/pagina.html` | La página en una pestaña del navegador. |
+| Una carpeta | `file:///Users/tu-usuario/Documents/mi-carpeta/` | El listado de sus archivos y subcarpetas en el navegador. |
+| Otro archivo | `file:///Users/tu-usuario/Documents/documento.pdf` | El archivo si Chrome puede mostrarlo; otros formatos pueden descargarse. |
+
+Usa `file:///` con tres barras antes de `Users` y añade `/` al final de las carpetas. No uses `finder://`. Si tienes la ruta `/Users/tu-usuario/Documents/pagina.html`, antepón `file://` para obtener la URL del ejemplo. También puedes copiar de la barra de direcciones la URL de un archivo local que ya tengas abierto en Chrome.
+
+Si esa misma ruta ya está abierta, nex.b enfoca su pestaña. Cada archivo local se identifica por su ruta completa, incluso si elegiste detección por dominio. Chrome aplica sus permisos y las restricciones normales de las páginas locales; esta función no convierte un HTML que requiere un servidor en una aplicación web alojada.
+
+Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opción. Los accesos y los respaldos guardan las rutas, **no copian los archivos locales**: adapta las URLs a la ubicación de los archivos en ese equipo.
+
+### Si algo no abre
+
+- **Chrome pide acceso a archivos:** activa la opción anterior y abre una pestaña nueva de nex.b.
+- **Aparece un error del asistente macOS:** estás usando código anterior. Actualiza y recarga la misma instalación; comprueba que Chrome muestra nex.b **1.7.3 o posterior** y cierra los paneles antiguos. No vuelvas a instalar el asistente.
+- **Archivo no encontrado o acceso denegado:** comprueba que la ruta existe y que Chrome tiene permiso para abrirla en macOS. Prueba la URL directamente en la barra de direcciones de Chrome.
+- **Moviste un archivo o una carpeta:** edita su acceso en nex.b para guardar la nueva ruta.
+
+La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
 
+### Ajustes de interfaz pendientes de versión
+
+- **Gris Nex** es el estilo predeterminado: una paleta gris neutra con azul sutil para selección, foco y acciones principales.
+- Todos los diálogos comparten la misma interfaz: contexto y ayuda a la izquierda, controles a la derecha y una sola columna en pantallas pequeñas. Los estilos prediseñados se muestran en una cuadrícula de cuatro columnas.
+- Los Workspaces se reordenan arrastrando sus etiquetas; se retiraron las flechas de orden.
+- Las miniaturas conservan el arrastre, usan cursor normal al pasar y cursor de arrastre solo al mantener el clic. La URL queda disponible como tooltip.
+- **Capturar imagen** es un enlace discreto alineado a la derecha, no un botón de tarjeta.
+- Las instalaciones nuevas reconocen `github.io` como **GitHub**. Los accesos `file:` muestran la etiqueta ámbar **⌂ Archivo local** para distinguirlos de enlaces web.
+
+### Ajustes 1.7.3
+
+- Los accesos `file:///` se abren directamente en el navegador, sin Native Messaging ni instalación adicional.
+- Configuración muestra **Configurar archivos locales** y explica el permiso necesario.
+- Los archivos locales reutilizan su pestaña y muestran correctamente el indicador de abierto.
+
+
 ### Ajustes 1.7.2
+
+> Historial de una versión anterior: desde 1.7.3 el asistente macOS dejó de ser necesario. Sigue las instrucciones de instalación del inicio de esta página.
 
 - Los avisos de archivos locales incluyen una URL completa y clicable a la guía del asistente macOS.
 - Configuración incorpora el botón **Instalar asistente macOS**, que abre directamente la guía de descarga e instalación.
@@ -101,9 +156,10 @@ Extensión local Chrome Manifest V3 para Workspaces, categorías, accesos visual
 ## Actualizar sin perder datos
 
 1. Descarga un ZIP de tu configuración desde ⚙ antes de actualizar. No es el ZIP del código.
-2. Conserva esta misma carpeta y la misma instalación. En chrome://extensions pulsa **Recargar**, no **Eliminar**.
-3. Cierra los paneles antiguos de NEX.B y abre una nueva pestaña. Los paneles de la versión anterior no tienen la protección nueva contra sobrescrituras.
-4. Verifica tus Workspaces. Si aparece una advertencia de datos incompatibles, no desinstales ni borres el almacenamiento; conserva una copia para repararlo.
+2. Descarga la nueva versión del código y reemplaza los archivos del programa dentro de la misma carpeta que Chrome ya tiene cargada. Conserva la carpeta y la instalación de la extensión.
+3. En `chrome://extensions`, pulsa **Recargar**, no **Eliminar**. Comprueba que aparece la nueva versión.
+4. Cierra los paneles antiguos de nex.b y abre una pestaña nueva. Si usas archivos locales, verifica en **Detalles** que esté activado **Permitir acceso a URLs de archivo**.
+5. Verifica tus Workspaces. Si aparece una advertencia de datos incompatibles, no desinstales ni borres el almacenamiento; conserva una copia para repararlo.
 
 Para instalar por primera vez: chrome://extensions → Modo de desarrollador → Cargar descomprimida → esta carpeta.
 
@@ -198,7 +254,6 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | `contextMenus` | Agregar sitios y actualizar capturas desde los menús de Chrome. |
 | `activeTab` | Capturar la pestaña tras una acción del usuario. |
 | `unlimitedStorage` | Almacenar miniaturas sin la cuota estándar de la extensión. |
-| `nativeMessaging` | Comunicación opcional con el asistente macOS incluido para abrir rutas `file://` locales tras un clic. |
 | `bookmarks` — opcional | Leer favoritos al solicitar una importación; el código no modifica los favoritos. |
 
 No declara permisos generales para todos los sitios ni inyecta scripts en las páginas. No publiques respaldos personales, credenciales ni capturas privadas en este repositorio.

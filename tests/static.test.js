@@ -4,24 +4,56 @@ import { readFileSync, existsSync } from 'node:fs';
 import { THEME_PRESETS, normalizeData } from '../src/model.js';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
-test('configuración ofrece editor visual seguro antes de estilos prediseñados', () => {
+test('configuración separa los ajustes generales del diseño visual', () => {
   const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css'), baseCss = read('src/styles.css');
   const form = html.split('id="settingsForm"')[1].split('</form>')[0];
-  assert.ok(form.indexOf('class="appearance-editor"') < form.indexOf('id="stylePresets"'));
+  assert.match(form, /id="settingsGeneralTab"/);
+  assert.match(form, /id="settingsDesignTab"/);
+  assert.match(form, /id="settingsGeneralPanel"/);
+  assert.match(form, /id="settingsDesignPanel"/);
+  assert.ok(form.indexOf('id="settingsGeneralPanel"') < form.indexOf('id="settingsDesignPanel"'));
   for (const id of ['fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) assert.match(form, new RegExp('id="' + id + '"'));
+  assert.match(app, /function selectSettingsTab\(tab\)/);
   assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
   assert.match(app, /dataset\.iconStyle = s\.iconStyle/);
   assert.match(css, /--card-border-width/);
   assert.match(baseCss, /--card-gap/);
 });
-test('la apertura local usa el worker para Native Messaging', () => {
+test('las miniaturas nuevas no tienen borde por defecto', () => {
+  assert.equal(normalizeData().settings.cardBorder, 'none');
+});
+test('Gris Nex es el estilo predeterminado con un azul de prioridad sutil', () => {
+  const defaults = normalizeData().settings;
+  assert.equal(defaults.themeId, 'gris-nex');
+  assert.equal(THEME_PRESETS['gris-nex'].name, 'Gris Nex');
+  assert.equal(defaults.accentColor, '#4d8dff');
+  assert.match(read('src/overrides.css'), /\.dialog-form \{[^}]*background: #212121/);
+});
+test('editar y capturar usan la misma regla Gris Nex de los ajustes', () => {
+  const css = read('src/overrides.css');
+  assert.match(css, /\.dialog-form \{[^}]*border-color: #454545/);
+  assert.match(css, /\.dialog-form input, \.dialog-form select, \.dialog-form textarea \{[^}]*background: #2a2a2a/);
+  assert.match(css, /\.dialog-form \.button:not\(\.secondary\) \{[^}]*background: #4d8dff/);
+  assert.match(css, /\.dialog-form \.paste-box \{[^}]*background: #262626/);
+});
+test('los formularios ordenan contexto y controles en dos columnas, con estilos en cuatro columnas', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /function arrangeDialogFields\(\)/);
+  assert.match(app, /field-copy/);
+  assert.match(css, /\.dialog-form \.field-row \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(220px, 290px\)/);
+  assert.match(css, /\.style-presets \{[^}]*repeat\(4, minmax\(0, 1fr\)\)/);
+});
+test('las acciones de los diálogos usan peso normal y capturar se alinea a la derecha', () => {
+  const css = read('src/overrides.css');
+  assert.match(css, /\.dialog-form \.button \{ font-weight: 500; \}/);
+  assert.match(css, /\.dialog-form #recaptureStart \{ margin-left: auto; text-align: right; \}/);
+});
+test('la apertura local usa pestañas y ofrece la configuración de archivos', () => {
   const app = read('src/app.js'), worker = read('src/background.js');
-  assert.match(app, /chrome\.runtime\.sendMessage\(\{ type: 'nex-b-open-local'/);
-  assert.doesNotMatch(app, /sendNativeMessage/);
-  assert.match(worker, /runtime\.onMessage\?\.addListener/);
-  assert.match(worker, /runtime\.sendNativeMessage\('com\.kilex\.nex_b'/);
-  assert.match(worker, /https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/blob\/main\/native-host\/INSTALAR-MACOS\.md/);
-  assert.match(read('newtab.html'), /class="button secondary native-host-link"/);
+  assert.doesNotMatch(app + worker, /sendNativeMessage|connectNative|nex-b-open-local/);
+  assert.match(app, /openOrFocusTab\(access, chrome, navigator\.locks\)/);
+  assert.match(read('newtab.html'), /id="openLocalSettings"/);
+  assert.doesNotMatch(read('newtab.html'), /Instalar asistente macOS/);
 });
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
@@ -39,8 +71,36 @@ test('miniaturas se pueden ordenar al arrastrar dentro de su sección', () => {
   assert.match(app, /thumb\.ondragstart/);
   assert.match(app, /card\.ondrop/);
   assert.match(app, /moveAccessToPosition\(categoryId, draggedAccess\.accessId, access\.id, after\)/);
-  assert.match(css, /\.thumb\[draggable=true\] \{ cursor: grab/);
+  assert.match(css, /\.thumb, \.thumb\[draggable=true\] \{ cursor: default/);
+  assert.match(css, /\.card\.holding-thumbnail \.thumb, \.card\.dragging \.thumb \{ cursor: grabbing/);
   assert.doesNotMatch(app, /Mover miniatura a la izquierda|Mover miniatura a la derecha/);
+});
+test('la URL aparece al posar el cursor sobre una miniatura y se limita a dos líneas', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /thumb\.title = access\.url/);
+  assert.match(app, /img\.title = access\.url/);
+  assert.match(app, /thumb\.onpointerdown/);
+  assert.doesNotMatch(css, /\.card-url/);
+});
+test('los accesos locales muestran un identificador visual diferente', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /access\.url\.startsWith\('file:'\)/);
+  assert.match(app, /'tag link-type local-link', '⌂ Archivo local'/);
+  assert.match(css, /\.tag\.link-type\.local-link \{[^}]*background: #4b3a25/);
+});
+test('capturar imagen es un enlace discreto y alineado a la derecha', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /node\('a', 'card-recapture', 'Capturar imagen'\)/);
+  assert.match(css, /\[data-theme\] \.card-recapture \{[^}]*margin: 8px 2px 0 auto[^}]*font-weight: 400/);
+});
+test('los Workspaces se ordenan al arrastrar sus etiquetas, sin flechas de orden', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), css = read('src/overrides.css');
+  assert.match(app, /b\.draggable = true/);
+  assert.match(app, /b\.ondrop = event/);
+  assert.match(app, /moveWorkspaceToPosition\(sourceId, workspace\.id/);
+  assert.match(app, /candidate\.workspaces\.splice\(destinationIndex/);
+  assert.match(css, /\.workspace-tab\[draggable=true\] \{ cursor: grab/);
+  assert.doesNotMatch(html, /moveWorkspaceLeft|moveWorkspaceRight/);
 });
 test('vinculación y sincronización manual de Favoritos no exponen bajas en tarjetas', () => {
   const app = read('src/app.js'), html = read('newtab.html');
@@ -100,7 +160,6 @@ test('Estilos es la última sección antes de Guardar configuración', () => {
   const form = read('newtab.html').split('id="settingsForm"')[1].split('</form>')[0];
   assert.ok(form.indexOf('id="stylePresets"') > form.indexOf('id="restorePrevious"'));
   const after = form.slice(form.indexOf('id="stylePresets"'));
-  assert.doesNotMatch(after, /<label|<input|<textarea/);
   assert.match(after, /Guardar configuración/);
 });
 test('Alegre es claro y Bosque se valida y conserva como estilo', () => {
@@ -135,9 +194,8 @@ test('manifest MV3: sin hosts, scripts remotos, recursos públicos ni evaluació
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'nativeMessaging']);
-  assert.ok(existsSync(new URL('../native-host/install-macos.sh', import.meta.url)));
-  assert.ok(existsSync(new URL('../native-host/nex_b_native_host.py', import.meta.url)));
+  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage']);
+  assert.equal(manifest.optional_host_permissions, undefined);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
   for (const key of ['host_permissions', 'content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);

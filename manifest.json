@@ -2,15 +2,14 @@
   "manifest_version": 3,
   "name": "nex.b",
   "description": "Espacios de trabajo visuales con accesos, etiquetas y reutilización de pestañas.",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "optional_permissions": ["bookmarks"],
   "permissions": [
     "tabs",
     "storage",
     "contextMenus",
     "activeTab",
-    "unlimitedStorage",
-    "nativeMessaging"
+    "unlimitedStorage"
   ],
   "icons": {
     "16": "icons/nex-b-16.png",

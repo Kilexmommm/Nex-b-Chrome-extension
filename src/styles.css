@@ -1,9 +1,9 @@
 :root {
   font-family:var(--ui-font,Inter,ui-sans-serif,system-ui,-apple-system,sans-serif);
-  color:#eef2ff;
-  background:#10131c;
+  color:#ececec;
+  background:#212121;
   color-scheme:dark;
-  --accent-color:#a9c7ff;
+  --accent-color:#4d8dff;
   --card-min-width:168px
 }
 * {
@@ -12,7 +12,7 @@
 body {
   margin:0;
   min-width:320px;
-  background:radial-gradient(circle at 15% 0,#28375b 0,transparent 38%),#10131c
+  background:#212121
 }
 .shell {
   width:80%;

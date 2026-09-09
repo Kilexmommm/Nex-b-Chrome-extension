@@ -2,10 +2,11 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "YPF", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "oscuro", accentColor: "#a9c7ff", backgroundColor: "#10131c", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", fontFamily: "system", cardStyle: "flat", cardBorder: "soft", cardBorderColor: "#40506b", cardSpacing: "normal", iconStyle: "minimal" },
-    autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub" }
+    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal" },
+    autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
 export const THEME_PRESETS = {
+    "gris-nex": { name: "Gris Nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundPattern: "linear-gradient(180deg,#252525 0%,#212121 100%)", light: false },
     papel: { name: "Papel", accentColor: "#c46746", backgroundColor: "#f4efe5", backgroundPattern: "repeating-linear-gradient(7deg,#75604706 0 1px,transparent 1px 4px),repeating-linear-gradient(97deg,#ffffff40 0 1px,transparent 1px 5px),radial-gradient(ellipse at 15% 0%,#fffdf6,transparent 70%),linear-gradient(135deg,#f4efe5,#e9dfce)", light: true },
     minimalista: { name: "Minimalista", accentColor: "#2f3437", backgroundColor: "#f4f1eb", backgroundPattern: "linear-gradient(135deg,#f8f6f1,#e8e2d8)", light: true },
     alegre: { name: "Alegre", accentColor: "#c65442", backgroundColor: "#fff5ed", backgroundPattern: "linear-gradient(135deg,#fff8ef 0%,#fce7df 52%,#e9f3ed 100%)", light: true },
@@ -204,6 +205,10 @@ export function documentKey(value) {
 }
 export function matches(access, tabUrl) {
     try {
+        const url = accessUrl(access.url);
+        // Los archivos no comparten un dominio: cada ruta identifica un acceso.
+        if (url.startsWith("file:"))
+            return url === accessUrl(tabUrl);
         if (access.matchType === "domain")
             return new URL(webUrl(access.url)).origin === new URL(webUrl(tabUrl)).origin;
         if (access.matchType === "exact")

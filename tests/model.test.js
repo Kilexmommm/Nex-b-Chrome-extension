@@ -12,6 +12,10 @@ test('migra datos anteriores sin resucitar categorías ni reglas eliminadas', ()
   assert.deepEqual(result.autoTagRules, {});
   assert.equal(result.schemaVersion, 1);
 });
+test('las reglas iniciales reconocen GitHub Pages como GitHub', () => {
+  assert.equal(DEFAULT_DATA.autoTagRules['github.com'], 'GitHub');
+  assert.equal(DEFAULT_DATA.autoTagRules['github.io'], 'GitHub');
+});
 test('rechaza tipos corruptos, esquemas futuros e identificadores duplicados', () => {
   for (const value of [null, [], {}, { categories: null }, { ...fixture(), schemaVersion: 4 }]) assert.throws(() => normalizeData(value));
   const value = fixture(); value.workspaces.push(value.workspaces[0]);
@@ -28,7 +32,7 @@ test('rechaza URLs ejecutables, credenciales e imágenes no permitidas', () => {
   for (const url of ['http://example.com/image.png', 'data:image/svg+xml;base64,AAAA', 'data:image/png;base64,?']) assert.throws(() => imageUrl(url));
   assert.equal(imageUrl('https://example.com/image.png'), 'https://example.com/image.png');
 });
-test('acepta solo rutas file:// locales para accesos del asistente macOS', () => {
+test('acepta solo rutas file:// locales para accesos del navegador', () => {
   assert.equal(accessUrl('file:///Users/test/archivo.html'), 'file:///Users/test/archivo.html');
   for (const url of ['file://server/share', 'file:///Users/test/a.html?x=1', 'file:///Users/test/a.html#x']) assert.throws(() => accessUrl(url));
 });
@@ -60,4 +64,20 @@ test('dominio exige el mismo origen y exacta conserva parámetros', () => {
   assert.equal(matches(access('https://mail.google.com/', 'domain'), 'https://mail.google.com/mail/u/1'), true);
   for (const url of ['http://mail.google.com/', 'https://mail.google.com:8443/', 'https://mail.google.com.evil.test/', 'chrome://newtab/']) assert.equal(matches(access('https://mail.google.com/', 'domain'), url), false);
   assert.equal(matches(access('https://example.com/?x=1', 'exact'), 'https://example.com/?x=2'), false);
+});
+
+test('rutas locales: coincidencia exacta incluso con detección por dominio o documento', () => {
+  for (const matchType of ['domain', 'document', 'exact']) {
+    const local = access('file:///Users/test/Mi carpeta/pagina.html', matchType);
+    assert.equal(matches(local, 'file:///Users/test/Mi%20carpeta/pagina.html'), true);
+    assert.equal(matches(local, 'file:///Users/test/otra.html'), false);
+    assert.equal(matches(local, 'file:///Users/test/Mi%20carpeta/Pagina.html'), false);
+    assert.equal(matches(local, 'https://example.com/pagina.html'), false);
+    assert.equal(matches(local, 'file://server/Users/test/Mi%20carpeta/pagina.html'), false);
+    assert.equal(matches(local, 'chrome://newtab/'), false);
+    assert.equal(matches(local, undefined), false);
+  }
+  const folder = access('file:///Users/test/carpeta/', 'domain');
+  assert.equal(matches(folder, 'file:///Users/test/carpeta/'), true);
+  assert.equal(matches(folder, 'file:///Users/test/carpeta/hijo.html'), false);
 });

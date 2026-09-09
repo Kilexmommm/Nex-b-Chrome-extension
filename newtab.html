@@ -12,7 +12,7 @@
     <main class="shell">
       <header class="topbar">
         <h1>nex.b</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
-        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="moveWorkspaceLeft" class="button secondary icon-button" title="Mover Workspace a la izquierda" aria-label="Mover Workspace a la izquierda">←</button><button id="moveWorkspaceRight" class="button secondary icon-button" title="Mover Workspace a la derecha" aria-label="Mover Workspace a la derecha">→</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
+        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
       </header>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
@@ -43,7 +43,7 @@
       <h2 id="accessDialogTitle">Nuevo acceso</h2><input id="accessId" type="hidden" />
       <label>Nombre<input id="accessTitle" required maxlength="60" placeholder="Demanda Figma" /></label>
       <p id="bookmarkState" class="bookmark-state" role="status" hidden></p>
-      <label>URL<input id="accessUrl" required type="url" placeholder="https://... o file:///Users/..." /><small>Para archivos o carpetas locales usa file://. Descarga e instala el asistente: github.com/Kilexmommm/Nex-b-Chrome-extension → native-host → INSTALAR-MACOS.md.</small></label>
+      <label>URL<input id="accessUrl" required type="url" placeholder="https://... o file:///Users/..." /><small>Usa file:/// para abrir archivos locales. Para ver una carpeta en el navegador, termina su ruta con /. Activa «Permitir acceso a URLs de archivo» en los detalles de nex.b en Chrome.</small></label>
       <label>URL de miniatura<input id="accessThumbnailUrl" type="url" placeholder="https://.../imagen.png" /><small>Opcional. Puedes pegar una captura debajo o usar una imagen por URL.</small></label>
       <label>Workspace de destino<select id="accessWorkspace" required></select></label>
       <label>Categoría<select id="accessCategory" required></select></label>
@@ -85,25 +85,36 @@
     </form></dialog>
     <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
       <h2>Configurar nex.b</h2>
-      <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
-      <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar Workspace</button>
-      <a class="button secondary native-host-link" href="https://github.com/Kilexmommm/Nex-b-Chrome-extension/blob/main/native-host/INSTALAR-MACOS.md" target="_blank" rel="noopener noreferrer">Instalar asistente macOS</a>
-      <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. nex.b solo los lee.</small>
-      <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
-      <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>
-      <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
-      <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
-      <label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option></select></label>
-      <section class="appearance-editor"><p>Diseño de interfaz</p><small>Personaliza la apariencia sin escribir código. Los estilos prediseñados siguen al final.</small>
+      <div class="settings-tabs" role="tablist" aria-label="Secciones de configuración">
+        <button id="settingsGeneralTab" type="button" role="tab" aria-controls="settingsGeneralPanel" aria-selected="true">General</button>
+        <button id="settingsDesignTab" type="button" role="tab" aria-controls="settingsDesignPanel" aria-selected="false" tabindex="-1">Diseño</button>
+      </div>
+      <section id="settingsGeneralPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsGeneralTab">
+        <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
+        <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
+        <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
+        <section class="settings-utilities"><p>Datos y favoritos</p>
+          <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
+          <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar Workspace</button>
+          <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. nex.b solo los lee.</small>
+          <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
+          <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
+          <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
+          <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
+          <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>
+        </section>
+      </section>
+      <section id="settingsDesignPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsDesignTab" hidden>
+        <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
+        <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>
+        <label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option></select></label>
+        <section class="appearance-editor"><p>Diseño de interfaz</p><small>Personaliza la apariencia sin escribir código. Las miniaturas nuevas no llevan borde por defecto.</small>
         <div class="setting-grid"><label>Fuente<select id="fontFamily"><option value="system">Sistema</option><option value="rounded">Redondeada</option><option value="serif">Serif</option><option value="mono">Monoespaciada</option></select></label><label>Estilo de tarjeta<select id="cardStyle"><option value="flat">Plano</option><option value="soft">Suave</option><option value="glass">Cristal</option></select></label></div>
         <div class="setting-grid"><label>Borde de tarjetas<select id="cardBorder"><option value="none">Sin borde</option><option value="soft">Suave</option><option value="strong">Marcado</option></select></label><label>Color del borde<input id="cardBorderColor" type="color" /></label></div>
         <div class="setting-grid"><label>Separación de tarjetas<select id="cardSpacing"><option value="compact">Compacta</option><option value="normal">Normal</option><option value="wide">Amplia</option></select></label><label>Estilo de iconos<select id="iconStyle"><option value="minimal">Minimalista</option><option value="filled">Rellenos</option><option value="round">Redondos</option></select></label></div>
+        </section>
+        <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
       </section>
-      <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
-      <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
-      <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
-      <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>
-      <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar configuración</button></div>
     </form></dialog>
     <menu id="cardMenu" class="card-menu" hidden>

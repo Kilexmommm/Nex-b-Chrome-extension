@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -16,7 +16,7 @@ let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = f
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
 let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
-let draggedAccess = null;
+let draggedAccess = null, draggedWorkspaceId = '';
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -24,6 +24,55 @@ function node(tag, className, text) {
   if (text !== undefined) element.textContent = text;
   return element;
 }
+function arrangeDialogFields() {
+  const descriptions = {
+    categoryName: 'El nombre que verás dentro de este Workspace.',
+    categoryParent: 'Puedes dejarla como sección principal.',
+    moveSectionWorkspace: 'La sección y sus accesos se moverán a este destino.',
+    accessTitle: 'Un nombre breve para reconocer este acceso.',
+    accessUrl: 'La dirección que se abrirá al seleccionar la tarjeta.',
+    accessThumbnailUrl: 'Opcional: usa una imagen remota para identificarlo.',
+    accessWorkspace: 'Elige dónde quieres guardar este acceso.',
+    accessCategory: 'Selecciona la sección dentro del Workspace.',
+    accessTags: 'Sepáralos por comas para encontrarlo más rápido.',
+    matchType: 'Evita abrir una pestaña que ya está disponible.',
+    workspaceName: 'El nombre que aparecerá en su etiqueta.',
+    workspaceKind: 'Principal para lo importante; estándar para el resto.',
+    editWorkspaceName: 'Actualiza el nombre que aparece en la etiqueta.',
+    editWorkspaceKind: 'Define la prioridad de este Workspace.',
+    bookmarkWorkspace: 'Elige dónde guardar los favoritos importados.',
+    bookmarkCategory: 'Usa una sección existente o crea una nueva.',
+    bookmarkSectionName: 'Nombre para la sección creada desde favoritos.',
+    accentColor: 'Color reservado para selección y acciones prioritarias.',
+    backgroundColor: 'Color base del espacio de trabajo.',
+    backgroundImageUrl: 'Opcional: añade una imagen de fondo remota.',
+    thumbnailSize: 'Define la altura de todas las miniaturas.',
+    fontFamily: 'Fuente usada en toda la interfaz.',
+    cardStyle: 'Tratamiento visual de las tarjetas.',
+    cardBorder: 'Las miniaturas nuevas no llevan borde por defecto.',
+    cardBorderColor: 'Solo se usa si activas un borde.',
+    cardSpacing: 'Espacio entre tarjetas del Workspace.',
+    iconStyle: 'Aspecto de los controles con icono.',
+    settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
+    captureEnabled: 'Crea una miniatura al agregar un acceso.',
+    bookmarkLink: 'Mantiene la sección vinculada a esa carpeta de Chrome.'
+  };
+  document.querySelectorAll('.dialog-form label').forEach(label => {
+    const control = [...label.children].find(child => child.matches('input, select, textarea'));
+    if (!control || label.classList.contains('field-row')) return;
+    const copy = node('span', 'field-copy');
+    [...label.childNodes].filter(child => child !== control).forEach(child => copy.append(child));
+    const title = [...copy.childNodes].find(child => child.nodeType === Node.TEXT_NODE && child.textContent.trim());
+    if (title) {
+      const heading = node('span', 'field-label', title.textContent.trim());
+      title.replaceWith(heading);
+    }
+    if (!copy.querySelector('small')) copy.append(node('small', '', descriptions[control.id] || 'Completa este valor para continuar.'));
+    label.replaceChildren(copy, control);
+    label.classList.add('field-row');
+  });
+}
+arrangeDialogFields();
 function accessCount(count) {
   const element = node('span', 'count', String(count));
   element.setAttribute('aria-label', count + (count === 1 ? ' acceso' : ' accesos'));
@@ -109,6 +158,15 @@ function parseRules(value) {
   }
   return validateRules(rules);
 }
+function selectSettingsTab(tab) {
+  const design = tab === 'design';
+  $('settingsGeneralPanel').hidden = design;
+  $('settingsDesignPanel').hidden = !design;
+  $('settingsGeneralTab').setAttribute('aria-selected', String(!design));
+  $('settingsDesignTab').setAttribute('aria-selected', String(design));
+  $('settingsGeneralTab').tabIndex = design ? -1 : 0;
+  $('settingsDesignTab').tabIndex = design ? 0 : -1;
+}
 function applySettings() {
   const s = data.settings;
   document.documentElement.dataset.theme = s.themeId;
@@ -161,6 +219,7 @@ function renderStylePresets(themeId) {
 
 function isOpen(access) {
   try {
+    if (access.url.startsWith('file:')) return openIndex.exact.has(accessUrl(access.url));
     const key = access.matchType === 'domain' ? new URL(access.url).origin : access.matchType === 'exact' ? webUrl(access.url) : documentKey(access.url);
     return openIndex[access.matchType].has(key);
   } catch { return false; }
@@ -178,11 +237,12 @@ async function refreshTabs() {
   openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
   for (const tab of tabs) {
     try {
-      const url = webUrl(tab.pendingUrl || tab.url);
+      const url = accessUrl(tab.pendingUrl || tab.url);
       openIndex.exact.add(url);
+      if (url.startsWith('file:')) continue;
       openIndex.domain.add(new URL(url).origin);
       openIndex.document.add(documentKey(url));
-    } catch { /* Internal browser pages cannot match saved HTTP(S) links. */ }
+    } catch { /* Internal browser pages cannot match saved accesses. */ }
   }
   updateStatuses();
 }
@@ -192,11 +252,6 @@ function scheduleTabRefresh() {
   tabRefreshTimer = setTimeout(() => run(refreshTabs), 150);
 }
 async function openAccess(access) {
-  if (access.url.startsWith('file:')) {
-    const result = await chrome.runtime.sendMessage({ type: 'nex-b-open-local', url: access.url });
-    if (!result?.ok) throw new Error(result?.error || 'No se pudo abrir el archivo local. Instala el asistente de nex.b para macOS.');
-    return;
-  }
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
 }
@@ -212,11 +267,34 @@ function render() {
       render();
     }, 'workspace-tab' + (workspace.id === currentWorkspace().id && viewMode === 'workspace' ? ' active' : ''));
     b.setAttribute('aria-pressed', String(workspace.id === currentWorkspace().id && viewMode === 'workspace'));
+    b.draggable = true;
+    b.ondragstart = event => {
+      draggedWorkspaceId = workspace.id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', workspace.id);
+      b.classList.add('dragging');
+    };
+    b.ondragover = event => {
+      if (!draggedWorkspaceId || draggedWorkspaceId === workspace.id) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      b.classList.add('workspace-drag-over');
+    };
+    b.ondragleave = () => b.classList.remove('workspace-drag-over');
+    b.ondragend = () => {
+      draggedWorkspaceId = '';
+      document.querySelectorAll('.workspace-tab').forEach(tab => tab.classList.remove('dragging', 'workspace-drag-over'));
+    };
+    b.ondrop = event => {
+      event.preventDefault();
+      b.classList.remove('workspace-drag-over');
+      const sourceId = draggedWorkspaceId;
+      if (!sourceId || sourceId === workspace.id) return;
+      const bounds = b.getBoundingClientRect();
+      run(() => moveWorkspaceToPosition(sourceId, workspace.id, event.clientX > bounds.left + bounds.width / 2));
+    };
     $('workspaceTabs').append(b);
   }
-  const workspaceIndex = data.workspaces.findIndex(workspace => workspace.id === currentWorkspace().id);
-  $('moveWorkspaceLeft').disabled = workspaceIndex < 1;
-  $('moveWorkspaceRight').disabled = workspaceIndex < 0 || workspaceIndex === data.workspaces.length - 1;
   document.querySelectorAll('[data-thumbnail-size]').forEach(control => control.setAttribute('aria-pressed', String(control.dataset.thumbnailSize === data.settings.thumbnailSize)));
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
@@ -297,23 +375,33 @@ function makeCard(access, categoryId) {
   const card = node('article', 'card');
   const open = button('', 'Abrir o enfocar: ' + access.title, () => openAccess(access), 'card-open');
   const thumb = node('div', 'thumb');
+  thumb.title = access.url;
   thumb.draggable = viewMode === 'workspace';
-  const recapture = button('↻ Capturar imagen', 'Volver a capturar ' + access.title, () => openRecaptureDialog(access), 'card-recapture');
+  const recapture = node('a', 'card-recapture', 'Capturar imagen');
+  recapture.href = '#';
+  recapture.title = 'Volver a capturar ' + access.title;
+  recapture.onclick = event => { event.preventDefault(); run(() => openRecaptureDialog(access)); };
   recapture.hidden = Boolean(access.thumbnail);
   if (access.thumbnail) {
     thumb.classList.add('has-thumbnail');
-    const img = node('img', 'thumbnail-image'); img.src = access.thumbnail; img.alt = '';
+    const img = node('img', 'thumbnail-image'); img.src = access.thumbnail; img.alt = ''; img.title = access.url;
     img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
     img.onerror = () => { img.remove(); thumb.classList.remove('has-thumbnail'); thumb.prepend(node('span', 'image-error', 'Imagen no disponible')); recapture.hidden = false; };
     thumb.append(img);
   } else thumb.append(node('span', 'image-error', 'Sin miniatura'));
   const overlay = node('div', 'card-overlay');
+  overlay.title = access.url;
   if (viewMode === 'tags') {
     const category = data.categories.find(item => item.id === categoryId);
     const workspace = data.workspaces.find(item => item.id === category?.workspaceId);
     if (workspace) overlay.append(node('span', 'tag workspace-tag', workspace.name));
   }
   const tags = node('div', 'tags');
+  if (access.url.startsWith('file:')) {
+    const local = node('span', 'tag link-type local-link', '⌂ Archivo local');
+    local.title = 'Acceso a archivo o carpeta local';
+    tags.append(local);
+  }
   const automatic = new Set(automaticTags(access.url));
   allTags(access).forEach(tag => tags.append(node('span', 'tag' + (automatic.has(tag) ? ' auto' : ''), tag)));
   overlay.append(tags);
@@ -334,7 +422,9 @@ function makeCard(access, categoryId) {
     event.dataTransfer.setData('text/plain', access.id);
     card.classList.add('dragging');
   };
-  thumb.ondragend = () => { draggedAccess = null; document.querySelectorAll('.card.drag-over, .card.dragging').forEach(item => item.classList.remove('drag-over', 'dragging')); };
+  thumb.onpointerdown = () => { if (viewMode === 'workspace') card.classList.add('holding-thumbnail'); };
+  thumb.onpointerup = thumb.onpointercancel = () => card.classList.remove('holding-thumbnail');
+  thumb.ondragend = () => { draggedAccess = null; document.querySelectorAll('.card.drag-over, .card.dragging, .card.holding-thumbnail').forEach(item => item.classList.remove('drag-over', 'dragging', 'holding-thumbnail')); };
   card.ondragover = event => {
     if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
     event.preventDefault(); event.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over');
@@ -502,16 +592,16 @@ onClick('editWorkspace', () => {
   $('editWorkspaceKind').value = workspace.type;
   openDialog('editWorkspaceDialog');
 });
-async function reorderWorkspace(direction) {
-  const current = currentWorkspace();
-  const index = data.workspaces.findIndex(workspace => workspace.id === current.id);
-  if (!data.workspaces[index + direction]) return;
+async function moveWorkspaceToPosition(sourceId, targetId, after) {
+  if (sourceId === targetId) return;
   const candidate = structuredClone(data);
-  [candidate.workspaces[index], candidate.workspaces[index + direction]] = [candidate.workspaces[index + direction], candidate.workspaces[index]];
+  const sourceIndex = candidate.workspaces.findIndex(workspace => workspace.id === sourceId);
+  if (sourceIndex < 0 || !candidate.workspaces.some(workspace => workspace.id === targetId)) throw new Error('El Workspace ya no existe.');
+  const [source] = candidate.workspaces.splice(sourceIndex, 1);
+  const destinationIndex = candidate.workspaces.findIndex(workspace => workspace.id === targetId);
+  candidate.workspaces.splice(destinationIndex + (after ? 1 : 0), 0, source);
   await commit(candidate);
 }
-onClick('moveWorkspaceLeft', () => reorderWorkspace(-1));
-onClick('moveWorkspaceRight', () => reorderWorkspace(1));
 onSubmit('editWorkspaceForm', async () => {
   const candidate = structuredClone(data);
   const workspace = candidate.workspaces.find(item => item.id === $('editWorkspaceDialog').dataset.workspaceId);
@@ -558,6 +648,9 @@ onSubmit('recaptureForm', async () => {
     $('recaptureDialog').querySelectorAll('button').forEach(b => { b.disabled = false; });
   }
 });
+onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
+onClick('settingsGeneralTab', () => selectSettingsTab('general'));
+onClick('settingsDesignTab', () => selectSettingsTab('design'));
 onClick('openSettings', () => {
   const s = data.settings;
   renderStylePresets(s.themeId);
@@ -567,6 +660,7 @@ onClick('openSettings', () => {
   $('captureEnabled').checked = s.captureEnabled;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
+  selectSettingsTab('general');
   openDialog('settingsDialog');
 });
 $('backgroundColor').oninput = () => { $('settingsDialog').dataset.pattern = ''; };

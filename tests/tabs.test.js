@@ -37,3 +37,48 @@ test('crea reemplazo solo si la pestaña coincidente se cerró', async () => {
   await openOrFocusTab(access, api, locks());
   assert.equal(api.state.creates, 1);
 });
+
+test('abre HTML y carpetas directamente en pestañas, sin asistente nativo', async () => {
+  for (const url of ['file:///Users/test/pagina.html', 'file:///Users/test/Mi%20carpeta/', 'file:///Users/test/documento.pdf']) {
+    const api = mock();
+    api.extension = { isAllowedFileSchemeAccess: async () => true };
+    const tab = await openOrFocusTab({ url, matchType: 'document' }, api, locks());
+    assert.equal(tab.pendingUrl, url);
+    assert.equal(api.state.creates, 1);
+  }
+});
+test('permiso local desactivado: explica cómo activarlo y no abre ni enfoca pestañas', async () => {
+  const url = 'file:///Users/test/pagina.html';
+  const api = mock([{ id: 8, windowId: 1, url }]);
+  api.extension = { isAllowedFileSchemeAccess: async () => false };
+  api.tabs.query = async () => { throw new Error('No debe consultar pestañas sin permiso'); };
+  await assert.rejects(openOrFocusTab({ url, matchType: 'exact' }, api, locks()), /Permitir acceso a URLs de archivo/);
+  assert.equal(api.state.creates, 0);
+  assert.deepEqual(api.state.updates, []);
+});
+test('doble clic local reutiliza la pestaña pendiente sin confundir otras rutas', async () => {
+  const url = 'file:///Users/test/Mi%20carpeta/pagina.html';
+  const api = mock([{ id: 50, windowId: 1, url: 'file:///Users/test/otra.html' }]);
+  api.extension = { isAllowedFileSchemeAccess: async () => true };
+  const mutex = locks();
+  await Promise.all([
+    openOrFocusTab({ url, matchType: 'domain' }, api, mutex),
+    openOrFocusTab({ url, matchType: 'domain' }, api, mutex)
+  ]);
+  assert.equal(api.state.creates, 1);
+  assert.deepEqual(api.state.updates, [1]);
+});
+test('rechaza destinos ejecutables, remotos e inválidos antes de consultar permisos', async () => {
+  for (const url of ['javascript:alert(1)', 'data:text/html,test', 'file://server/share', 'file:///tmp/a.html?x=1', 'finder:///tmp/']) {
+    const api = mock();
+    api.extension = { isAllowedFileSchemeAccess: async () => { throw new Error('No debe consultar permisos'); } };
+    await assert.rejects(openOrFocusTab({ url, matchType: 'exact' }, api, locks()), error => !error.message.includes('No debe consultar'));
+    assert.equal(api.state.creates, 0);
+  }
+});
+test('conserva errores reales de Chrome sin intentar otro programa', async () => {
+  const api = mock();
+  api.extension = { isAllowedFileSchemeAccess: async () => true };
+  api.tabs.create = async () => { throw new Error('File URL navigation is not allowed'); };
+  await assert.rejects(openOrFocusTab({ url: 'file:///tmp/a.html', matchType: 'exact' }, api, locks()), /File URL navigation is not allowed/);
+});
