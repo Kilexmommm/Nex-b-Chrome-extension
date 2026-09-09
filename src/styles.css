@@ -5,7 +5,7 @@
   color-scheme:dark;
   --accent-color:#a9c7ff;
   --thumbnail-height:174px;
-  --card-min-width:240px
+  --card-min-width:168px
 }
 * {
   box-sizing:border-box

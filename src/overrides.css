@@ -68,6 +68,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .access-order { position: absolute; right: 41px; top: 9px; display: flex; gap: 2px; opacity: .58; }
 .access-order button { border: 0; border-radius: 4px; padding: 4px 6px; background: #10182066; color: #fff; cursor: pointer; backdrop-filter: blur(4px); }
 .card:hover .access-order, .card:focus-within .access-order { opacity: 1; }
+.thumb[draggable=true] { cursor: grab; }
+.card.dragging { opacity: .55; }
+.card.drag-over .thumb { outline: 2px dashed var(--accent-color); outline-offset: 3px; }
 .workspace-tag { background: #664e98d9 !important; color: #f1eaff !important; }
 .light-theme .quick-menu { background: #fffdf8; border-color: #a9b6c8; }
 .light-theme .quick-menu button { color: #26344b; }

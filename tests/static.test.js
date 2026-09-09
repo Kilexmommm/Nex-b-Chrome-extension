@@ -7,10 +7,19 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 test('alto de miniaturas usa bajo por defecto y tarjetas 20% más angostas', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
   assert.match(app, /small: 174, medium: 248, large: 322/);
+  assert.match(app, /small: 168, medium: 240, large: 312/);
   assert.equal(normalizeData().settings.thumbnailSize, 'small');
-  assert.match(css, /--card-min-width:240px/);
+  assert.match(css, /--card-min-width:168px/);
   assert.match(css, /minmax\(var\(--card-min-width\),1fr\)/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
+});
+test('miniaturas se pueden ordenar con flechas o al arrastrar dentro de su sección', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /thumb\.draggable = viewMode === 'workspace'/);
+  assert.match(app, /thumb\.ondragstart/);
+  assert.match(app, /card\.ondrop/);
+  assert.match(app, /moveAccessToPosition\(categoryId, draggedAccess\.accessId, access\.id, after\)/);
+  assert.match(css, /\.thumb\[draggable=true\] \{ cursor: grab/);
 });
 test('vinculación y sincronización manual de Favoritos no exponen bajas en tarjetas', () => {
   const app = read('src/app.js'), html = read('newtab.html');

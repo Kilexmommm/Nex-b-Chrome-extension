@@ -1,4 +1,4 @@
-# nex.b · 1.6.1
+# nex.b · 1.6.2
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -26,6 +26,11 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.6.2
+
+- Bajo, Mediano y Alto ahora escalan la tarjeta completa de forma proporcional: ancho y alto cambian juntos en −30%, referencia y +30%.
+- Las miniaturas se pueden ordenar con las flechas o arrastrándolas dentro de la misma sección.
 
 ### Ajustes 1.6.1
 

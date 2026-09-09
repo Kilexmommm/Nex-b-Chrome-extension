@@ -16,6 +16,7 @@ let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = f
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
 let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
+let draggedAccess = null;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -115,8 +116,9 @@ function applySettings() {
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   document.documentElement.style.setProperty('--accent-ink', luminance > 0.179 ? '#000000' : '#ffffff');
-  // Mediano es la referencia: Pequeño −30% y Grande +30% de altura.
+  // Mediano usa 240×248; Bajo y Alto escalan ancho y alto −30%/+30%.
   document.documentElement.style.setProperty('--thumbnail-height', ({ small: 174, medium: 248, large: 322 }[s.thumbnailSize]) + 'px');
+  document.documentElement.style.setProperty('--card-min-width', ({ small: 168, medium: 240, large: 312 }[s.thumbnailSize]) + 'px');
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
   document.body.style.backgroundColor = s.backgroundColor;
   document.body.style.backgroundImage = s.backgroundImageUrl
@@ -290,6 +292,7 @@ function makeCard(access, categoryId) {
   const card = node('article', 'card');
   const open = button('', 'Abrir o enfocar: ' + access.title, () => openAccess(access), 'card-open');
   const thumb = node('div', 'thumb');
+  thumb.draggable = viewMode === 'workspace';
   const recapture = button('↻ Capturar imagen', 'Volver a capturar ' + access.title, () => openRecaptureDialog(access), 'card-recapture');
   recapture.hidden = Boolean(access.thumbnail);
   if (access.thumbnail) {
@@ -327,6 +330,25 @@ function makeCard(access, categoryId) {
     order.append(control);
   }
   card.append(open, edit, order, recapture);
+  thumb.ondragstart = event => {
+    if (viewMode !== 'workspace') return;
+    draggedAccess = { categoryId, accessId: access.id };
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', access.id);
+    card.classList.add('dragging');
+  };
+  thumb.ondragend = () => { draggedAccess = null; document.querySelectorAll('.card.drag-over, .card.dragging').forEach(item => item.classList.remove('drag-over', 'dragging')); };
+  card.ondragover = event => {
+    if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over');
+  };
+  card.ondragleave = () => card.classList.remove('drag-over');
+  card.ondrop = event => {
+    if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
+    event.preventDefault();
+    const after = event.clientX > card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2;
+    run(() => moveAccessToPosition(categoryId, draggedAccess.accessId, access.id, after));
+  };
   card.oncontextmenu = event => { event.preventDefault(); showCardMenu(event, access, categoryId); };
   card.onkeydown = event => {
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
@@ -344,6 +366,17 @@ async function moveAccess(categoryId, accessId, direction) {
   const index = category?.accesses.findIndex(item => item.id === accessId) ?? -1;
   if (index < 0 || !category.accesses[index + direction]) return;
   [category.accesses[index], category.accesses[index + direction]] = [category.accesses[index + direction], category.accesses[index]];
+  await commit(candidate);
+}
+async function moveAccessToPosition(categoryId, accessId, targetId, after) {
+  const candidate = structuredClone(data);
+  const category = candidate.categories.find(item => item.id === categoryId);
+  const sourceIndex = category?.accesses.findIndex(item => item.id === accessId) ?? -1;
+  const targetIndex = category?.accesses.findIndex(item => item.id === targetId) ?? -1;
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+  const [access] = category.accesses.splice(sourceIndex, 1);
+  const updatedTarget = category.accesses.findIndex(item => item.id === targetId);
+  category.accesses.splice(updatedTarget + (after ? 1 : 0), 0, access);
   await commit(candidate);
 }
 function fillTagSuggestions() {
