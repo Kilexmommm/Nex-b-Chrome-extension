@@ -193,7 +193,7 @@ function scheduleTabRefresh() {
 }
 async function openAccess(access) {
   if (access.url.startsWith('file:')) {
-    const result = await chrome.runtime.sendNativeMessage('com.kilex.nex_b', { action: 'open', url: access.url });
+    const result = await chrome.runtime.sendMessage({ type: 'nex-b-open-local', url: access.url });
     if (!result?.ok) throw new Error(result?.error || 'No se pudo abrir el archivo local. Instala el asistente de nex.b para macOS.');
     return;
   }

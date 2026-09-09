@@ -1,4 +1,4 @@
-# nex.b · 1.7.0
+# nex.b · 1.7.1
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -26,6 +26,10 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.7.1
+
+- La apertura de archivos locales ahora pasa por el service worker antes de comunicarse con el asistente macOS. Corrige el error `chrome.runtime.sendNativeMessage is not a function` desde el panel.
 
 ### Ajustes 1.7.0
 

@@ -112,6 +112,15 @@ chrome.action.onClicked.addListener(tab => {
   chrome.action.setBadgeText({ text: '' }).catch(() => {});
   openHome().catch(reportFailure);
 });
+// Native Messaging is invoked from the service worker, not the new-tab page.
+// The host manifest restricts the caller to this extension ID.
+chrome.runtime.onMessage?.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== 'nex-b-open-local' || typeof message.url !== 'string') return;
+  chrome.runtime.sendNativeMessage('com.kilex.nex_b', { action: 'open', url: message.url })
+    .then(result => sendResponse(result || { ok: false, error: 'El asistente local no devolvió una respuesta.' }))
+    .catch(error => sendResponse({ ok: false, error: 'No se pudo conectar con el asistente macOS. Instálalo desde native-host/INSTALAR-MACOS.md y recarga nex.b. (' + (error.message || 'error desconocido') + ')' }));
+  return true;
+});
 chrome.tabs.onRemoved.addListener(tabId => {
   chrome.storage.session.remove(recaptureKey(tabId)).catch(reportFailure);
 });

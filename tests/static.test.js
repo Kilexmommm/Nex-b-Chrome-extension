@@ -14,6 +14,13 @@ test('configuración ofrece editor visual seguro antes de estilos prediseñados'
   assert.match(css, /--card-border-width/);
   assert.match(baseCss, /--card-gap/);
 });
+test('la apertura local usa el worker para Native Messaging', () => {
+  const app = read('src/app.js'), worker = read('src/background.js');
+  assert.match(app, /chrome\.runtime\.sendMessage\(\{ type: 'nex-b-open-local'/);
+  assert.doesNotMatch(app, /sendNativeMessage/);
+  assert.match(worker, /runtime\.onMessage\?\.addListener/);
+  assert.match(worker, /runtime\.sendNativeMessage\('com\.kilex\.nex_b'/);
+});
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
   assert.match(app, /small: 168, medium: 240, large: 312/);
