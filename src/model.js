@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "YPF", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "oscuro", accentColor: "#a9c7ff", backgroundColor: "#10131c", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small" },
+    settings: { themeId: "oscuro", accentColor: "#a9c7ff", backgroundColor: "#10131c", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", fontFamily: "system", cardStyle: "flat", cardBorder: "soft", cardBorderColor: "#40506b", cardSpacing: "normal", iconStyle: "minimal" },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -167,7 +167,13 @@ export function normalizeData(stored = DEFAULT_DATA) {
         settings: { themeId, accentColor: s.accentColor, backgroundColor: s.backgroundColor,
             backgroundImageUrl: imageUrl(s.backgroundImageUrl), backgroundPattern,
             captureEnabled: typeof s.captureEnabled === 'boolean' ? s.captureEnabled : true,
-            thumbnailSize: enumValue(s.thumbnailSize, ["small", "medium", "large"], "Miniaturas") },
+            thumbnailSize: enumValue(s.thumbnailSize, ["small", "medium", "large"], "Miniaturas"),
+            fontFamily: enumValue(s.fontFamily, ["system", "rounded", "serif", "mono"], "Fuente"),
+            cardStyle: enumValue(s.cardStyle, ["flat", "soft", "glass"], "Estilo de tarjeta"),
+            cardBorder: enumValue(s.cardBorder, ["none", "soft", "strong"], "Borde de tarjeta"),
+            cardBorderColor: /^#[0-9a-f]{6}$/i.test(s.cardBorderColor) ? s.cardBorderColor : fail("Color de borde inválido."),
+            cardSpacing: enumValue(s.cardSpacing, ["compact", "normal", "wide"], "Separación de tarjetas"),
+            iconStyle: enumValue(s.iconStyle, ["minimal", "filled", "round"], "Estilo de icono") },
         autoTagRules: validateRules(stored.autoTagRules ?? DEFAULT_DATA.autoTagRules) };
 }
 export function documentKey(value) {

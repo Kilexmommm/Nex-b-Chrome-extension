@@ -15,8 +15,8 @@ body { min-height: 100vh; }
 .signature { margin-top: 40px; padding: 16px 0 8px; text-align: center; font-size: 11px; color: inherit; opacity: .7; }
 .card { min-height: 0; }
 .card, .light-theme .card { border: 0; background: transparent; overflow: visible; }
-.card .thumb { border: 1px solid #40506b; border-radius: 7px; overflow: hidden; }
-.light-theme .card .thumb { border-color: #a9b6c8; }
+.card .thumb { border: var(--card-border-width, 1px) solid var(--card-border-color, #40506b); border-radius: 7px; overflow: hidden; }
+.light-theme .card .thumb { border-color: var(--card-border-color, #a9b6c8); }
 .card:hover .thumb { border-color: var(--accent-color); }
 .card-open { display: block; width: 100%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; }
 .thumbnail-image { display: block; width: 100%; height: 100%; object-fit: cover; min-height: 0; }
@@ -86,6 +86,14 @@ button:disabled { opacity: .55; cursor: wait; }
 dialog::backdrop { background: #080b12aa; }
 
 .preset-section { margin-top: 4px; }
+.appearance-editor { margin-top: 18px; padding-top: 18px; border-top: 1px solid #3b4969; }
+.appearance-editor > p { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+[data-card-style="soft"] .card .thumb { box-shadow: 0 8px 20px #00000020; }
+[data-card-style="glass"] .card .thumb:not(.has-thumbnail) { background-color: #ffffff12; backdrop-filter: blur(10px); }
+[data-card-style="glass"] .card .thumb { box-shadow: 0 10px 26px #00000030; }
+[data-icon-style="round"] :is(.icon-button, .category-icon, .card-edit) { border-radius: 999px; }
+[data-icon-style="filled"] :is(.icon-button, .category-icon) { background: color-mix(in srgb, var(--accent-color) 22%, transparent) !important; color: var(--accent-color); }
+[data-icon-style="filled"] .card-edit { background: color-mix(in srgb, var(--accent-color) 42%, #101820); }
 .preset-section > p { color: #b9c4df; font-size: 13px; }
 .style-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .style-preset { border: 1px solid #3b4969; border-radius: 7px; background: #111724; color: #dce6ff; padding: 7px; cursor: pointer; text-align: left; }

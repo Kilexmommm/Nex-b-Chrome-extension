@@ -93,6 +93,11 @@
       <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
       <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
       <label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option></select></label>
+      <section class="appearance-editor"><p>Diseño de interfaz</p><small>Personaliza la apariencia sin escribir código. Los estilos prediseñados siguen al final.</small>
+        <div class="setting-grid"><label>Fuente<select id="fontFamily"><option value="system">Sistema</option><option value="rounded">Redondeada</option><option value="serif">Serif</option><option value="mono">Monoespaciada</option></select></label><label>Estilo de tarjeta<select id="cardStyle"><option value="flat">Plano</option><option value="soft">Suave</option><option value="glass">Cristal</option></select></label></div>
+        <div class="setting-grid"><label>Borde de tarjetas<select id="cardBorder"><option value="none">Sin borde</option><option value="soft">Suave</option><option value="strong">Marcado</option></select></label><label>Color del borde<input id="cardBorderColor" type="color" /></label></div>
+        <div class="setting-grid"><label>Separación de tarjetas<select id="cardSpacing"><option value="compact">Compacta</option><option value="normal">Normal</option><option value="wide">Amplia</option></select></label><label>Estilo de iconos<select id="iconStyle"><option value="minimal">Minimalista</option><option value="filled">Rellenos</option><option value="round">Redondos</option></select></label></div>
+      </section>
       <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
       <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
       <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />

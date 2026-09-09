@@ -4,6 +4,16 @@ import { readFileSync, existsSync } from 'node:fs';
 import { THEME_PRESETS, normalizeData } from '../src/model.js';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+test('configuración ofrece editor visual seguro antes de estilos prediseñados', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css'), baseCss = read('src/styles.css');
+  const form = html.split('id="settingsForm"')[1].split('</form>')[0];
+  assert.ok(form.indexOf('class="appearance-editor"') < form.indexOf('id="stylePresets"'));
+  for (const id of ['fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) assert.match(form, new RegExp('id="' + id + '"'));
+  assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
+  assert.match(app, /dataset\.iconStyle = s\.iconStyle/);
+  assert.match(css, /--card-border-width/);
+  assert.match(baseCss, /--card-gap/);
+});
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
   assert.match(app, /small: 168, medium: 240, large: 312/);

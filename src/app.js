@@ -112,12 +112,18 @@ function parseRules(value) {
 function applySettings() {
   const s = data.settings;
   document.documentElement.dataset.theme = s.themeId;
+  document.documentElement.dataset.cardStyle = s.cardStyle;
+  document.documentElement.dataset.iconStyle = s.iconStyle;
   document.documentElement.style.setProperty('--accent-color', s.accentColor);
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   document.documentElement.style.setProperty('--accent-ink', luminance > 0.179 ? '#000000' : '#ffffff');
   // La relación 5:3 se calcula en CSS desde el ancho de cada tarjeta.
   document.documentElement.style.setProperty('--card-min-width', ({ small: 168, medium: 240, large: 312 }[s.thumbnailSize]) + 'px');
+  document.documentElement.style.setProperty('--ui-font', ({ system: 'Inter,ui-sans-serif,system-ui,-apple-system,sans-serif', rounded: 'ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif', serif: 'ui-serif,Georgia,serif', mono: 'ui-monospace,SFMono-Regular,Menlo,monospace' }[s.fontFamily]));
+  document.documentElement.style.setProperty('--card-border-color', s.cardBorderColor);
+  document.documentElement.style.setProperty('--card-border-width', ({ none: '0px', soft: '1px', strong: '2px' }[s.cardBorder]));
+  document.documentElement.style.setProperty('--card-gap', ({ compact: '9px', normal: '16px', wide: '25px' }[s.cardSpacing]));
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
   document.body.style.backgroundColor = s.backgroundColor;
   document.body.style.backgroundImage = s.backgroundImageUrl
@@ -557,7 +563,7 @@ onClick('openSettings', () => {
   renderStylePresets(s.themeId);
   $('settingsDialog').dataset.themeId = s.themeId;
   $('settingsDialog').dataset.pattern = s.backgroundPattern;
-  for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize']) $(key).value = s[key];
+  for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) $(key).value = s[key];
   $('captureEnabled').checked = s.captureEnabled;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
@@ -611,6 +617,8 @@ onSubmit('settingsForm', async () => {
     themeId: $('settingsDialog').dataset.themeId, backgroundPattern: $('settingsDialog').dataset.pattern,
     accentColor: $('accentColor').value, backgroundColor: $('backgroundColor').value,
     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize: $('thumbnailSize').value,
+    fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
+    cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
     captureEnabled: $('captureEnabled').checked
   };
   candidate.autoTagRules = parseRules($('settingsTagRules').value);

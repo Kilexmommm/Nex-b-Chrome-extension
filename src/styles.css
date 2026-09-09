@@ -1,5 +1,5 @@
 :root {
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;
+  font-family:var(--ui-font,Inter,ui-sans-serif,system-ui,-apple-system,sans-serif);
   color:#eef2ff;
   background:#10131c;
   color-scheme:dark;
@@ -153,7 +153,7 @@ h2 {
 .cards {
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(var(--card-min-width),1fr));
-  gap:16px
+  gap:var(--card-gap,16px)
 }
 .card {
   position:relative;

@@ -1,4 +1,4 @@
-# nex.b · 1.6.3
+# nex.b · 1.7.0
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -26,6 +26,12 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.7.0
+
+- Configuración incorpora **Diseño de interfaz**: fuente, estilo y color de borde, separación entre tarjetas y estilo de iconos.
+- Las opciones son valores seguros predefinidos y se guardan en tu respaldo ZIP; no se permite CSS libre.
+- Los estilos prediseñados siguen al final del formulario y no borran estos ajustes visuales.
 
 ### Ajustes 1.6.3
 
