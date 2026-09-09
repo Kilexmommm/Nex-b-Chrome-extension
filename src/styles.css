@@ -4,7 +4,6 @@
   background:#10131c;
   color-scheme:dark;
   --accent-color:#a9c7ff;
-  --thumbnail-height:174px;
   --card-min-width:168px
 }
 * {
@@ -171,7 +170,7 @@ h2 {
 }
 .thumb {
   position:relative;
-  height:var(--thumbnail-height);
+  aspect-ratio:5 / 3;
   background:linear-gradient(135deg,#253453,#182033);
   display:grid;
   place-items:center;
@@ -230,7 +229,7 @@ h2 {
   color:#99a8ca;
   display:grid;
   place-items:center;
-  min-height:var(--thumbnail-height);
+  aspect-ratio:5 / 3;
   border-radius:7px;
   cursor:pointer;
   font-size:36px;
@@ -427,12 +426,8 @@ dialog {
   grid-template-columns:repeat(2,minmax(0,1fr));
   gap:10px
 }
-.thumb {
-  height:min(var(--thumbnail-height),180px)
-}
-.add-card {
-  min-height:180px
-}
+.thumb { aspect-ratio:5 / 3 }
+.add-card { aspect-ratio:5 / 3 }
 .card-overlay {
   padding:28px 10px 9px
 }

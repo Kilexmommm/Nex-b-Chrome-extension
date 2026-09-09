@@ -1,4 +1,4 @@
-# nex.b · 1.6.2
+# nex.b · 1.6.3
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -26,6 +26,11 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 No necesitas instalar dependencias. Esta distribución se carga localmente; no es una publicación en Chrome Web Store. El ZIP de código de GitHub **no contiene tu configuración personal**.
 
 ## Últimas actualizaciones
+
+### Ajustes 1.6.3
+
+- Todas las miniaturas y la tarjeta de nuevo acceso usan proporción horizontal **5:3**, sin importar el tamaño elegido.
+- Se quitaron las flechas de orden de cada tarjeta: ahora se ordenan únicamente arrastrando una miniatura dentro de su sección.
 
 ### Ajustes 1.6.2
 

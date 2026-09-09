@@ -116,8 +116,7 @@ function applySettings() {
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   document.documentElement.style.setProperty('--accent-ink', luminance > 0.179 ? '#000000' : '#ffffff');
-  // Mediano usa 240×248; Bajo y Alto escalan ancho y alto −30%/+30%.
-  document.documentElement.style.setProperty('--thumbnail-height', ({ small: 174, medium: 248, large: 322 }[s.thumbnailSize]) + 'px');
+  // La relación 5:3 se calcula en CSS desde el ancho de cada tarjeta.
   document.documentElement.style.setProperty('--card-min-width', ({ small: 168, medium: 240, large: 312 }[s.thumbnailSize]) + 'px');
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
   document.body.style.backgroundColor = s.backgroundColor;
@@ -321,15 +320,7 @@ function makeCard(access, categoryId) {
   open.append(thumb, footer);
   cardStatuses.push({ access, status });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  const category = data.categories.find(item => item.id === categoryId);
-  const position = category?.accesses.findIndex(item => item.id === access.id) ?? -1;
-  const order = node('div', 'access-order');
-  for (const [symbol, label, direction] of [['←', 'Mover miniatura a la izquierda', -1], ['→', 'Mover miniatura a la derecha', 1]]) {
-    const control = button(symbol, label, () => moveAccess(categoryId, access.id, direction), '');
-    control.disabled = position + direction < 0 || position + direction >= (category?.accesses.length || 0);
-    order.append(control);
-  }
-  card.append(open, edit, order, recapture);
+  card.append(open, edit, recapture);
   thumb.ondragstart = event => {
     if (viewMode !== 'workspace') return;
     draggedAccess = { categoryId, accessId: access.id };
@@ -359,14 +350,6 @@ function makeCard(access, categoryId) {
     }
   };
   return card;
-}
-async function moveAccess(categoryId, accessId, direction) {
-  const candidate = structuredClone(data);
-  const category = candidate.categories.find(item => item.id === categoryId);
-  const index = category?.accesses.findIndex(item => item.id === accessId) ?? -1;
-  if (index < 0 || !category.accesses[index + direction]) return;
-  [category.accesses[index], category.accesses[index + direction]] = [category.accesses[index + direction], category.accesses[index]];
-  await commit(candidate);
 }
 async function moveAccessToPosition(categoryId, accessId, targetId, after) {
   const candidate = structuredClone(data);
