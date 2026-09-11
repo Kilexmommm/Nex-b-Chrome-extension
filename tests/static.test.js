@@ -211,7 +211,8 @@ test('interfaz: todos los IDs usados existen y son únicos; módulo local sin in
   assert.doesNotMatch(app, /innerHTML|document\.write|eval\(/);
   assert.doesNotMatch(html, /id="rulesDialog"/);
   assert.match(app, /footer\.append\(status, title\)/);
-  assert.match(app, /open\.append\(thumb, footer\)/);
+  assert.match(app, /open\.append\(thumb\)/);
+  assert.match(app, /card\.append\(open, footer, edit, recapture\)/);
   assert.doesNotMatch(app, /overlay\.append\(node\('div', 'card-title'/);
 });
 test('regresión de CSS: una base, hidden respetado y tag activo claro con contraste', () => {

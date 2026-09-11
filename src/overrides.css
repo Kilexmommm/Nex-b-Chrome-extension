@@ -31,6 +31,9 @@ body { min-height: 100vh; }
 .status { pointer-events: none; }
 .card-footer { display: flex; align-items: flex-start; gap: 9px; padding: 10px 2px; background: transparent; color: #eef2ff; }
 .card-footer .status { position: static; flex: 0 0 9px; margin-top: 5px; }
+.card-title-link { flex: 1; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.card-duplicates { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 3px 6px; background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; font: inherit; font-size: 10px; cursor: pointer; }
+.card-duplicates:hover { text-decoration: underline; }
 .card-footer .card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-height: 2.8em; min-width: 0; white-space: normal; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; line-height: 1.4; font-size: 13px; font-weight: 650; }
 .light-theme .card-footer { background: transparent; color: #1d2940; }
 #openBookmarks { background: #ffb15c; color: #2a180c; border: 1px solid #ffc98e; padding: 11px 15px; }

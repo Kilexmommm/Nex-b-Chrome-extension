@@ -16,6 +16,7 @@ let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = f
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
 let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
+let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 
 function node(tag, className, text) {
@@ -225,7 +226,11 @@ function isOpen(access) {
   } catch { return false; }
 }
 function updateStatuses() {
-  for (const { access, status } of cardStatuses) {
+  for (const { access, status, duplicateBadge } of cardStatuses) {
+    const count = duplicateCounts.get(tabKey(access.url)) || 0;
+    duplicateBadge.hidden = count === 0;
+    duplicateBadge.textContent = count + (count === 1 ? ' repetida' : ' repetidas');
+    duplicateBadge.title = count + ' copias adicionales abiertas. Ver este documento en el inventario.';
     const open = isOpen(access);
     status.classList.toggle('open', open);
     status.title = open ? 'Abierto' : 'Cerrado';
@@ -234,6 +239,7 @@ function updateStatuses() {
 }
 async function refreshTabs() {
   const tabs = await chrome.tabs.query({});
+  duplicateCounts = new Map(duplicateTabGroups(tabs).map(group => [group.key, group.duplicates.length]));
   openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
   for (const tab of tabs) {
     try {
@@ -409,12 +415,19 @@ function makeCard(access, categoryId) {
   const status = node('span', 'status');
   status.setAttribute('role', 'img');
   const footer = node('div', 'card-footer');
-  const title = node('div', 'card-title', access.title); title.title = access.title;
+  const title = button(access.title, 'Abrir o enfocar: ' + access.title, () => openAccess(access), 'card-title card-title-link'); title.title = access.title;
+  const duplicateBadge = button('', 'Ver pestañas repetidas de ' + access.title, async () => {
+    await openInventoryDialog();
+    selectInventoryTab('dup');
+    await refreshDuplicates(tabKey(access.url));
+  }, 'card-duplicates');
+  duplicateBadge.hidden = true;
   footer.append(status, title);
-  open.append(thumb, footer);
-  cardStatuses.push({ access, status });
+  footer.append(duplicateBadge);
+  open.append(thumb);
+  cardStatuses.push({ access, status, duplicateBadge });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  card.append(open, edit, recapture);
+  card.append(open, footer, edit, recapture);
   thumb.ondragstart = event => {
     if (viewMode !== 'workspace') return;
     draggedAccess = { categoryId, accessId: access.id };
@@ -646,10 +659,10 @@ async function selectedDupGroups() {
   const webTabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
   return duplicateTabGroups(webTabs).filter(group => keys.has(group.key));
 }
-async function refreshDuplicates() {
+async function refreshDuplicates(onlyKey = '') {
   const allTabs = await chrome.tabs.query({});
   const webTabs = allTabs.filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
-  const groups = duplicateTabGroups(webTabs);
+  const groups = duplicateTabGroups(webTabs).filter(group => !onlyKey || group.key === onlyKey);
   const labels = buildWindowLabels(allTabs);
   const list = $('inventoryDupList'); list.replaceChildren();
   $('inventoryDupSummary').textContent = groups.length
