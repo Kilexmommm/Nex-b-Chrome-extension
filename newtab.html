@@ -12,7 +12,7 @@
     <main class="shell">
       <header class="topbar">
         <h1>nex.b</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
-        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
+        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="openInWindows" class="button secondary icon-button" title="Abrir grupos en ventanas separadas" aria-label="Abrir grupos en ventanas separadas">⊞</button><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
       </header>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
@@ -116,6 +116,12 @@
         <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
       </section>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar configuración</button></div>
+    </form></dialog>
+    <dialog id="windowsDialog"><form method="dialog" id="windowsForm" class="dialog-form">
+      <h2>Abrir en ventanas separadas</h2>
+      <p id="windowsSummary" class="help"></p>
+      <div id="windowsList" class="group-list"></div>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="openWindowsSubmit" type="button" class="button" disabled>Abrir ventanas</button></div>
     </form></dialog>
     <menu id="cardMenu" class="card-menu" hidden>
       <button type="button" data-card-action="edit">Editar</button>

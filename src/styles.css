@@ -315,6 +315,28 @@ dialog {
   grid-template-columns:1fr 1fr;
   gap:12px
 }
+.group-list {
+  max-height:50vh;
+  overflow:auto;
+  margin-top:12px
+}
+.group-row {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:8px 0
+}
+.group-row input {
+  width:auto;
+  margin:0;
+  flex:0 0 auto
+}
+.group-row-text {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px
+}
 .setting-grid label {
   margin-top:0
 }

@@ -219,3 +219,20 @@ export function matches(access, tabUrl) {
         return false;
     }
 }
+// Reúne los accesos de cada Workspace para abrirlos como una ventana separada.
+// Devuelve todos los Workspaces en orden, con sus URLs (puede venir vacío); la
+// UI decide cuáles ofrecer y descarta los grupos sin accesos.
+export function workspaceWindowGroups(data) {
+    const groups = [];
+    for (const workspace of data?.workspaces ?? []) {
+        const urls = [];
+        for (const category of data?.categories ?? []) {
+            if (category.workspaceId !== workspace.id)
+                continue;
+            for (const access of category.accesses ?? [])
+                urls.push(access.url);
+        }
+        groups.push({ id: workspace.id, name: workspace.name, urls });
+    }
+    return groups;
+}
