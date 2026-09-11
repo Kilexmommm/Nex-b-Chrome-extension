@@ -574,15 +574,105 @@ async function refreshInventory() {
     ? tabs.length + (tabs.length === 1 ? ' pestaña web' : ' pestañas web') + ' en ' + windows + (windows === 1 ? ' ventana' : ' ventanas') + (duplicateIds.size ? ' · ' + duplicateIds.size + ' repetidas' : ' · sin repetidas')
     : 'No hay pestañas web abiertas para inventariar.';
 }
-async function openInventoryDialog() {
+function buildWindowLabels(tabs) {
+  const ids = [...new Set(tabs.map(tab => tab.windowId))].sort((a, b) => a - b);
+  return new Map(ids.map((id, index) => [id, 'Ventana ' + (index + 1)]));
+}
+function fillWorkspaceSelect(workspaceSelectId, categorySelectId, categoryFiller) {
   const workspaceId = currentWorkspace().id;
-  $('inventoryWorkspace').replaceChildren(...data.workspaces.map(w => new Option(w.name, w.id, false, w.id === workspaceId)));
-  fillInventoryCategories(workspaceId);
+  $(workspaceSelectId).replaceChildren(...data.workspaces.map(w => new Option(w.name, w.id, false, w.id === workspaceId)));
+  categoryFiller(workspaceId);
+}
+async function openInventoryDialog() {
+  fillWorkspaceSelect('inventoryWorkspace', 'inventoryCategory', id => fillInventoryCategories(id));
+  fillWorkspaceSelect('inventoryDupWorkspace', 'inventoryDupCategory', id => fillDupCategories(id));
+  selectInventoryTab('all');
   await refreshInventory();
   openDialog('inventoryDialog');
 }
-function selectInventoryDuplicates() {
-  inventoryBoxes().forEach(box => { box.checked = box.dataset.duplicate === '1'; });
+function selectInventoryTab(tab) {
+  const dup = tab === 'dup';
+  $('inventoryAllPanel').hidden = dup;
+  $('inventoryDupPanel').hidden = !dup;
+  $('inventoryAllTab').setAttribute('aria-selected', String(!dup));
+  $('inventoryDupTab').setAttribute('aria-selected', String(dup));
+  $('inventoryAllTab').tabIndex = dup ? -1 : 0;
+  $('inventoryDupTab').tabIndex = dup ? 0 : -1;
+}
+function fillDupCategories(workspaceId, selectedId = '') {
+  const categories = data.categories.filter(c => c.workspaceId === workspaceId);
+  const options = categories.map(c => {
+    const parent = categories.find(p => p.id === c.parentId);
+    return new Option((parent ? parent.name + ' › ' : '') + c.name, c.id, false, c.id === selectedId);
+  });
+  if (!options.length) options.push(new Option('General (se creará al guardar)', '__new'));
+  $('inventoryDupCategory').replaceChildren(...options);
+}
+function selectedDupKeys() {
+  return [...$('inventoryDupList').querySelectorAll('input[type=checkbox]:checked')].map(box => box.dataset.key);
+}
+async function selectedDupGroups() {
+  const keys = new Set(selectedDupKeys());
+  const webTabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
+  return duplicateTabGroups(webTabs).filter(group => keys.has(group.key));
+}
+async function refreshDuplicates() {
+  const allTabs = await chrome.tabs.query({});
+  const webTabs = allTabs.filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
+  const groups = duplicateTabGroups(webTabs);
+  const labels = buildWindowLabels(allTabs);
+  const list = $('inventoryDupList'); list.replaceChildren();
+  $('inventoryDupSummary').textContent = groups.length
+    ? groups.length + (groups.length === 1 ? ' documento repetido.' : ' documentos repetidos.') + ' Marca los grupos y elige una acción.'
+    : 'No hay pestañas repetidas.';
+  for (const group of groups) {
+    const section = node('div', 'dup-group');
+    const head = node('label', 'dup-group-head');
+    const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
+    checkbox.dataset.key = group.key;
+    head.append(checkbox, node('span', 'inventory-row-title', tabLabel(group.keep)));
+    section.append(head);
+    for (const tab of [group.keep, ...group.duplicates]) {
+      const location = (labels.get(tab.windowId) || 'Ventana ?') + ' · posición ' + ((tab.index ?? 0) + 1);
+      section.append(node('p', 'dup-copy', location + (tab === group.keep ? ' — se conserva' : '')));
+    }
+    list.append(section);
+  }
+}
+async function passiveCloseDuplicates() {
+  const groups = await selectedDupGroups();
+  if (!groups.length) { showMessage('Selecciona al menos un grupo repetido.', true); return; }
+  const ids = groups.flatMap(group => group.duplicates.map(tab => tab.id)).filter(Number.isInteger);
+  if (!ids.length) { showMessage('No hay copias para cerrar.', true); return; }
+  await chrome.tabs.remove(ids);
+  await refreshDuplicates(); await refreshInventory();
+  showMessage('Cierre pasivo: se cerraron ' + ids.length + (ids.length === 1 ? ' copia' : ' copias') + ' y se conservó 1 de cada grupo.');
+}
+async function gatherDuplicates() {
+  const groups = await selectedDupGroups();
+  if (!groups.length) { showMessage('Selecciona al menos un grupo repetido.', true); return; }
+  const ids = groups.flatMap(group => [group.keep, ...group.duplicates].map(tab => tab.id)).filter(Number.isInteger);
+  const current = await chrome.windows.getCurrent();
+  await chrome.tabs.move(ids, { windowId: current.id, index: -1 });
+  await refreshDuplicates();
+  showMessage('Se reunieron ' + ids.length + ' pestañas repetidas en esta ventana.');
+}
+async function registerDuplicates() {
+  const groups = await selectedDupGroups();
+  if (!groups.length) { showMessage('Selecciona al menos un grupo repetido.', true); return; }
+  const workspaceId = $('inventoryDupWorkspace').value, categoryId = $('inventoryDupCategory').value;
+  const candidate = structuredClone(data);
+  let added = 0, skipped = 0;
+  for (const group of groups) {
+    let url; try { url = accessUrl(group.keep.url); } catch { skipped++; continue; }
+    const title = (group.keep.title || '').trim().slice(0, 300) || url;
+    try { placeAccess(candidate, { id: uid('access'), title, url, tags: [], matchType: 'document', thumbnail: '' }, { sourceCategoryId: '', workspaceId, categoryId }, uid); added++; }
+    catch { skipped++; }
+  }
+  if (!added) { showMessage('No se pudo registrar ninguna; revisa las URLs.', true); return; }
+  await commit(candidate);
+  const name = data.workspaces.find(w => w.id === workspaceId)?.name || '';
+  showMessage('Se registraron ' + added + (added === 1 ? ' acceso' : ' accesos') + (name ? ' en ' + name : '') + (skipped ? '; ' + skipped + ' se omitieron.' : '.'));
 }
 function toggleSelectAllInventory() {
   const boxes = inventoryBoxes();
@@ -671,12 +761,17 @@ document.querySelectorAll('[data-cancel]').forEach(b => {
 document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
 onClick('openInventory', openInventoryDialog);
-onClick('inventorySelectDuplicates', selectInventoryDuplicates);
+onClick('inventoryAllTab', () => selectInventoryTab('all'));
+onClick('inventoryDupTab', async () => { selectInventoryTab('dup'); await refreshDuplicates(); });
 onClick('inventorySelectAll', toggleSelectAllInventory);
 onClick('inventoryConsolidate', consolidateInventory);
 onClick('inventoryAddToCategory', addSelectedToCategory);
 onClick('inventoryCloseSelected', closeSelectedInventory);
+onClick('inventoryDupRegister', registerDuplicates);
+onClick('inventoryDupGather', gatherDuplicates);
+onClick('inventoryDupClose', passiveCloseDuplicates);
 $('inventoryWorkspace').onchange = () => fillInventoryCategories($('inventoryWorkspace').value);
+$('inventoryDupWorkspace').onchange = () => fillDupCategories($('inventoryDupWorkspace').value);
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });
 onClick('editWorkspace', () => {
   const workspace = currentWorkspace();

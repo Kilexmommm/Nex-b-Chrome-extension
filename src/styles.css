@@ -384,6 +384,36 @@ dialog {
   margin-top:0;
   flex:1 1 160px
 }
+.inventory-actions {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  margin-top:14px
+}
+.dup-group {
+  padding:10px 12px;
+  border-bottom:1px solid #2a3450
+}
+.dup-group:last-child {
+  border-bottom:0
+}
+.dup-group-head {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:0
+}
+.dup-group-head input {
+  width:auto;
+  margin:0;
+  flex:0 0 auto
+}
+.dup-copy {
+  margin:4px 0 0 28px;
+  color:#8392b4;
+  font-size:12px
+}
 .setting-grid label {
   margin-top:0
 }

@@ -120,18 +120,37 @@
     <dialog id="inventoryDialog"><form method="dialog" id="inventoryForm" class="dialog-form inventory-form">
       <h2>Inventario de pestañas</h2>
       <p id="inventorySummary" class="help"></p>
-      <div class="inventory-toolbar">
-        <button id="inventorySelectDuplicates" type="button" class="button secondary">Seleccionar repetidas</button>
-        <button id="inventorySelectAll" type="button" class="button secondary">Seleccionar todo</button>
-        <button id="inventoryConsolidate" type="button" class="button secondary">Reunir en una ventana</button>
+      <div class="settings-tabs" role="tablist" aria-label="Vistas del inventario">
+        <button id="inventoryAllTab" type="button" role="tab" aria-controls="inventoryAllPanel" aria-selected="true">Todas</button>
+        <button id="inventoryDupTab" type="button" role="tab" aria-controls="inventoryDupPanel" aria-selected="false" tabindex="-1">Repetidas</button>
       </div>
-      <div id="inventoryList" class="inventory-list"></div>
-      <div class="inventory-add">
-        <select id="inventoryWorkspace" aria-label="Workspace de destino"></select>
-        <select id="inventoryCategory" aria-label="Categoría de destino"></select>
-        <button id="inventoryAddToCategory" type="button" class="button secondary">Agregar seleccionadas</button>
-      </div>
-      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cerrar</button><button id="inventoryCloseSelected" type="button" class="button">Cerrar seleccionadas</button></div>
+      <section id="inventoryAllPanel" role="tabpanel" aria-labelledby="inventoryAllTab">
+        <div class="inventory-toolbar">
+          <button id="inventorySelectAll" type="button" class="button secondary">Seleccionar todo</button>
+          <button id="inventoryConsolidate" type="button" class="button secondary">Reunir en una ventana</button>
+        </div>
+        <div id="inventoryList" class="inventory-list"></div>
+        <div class="inventory-add">
+          <select id="inventoryWorkspace" aria-label="Workspace de destino"></select>
+          <select id="inventoryCategory" aria-label="Categoría de destino"></select>
+          <button id="inventoryAddToCategory" type="button" class="button secondary">Agregar seleccionadas</button>
+        </div>
+        <div class="inventory-actions"><button id="inventoryCloseSelected" type="button" class="button">Cerrar seleccionadas</button></div>
+      </section>
+      <section id="inventoryDupPanel" role="tabpanel" aria-labelledby="inventoryDupTab" hidden>
+        <p id="inventoryDupSummary" class="help"></p>
+        <div id="inventoryDupList" class="inventory-list"></div>
+        <div class="inventory-add">
+          <select id="inventoryDupWorkspace" aria-label="Workspace de destino"></select>
+          <select id="inventoryDupCategory" aria-label="Categoría de destino"></select>
+          <button id="inventoryDupRegister" type="button" class="button secondary">Registrar conservadas</button>
+        </div>
+        <div class="inventory-actions">
+          <button id="inventoryDupGather" type="button" class="button secondary">Reunir en una ventana</button>
+          <button id="inventoryDupClose" type="button" class="button">Cierre pasivo (dejar 1 de cada una)</button>
+        </div>
+      </section>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cerrar</button></div>
     </form></dialog>
     <menu id="cardMenu" class="card-menu" hidden>
       <button type="button" data-card-action="edit">Editar</button>
