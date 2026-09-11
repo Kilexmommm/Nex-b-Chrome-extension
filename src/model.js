@@ -219,3 +219,46 @@ export function matches(access, tabUrl) {
         return false;
     }
 }
+// Clave para inventariar una pestaña: agrupa las que apuntan al mismo documento
+// (misma normalización que la reutilización de accesos). Devuelve "" para las
+// páginas internas del navegador, que no se inventarían.
+export function tabKey(url) {
+    try {
+        const protocol = new URL(url).protocol;
+        if (protocol === "http:" || protocol === "https:")
+            return documentKey(url);
+        if (protocol === "file:")
+            return accessUrl(url);
+        return "";
+    }
+    catch {
+        return "";
+    }
+}
+// Agrupa pestañas abiertas que apuntan al mismo documento y conserva una (la
+// activa si existe), marcando el resto como cerrables.
+export function duplicateTabGroups(tabs = []) {
+    const groups = new Map();
+    for (const tab of tabs) {
+        if (!tab || tab.id === undefined || tab.id === null)
+            continue;
+        const key = tabKey(tab.url || tab.pendingUrl || "");
+        if (!key)
+            continue;
+        if (!groups.has(key))
+            groups.set(key, []);
+        groups.get(key).push(tab);
+    }
+    const result = [];
+    for (const [key, group] of groups) {
+        if (group.length < 2)
+            continue;
+        const keeperIndex = Math.max(0, group.findIndex(tab => tab.active));
+        result.push({
+            key,
+            keep: group[keeperIndex],
+            duplicates: group.filter((_, index) => index !== keeperIndex),
+        });
+    }
+    return result;
+}

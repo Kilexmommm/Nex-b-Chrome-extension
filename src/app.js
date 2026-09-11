@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -536,6 +536,92 @@ function openRecaptureDialog(access) {
   $('recaptureSummary').textContent = 'Preparar una nueva miniatura para “' + access.title + '”.';
   openDialog('recaptureDialog');
 }
+function tabLabel(tab) {
+  return (tab.title && tab.title.trim()) || tab.url || tab.pendingUrl || 'Pestaña sin título';
+}
+function inventoryBoxes() {
+  return [...$('inventoryList').querySelectorAll('input[type=checkbox]')];
+}
+function fillInventoryCategories(workspaceId, selectedId = '') {
+  const categories = data.categories.filter(c => c.workspaceId === workspaceId);
+  const options = categories.map(c => {
+    const parent = categories.find(p => p.id === c.parentId);
+    return new Option((parent ? parent.name + ' › ' : '') + c.name, c.id, false, c.id === selectedId);
+  });
+  if (!options.length) options.push(new Option('General (se creará al guardar)', '__new'));
+  $('inventoryCategory').replaceChildren(...options);
+}
+async function refreshInventory() {
+  const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
+  const duplicateIds = new Set(duplicateTabGroups(tabs).flatMap(group => group.duplicates.map(tab => tab.id)));
+  const list = $('inventoryList'); list.replaceChildren();
+  for (const tab of tabs) {
+    const row = node('label', 'inventory-row');
+    const checkbox = node('input'); checkbox.type = 'checkbox';
+    checkbox.dataset.tabId = String(tab.id);
+    checkbox.dataset.url = tab.url || tab.pendingUrl || '';
+    checkbox.dataset.title = tab.title || '';
+    if (duplicateIds.has(tab.id)) checkbox.dataset.duplicate = '1';
+    const info = node('span', 'inventory-row-info');
+    info.append(node('span', 'inventory-row-title', tabLabel(tab)));
+    info.append(node('small', 'inventory-row-url', tab.url || tab.pendingUrl || ''));
+    row.append(checkbox, info);
+    if (duplicateIds.has(tab.id)) row.append(node('span', 'inventory-badge', 'repetida'));
+    list.append(row);
+  }
+  const windows = new Set(tabs.map(tab => tab.windowId)).size;
+  $('inventorySummary').textContent = tabs.length
+    ? tabs.length + (tabs.length === 1 ? ' pestaña web' : ' pestañas web') + ' en ' + windows + (windows === 1 ? ' ventana' : ' ventanas') + (duplicateIds.size ? ' · ' + duplicateIds.size + ' repetidas' : ' · sin repetidas')
+    : 'No hay pestañas web abiertas para inventariar.';
+}
+async function openInventoryDialog() {
+  const workspaceId = currentWorkspace().id;
+  $('inventoryWorkspace').replaceChildren(...data.workspaces.map(w => new Option(w.name, w.id, false, w.id === workspaceId)));
+  fillInventoryCategories(workspaceId);
+  await refreshInventory();
+  openDialog('inventoryDialog');
+}
+function selectInventoryDuplicates() {
+  inventoryBoxes().forEach(box => { box.checked = box.dataset.duplicate === '1'; });
+}
+function toggleSelectAllInventory() {
+  const boxes = inventoryBoxes();
+  const allChecked = boxes.length > 0 && boxes.every(box => box.checked);
+  boxes.forEach(box => { box.checked = !allChecked; });
+}
+async function consolidateInventory() {
+  const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
+  const ids = tabs.map(tab => tab.id).filter(Number.isInteger);
+  if (ids.length < 2) { showMessage('No hay suficientes pestañas para reunir.', true); return; }
+  const current = await chrome.windows.getCurrent();
+  await chrome.tabs.move(ids, { windowId: current.id, index: -1 });
+  await refreshInventory();
+  showMessage('Se reunieron ' + ids.length + ' pestañas en esta ventana.');
+}
+async function closeSelectedInventory() {
+  const ids = inventoryBoxes().filter(box => box.checked).map(box => Number(box.dataset.tabId)).filter(Number.isInteger);
+  if (!ids.length) { showMessage('Selecciona al menos una pestaña para cerrar.', true); return; }
+  await chrome.tabs.remove(ids);
+  await refreshInventory();
+  showMessage(ids.length === 1 ? 'Se cerró 1 pestaña.' : 'Se cerraron ' + ids.length + ' pestañas.');
+}
+async function addSelectedToCategory() {
+  const boxes = inventoryBoxes().filter(box => box.checked);
+  if (!boxes.length) { showMessage('Selecciona al menos una pestaña.', true); return; }
+  const workspaceId = $('inventoryWorkspace').value, categoryId = $('inventoryCategory').value;
+  const candidate = structuredClone(data);
+  let added = 0, skipped = 0;
+  for (const box of boxes) {
+    let url; try { url = accessUrl(box.dataset.url); } catch { skipped++; continue; }
+    const title = (box.dataset.title || '').trim().slice(0, 300) || url;
+    try { placeAccess(candidate, { id: uid('access'), title, url, tags: [], matchType: 'document', thumbnail: '' }, { sourceCategoryId: '', workspaceId, categoryId }, uid); added++; }
+    catch { skipped++; }
+  }
+  if (!added) { showMessage('No se pudo agregar ninguna pestaña; revisa las URLs.', true); return; }
+  await commit(candidate);
+  const name = data.workspaces.find(w => w.id === workspaceId)?.name || '';
+  showMessage('Se agregaron ' + added + (added === 1 ? ' acceso' : ' accesos') + (name ? ' a ' + name : '') + (skipped ? '; ' + skipped + ' se omitieron.' : '.'));
+}
 function showCardMenu(event, access, categoryId) {
   const menu = $('cardMenu'); menu.hidden = false;
   menu.style.left = Math.max(0, Math.min(event.clientX, innerWidth - 190)) + 'px';
@@ -584,6 +670,13 @@ document.querySelectorAll('[data-cancel]').forEach(b => {
 });
 document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
+onClick('openInventory', openInventoryDialog);
+onClick('inventorySelectDuplicates', selectInventoryDuplicates);
+onClick('inventorySelectAll', toggleSelectAllInventory);
+onClick('inventoryConsolidate', consolidateInventory);
+onClick('inventoryAddToCategory', addSelectedToCategory);
+onClick('inventoryCloseSelected', closeSelectedInventory);
+$('inventoryWorkspace').onchange = () => fillInventoryCategories($('inventoryWorkspace').value);
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });
 onClick('editWorkspace', () => {
   const workspace = currentWorkspace();

@@ -1,9 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules } from '../src/model.js';
+import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules, duplicateTabGroups, tabKey } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
 const access = (url, matchType = 'document') => ({ url, matchType });
+
+test('tabKey normaliza web y file, e ignora páginas internas del navegador', () => {
+  assert.equal(tabKey('https://docs.google.com/document/u/0/d/ABC/edit?x=1'), tabKey('https://docs.google.com/document/d/ABC/view'));
+  assert.equal(tabKey('file:///Users/test/a.html'), 'file:///Users/test/a.html');
+  for (const url of ['chrome://newtab/', 'about:blank', 'chrome-extension://abc/newtab.html', 'no-es-url']) assert.equal(tabKey(url), '');
+});
+test('el inventario agrupa repetidas y conserva la activa, ignorando internas', () => {
+  const tabs = [
+    { id: 1, url: 'https://a.com/', active: false, windowId: 1 },
+    { id: 2, url: 'https://a.com/', active: true, windowId: 2 },
+    { id: 3, url: 'https://b.com/', active: false, windowId: 1 },
+    { id: 4, url: 'chrome://newtab/', active: false, windowId: 1 },
+  ];
+  const groups = duplicateTabGroups(tabs);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].keep.id, 2);
+  assert.deepEqual(groups[0].duplicates.map(t => t.id), [1]);
+});
+test('duplicateTabGroups tolera pestañas sin id o url inválida y entrada vacía', () => {
+  assert.deepEqual(duplicateTabGroups([{ id: 1, url: 'https://a.com/' }, { url: 'https://a.com/' }, { id: 3, url: 'x' }]), []);
+  assert.deepEqual(duplicateTabGroups(), []);
+});
 
 test('migra datos anteriores sin resucitar categorías ni reglas eliminadas', () => {
   const old = fixture(); old.categories = []; old.autoTagRules = {};
