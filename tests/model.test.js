@@ -12,6 +12,16 @@ test('migra datos anteriores sin resucitar categorías ni reglas eliminadas', ()
   assert.deepEqual(result.autoTagRules, {});
   assert.equal(result.schemaVersion, 1);
 });
+test('conserva el estado pineado de un acceso y lo omite cuando es falso', () => {
+  const value = fixture();
+  value.categories[0].accesses = [
+    { id: 'a1', title: 'Uno', url: 'https://a.com/', tags: [], matchType: 'document', thumbnail: '', pinned: true },
+    { id: 'a2', title: 'Dos', url: 'https://b.com/', tags: [], matchType: 'document', thumbnail: '' },
+  ];
+  const [one, two] = normalizeData(value).categories[0].accesses;
+  assert.equal(one.pinned, true);
+  assert.equal('pinned' in two, false);
+});
 test('las reglas iniciales reconocen GitHub Pages como GitHub', () => {
   assert.equal(DEFAULT_DATA.autoTagRules['github.com'], 'GitHub');
   assert.equal(DEFAULT_DATA.autoTagRules['github.io'], 'GitHub');

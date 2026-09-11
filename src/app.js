@@ -304,6 +304,7 @@ function render() {
   else {
     const categories = currentCategories();
     $('emptyState').hidden = categories.length > 0;
+    renderPinned();
     for (const category of categories.filter(c => !c.parentId)) {
       renderCategory(category, false);
       for (const child of categories.filter(c => c.parentId === category.id)) renderCategory(child, true);
@@ -371,12 +372,12 @@ function renderCategory(category, subcategory) {
   section.append(heading, cards);
   $('workspace').append(section);
 }
-function makeCard(access, categoryId) {
+function makeCard(access, categoryId, inPinned = false) {
   const card = node('article', 'card');
   const open = button('', 'Abrir o enfocar: ' + access.title, () => openAccess(access), 'card-open');
   const thumb = node('div', 'thumb');
   thumb.title = access.url;
-  thumb.draggable = viewMode === 'workspace';
+  thumb.draggable = viewMode === 'workspace' && !inPinned;
   const recapture = node('a', 'card-recapture', 'Capturar imagen');
   recapture.href = '#';
   recapture.title = 'Volver a capturar ' + access.title;
@@ -414,28 +415,32 @@ function makeCard(access, categoryId) {
   open.append(thumb, footer);
   cardStatuses.push({ access, status });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  card.append(open, edit, recapture);
-  thumb.ondragstart = event => {
-    if (viewMode !== 'workspace') return;
-    draggedAccess = { categoryId, accessId: access.id };
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', access.id);
-    card.classList.add('dragging');
-  };
-  thumb.onpointerdown = () => { if (viewMode === 'workspace') card.classList.add('holding-thumbnail'); };
-  thumb.onpointerup = thumb.onpointercancel = () => card.classList.remove('holding-thumbnail');
-  thumb.ondragend = () => { draggedAccess = null; document.querySelectorAll('.card.drag-over, .card.dragging, .card.holding-thumbnail').forEach(item => item.classList.remove('drag-over', 'dragging', 'holding-thumbnail')); };
-  card.ondragover = event => {
-    if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
-    event.preventDefault(); event.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over');
-  };
-  card.ondragleave = () => card.classList.remove('drag-over');
-  card.ondrop = event => {
-    if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
-    event.preventDefault();
-    const after = event.clientX > card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2;
-    run(() => moveAccessToPosition(categoryId, draggedAccess.accessId, access.id, after));
-  };
+  const pinned = Boolean(access.pinned);
+  const pin = button(pinned ? '★' : '☆', pinned ? 'Quitar de Pineados' : 'Fijar en Pineados', () => togglePin(access), 'card-pin' + (pinned ? ' pinned' : ''));
+  card.append(open, pin, edit, recapture);
+  if (!inPinned) {
+    thumb.ondragstart = event => {
+      if (viewMode !== 'workspace') return;
+      draggedAccess = { categoryId, accessId: access.id };
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', access.id);
+      card.classList.add('dragging');
+    };
+    thumb.onpointerdown = () => { if (viewMode === 'workspace') card.classList.add('holding-thumbnail'); };
+    thumb.onpointerup = thumb.onpointercancel = () => card.classList.remove('holding-thumbnail');
+    thumb.ondragend = () => { draggedAccess = null; document.querySelectorAll('.card.drag-over, .card.dragging, .card.holding-thumbnail').forEach(item => item.classList.remove('drag-over', 'dragging', 'holding-thumbnail')); };
+    card.ondragover = event => {
+      if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
+      event.preventDefault(); event.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over');
+    };
+    card.ondragleave = () => card.classList.remove('drag-over');
+    card.ondrop = event => {
+      if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
+      event.preventDefault();
+      const after = event.clientX > card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2;
+      run(() => moveAccessToPosition(categoryId, draggedAccess.accessId, access.id, after));
+    };
+  }
   card.oncontextmenu = event => { event.preventDefault(); showCardMenu(event, access, categoryId); };
   card.onkeydown = event => {
     if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
@@ -446,6 +451,29 @@ function makeCard(access, categoryId) {
     }
   };
   return card;
+}
+async function togglePin(access) {
+  const candidate = structuredClone(data);
+  const target = candidate.categories.flatMap(category => category.accesses).find(item => item.id === access.id);
+  if (!target) throw new Error('El acceso ya no existe; recarga la página.');
+  if (target.pinned) delete target.pinned; else target.pinned = true;
+  await commit(candidate);
+}
+function renderPinned() {
+  const workspaceId = currentWorkspace().id;
+  const pinned = [];
+  for (const category of data.categories) {
+    if (category.workspaceId !== workspaceId) continue;
+    for (const access of category.accesses) if (access.pinned) pinned.push({ access, categoryId: category.id });
+  }
+  if (!pinned.length) return;
+  const section = node('section', 'category pinned-section');
+  const heading = node('div', 'category-heading');
+  heading.append(node('h2', '', '★ Pineados'), accessCount(pinned.length));
+  const cards = node('div', 'cards');
+  pinned.forEach(({ access, categoryId }) => cards.append(makeCard(access, categoryId, true)));
+  section.append(heading, cards);
+  $('workspace').append(section);
 }
 async function moveAccessToPosition(categoryId, accessId, targetId, after) {
   const candidate = structuredClone(data);

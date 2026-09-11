@@ -28,6 +28,13 @@ body { min-height: 100vh; }
 .light-theme .card-edit:hover, .light-theme .card-edit:focus-visible { background: #fffaf0e6; color: #302d28; }
 @media (hover: none) { .card-edit { opacity: .9; } }
 @media (prefers-reduced-motion: reduce) { .card-edit { transition: none; } }
+.card-pin { position: absolute; left: 8px; top: 9px; border: 1px solid #ffffff30; border-radius: 5px; background: #10182066; color: #fff; padding: 4px 7px; cursor: pointer; opacity: .65; line-height: 1; backdrop-filter: blur(4px); transition: opacity .15s, background .15s; }
+.light-theme .card-pin { background: #fffaf080; border-color: #514a3e30; color: #302d28; }
+.card:hover .card-pin, .card:focus-within .card-pin { opacity: 1; }
+.card-pin:hover, .card-pin:focus-visible { background: #101820cc; color: #fff; }
+.card-pin.pinned { opacity: 1; color: var(--accent-color); border-color: var(--accent-color); }
+@media (hover: none) { .card-pin { opacity: .9; } }
+@media (prefers-reduced-motion: reduce) { .card-pin { transition: none; } }
 .status { pointer-events: none; }
 .card-footer { display: flex; align-items: flex-start; gap: 9px; padding: 10px 2px; background: transparent; color: #eef2ff; }
 .card-footer .status { position: static; flex: 0 0 9px; margin-top: 5px; }

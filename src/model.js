@@ -143,6 +143,7 @@ export function normalizeData(stored = DEFAULT_DATA) {
                     url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
                     thumbnail: imageUrl(a.thumbnail ?? ""),
+                    ...(a.pinned ? { pinned: true } : {}),
                     ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}) };
             })
         };
