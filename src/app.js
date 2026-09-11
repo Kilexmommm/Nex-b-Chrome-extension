@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, workspaceWindowGroups } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -536,6 +536,46 @@ function openRecaptureDialog(access) {
   $('recaptureSummary').textContent = 'Preparar una nueva miniatura para “' + access.title + '”.';
   openDialog('recaptureDialog');
 }
+function openWindowsDialog() {
+  const groups = workspaceWindowGroups(data);
+  const list = $('windowsList'); list.replaceChildren();
+  const withUrls = groups.filter(group => group.urls.length);
+  if (!withUrls.length) {
+    $('windowsSummary').textContent = 'Ningún grupo tiene accesos para abrir todavía.';
+    $('openWindowsSubmit').disabled = true;
+    openDialog('windowsDialog');
+    return;
+  }
+  $('windowsSummary').textContent = 'Cada grupo seleccionado se abrirá en su propia ventana con todas sus pestañas.';
+  for (const group of groups) {
+    const row = node('label', 'group-row');
+    const checkbox = node('input'); checkbox.type = 'checkbox';
+    checkbox.checked = group.urls.length > 0;
+    checkbox.disabled = group.urls.length === 0;
+    checkbox.dataset.workspaceId = group.id;
+    const count = group.urls.length;
+    row.append(checkbox, node('span', 'group-row-text', group.name + ' · ' + count + (count === 1 ? ' acceso' : ' accesos')));
+    list.append(row);
+  }
+  $('openWindowsSubmit').disabled = false;
+  openDialog('windowsDialog');
+}
+async function openSelectedWorkspaceWindows() {
+  const selected = [...$('windowsList').querySelectorAll('input[type=checkbox]:checked')].map(box => box.dataset.workspaceId);
+  if (!selected.length) { showMessage('Selecciona al menos un grupo.', true); return; }
+  const groups = new Map(workspaceWindowGroups(data).map(group => [group.id, group]));
+  let opened = 0, failed = 0;
+  for (const id of selected) {
+    const urls = (groups.get(id)?.urls ?? []).map(url => { try { return accessUrl(url); } catch { return ''; } }).filter(Boolean);
+    if (!urls.length) continue;
+    try { await chrome.windows.create({ url: urls, focused: true }); opened++; }
+    catch { failed++; }
+  }
+  $('windowsDialog').close();
+  showMessage(failed
+    ? 'Se abrieron ' + opened + ' ventana(s); ' + failed + ' fallaron (por ejemplo, archivos locales sin permiso).'
+    : opened === 1 ? 'Se abrió 1 ventana.' : 'Se abrieron ' + opened + ' ventanas.', failed > 0);
+}
 function showCardMenu(event, access, categoryId) {
   const menu = $('cardMenu'); menu.hidden = false;
   menu.style.left = Math.max(0, Math.min(event.clientX, innerWidth - 190)) + 'px';
@@ -584,6 +624,8 @@ document.querySelectorAll('[data-cancel]').forEach(b => {
 });
 document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
+onClick('openInWindows', openWindowsDialog);
+onClick('openWindowsSubmit', openSelectedWorkspaceWindows);
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });
 onClick('editWorkspace', () => {
   const workspace = currentWorkspace();

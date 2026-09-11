@@ -1,9 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules } from '../src/model.js';
+import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules, workspaceWindowGroups } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
 const access = (url, matchType = 'document') => ({ url, matchType });
+
+test('agrupa accesos por Workspace para abrir cada grupo en su ventana', () => {
+  const data = {
+    workspaces: [{ id: 'trabajo', name: 'Trabajo' }, { id: 'personal', name: 'Personal' }, { id: 'vacio', name: 'Vacío' }],
+    categories: [
+      { id: 'c1', workspaceId: 'trabajo', accesses: [{ url: 'https://a.com/' }, { url: 'https://b.com/' }] },
+      { id: 'c2', workspaceId: 'trabajo', accesses: [{ url: 'https://c.com/' }] },
+      { id: 'c3', workspaceId: 'personal', accesses: [{ url: 'https://d.com/' }] },
+    ],
+  };
+  const groups = workspaceWindowGroups(data);
+  assert.equal(groups.length, 3);
+  assert.deepEqual(groups[0], { id: 'trabajo', name: 'Trabajo', urls: ['https://a.com/', 'https://b.com/', 'https://c.com/'] });
+  assert.deepEqual(groups[1], { id: 'personal', name: 'Personal', urls: ['https://d.com/'] });
+  assert.deepEqual(groups[2].urls, []);
+});
+test('workspaceWindowGroups tolera datos ausentes', () => {
+  assert.deepEqual(workspaceWindowGroups(), []);
+  assert.deepEqual(workspaceWindowGroups({ workspaces: [{ id: 'x', name: 'X' }] }), [{ id: 'x', name: 'X', urls: [] }]);
+});
 
 test('migra datos anteriores sin resucitar categorías ni reglas eliminadas', () => {
   const old = fixture(); old.categories = []; old.autoTagRules = {};
