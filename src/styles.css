@@ -297,12 +297,38 @@ dialog {
   background:transparent
 }
 .dialog-form {
+  position:relative;
   min-width:min(420px,calc(100vw - 48px));
   border:1px solid #697386;
   border-radius:10px;
   background:#1b2334;
   color:#eef2ff;
   padding:25px
+}
+.dialog-close {
+  position:absolute;
+  top:12px;
+  right:12px;
+  width:32px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:#b9c4df;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer
+}
+.dialog-close:hover {
+  background:#2a3450;
+  color:#fff
+}
+.dialog-close:focus-visible {
+  outline:2px solid #6f8bff;
+  outline-offset:2px
 }
 .settings-form {
   width:80vw;
