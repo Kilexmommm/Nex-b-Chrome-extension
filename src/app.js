@@ -556,23 +556,44 @@ async function refreshInventory() {
   const duplicateIds = new Set(duplicateTabGroups(tabs).flatMap(group => group.duplicates.map(tab => tab.id)));
   const list = $('inventoryList'); list.replaceChildren();
   for (const tab of tabs) {
+    const url = tab.url || tab.pendingUrl || '';
     const row = node('label', 'inventory-row');
     const checkbox = node('input'); checkbox.type = 'checkbox';
     checkbox.dataset.tabId = String(tab.id);
-    checkbox.dataset.url = tab.url || tab.pendingUrl || '';
+    checkbox.dataset.url = url;
     checkbox.dataset.title = tab.title || '';
+    checkbox.dataset.search = (tabLabel(tab) + ' ' + url).toLowerCase();
     if (duplicateIds.has(tab.id)) checkbox.dataset.duplicate = '1';
     const info = node('span', 'inventory-row-info');
     info.append(node('span', 'inventory-row-title', tabLabel(tab)));
-    info.append(node('small', 'inventory-row-url', tab.url || tab.pendingUrl || ''));
+    info.append(node('small', 'inventory-row-url', url));
     row.append(checkbox, info);
     if (duplicateIds.has(tab.id)) row.append(node('span', 'inventory-badge', 'repetida'));
     list.append(row);
   }
   const windows = new Set(tabs.map(tab => tab.windowId)).size;
-  $('inventorySummary').textContent = tabs.length
-    ? tabs.length + (tabs.length === 1 ? ' pestaña web' : ' pestañas web') + ' en ' + windows + (windows === 1 ? ' ventana' : ' ventanas') + (duplicateIds.size ? ' · ' + duplicateIds.size + ' repetidas' : ' · sin repetidas')
-    : 'No hay pestañas web abiertas para inventariar.';
+  $('inventoryList').dataset.total = String(tabs.length);
+  $('inventoryList').dataset.windows = String(windows);
+  $('inventoryList').dataset.duplicates = String(duplicateIds.size);
+  filterInventory();
+}
+function filterInventory() {
+  const query = $('inventorySearch').value.trim().toLowerCase();
+  const rows = [...$('inventoryList').querySelectorAll('.inventory-row')];
+  let visible = 0;
+  for (const row of rows) {
+    const box = row.querySelector('input[type=checkbox]');
+    const match = !query || (box.dataset.search || '').includes(query);
+    row.hidden = !match;
+    if (!match) box.checked = false;
+    if (match) visible++;
+  }
+  const total = Number($('inventoryList').dataset.total || 0);
+  const windows = Number($('inventoryList').dataset.windows || 0);
+  const duplicates = Number($('inventoryList').dataset.duplicates || 0);
+  if (!total) { $('inventorySummary').textContent = 'No hay pestañas web abiertas para inventariar.'; return; }
+  const base = total + (total === 1 ? ' pestaña web' : ' pestañas web') + ' en ' + windows + (windows === 1 ? ' ventana' : ' ventanas') + (duplicates ? ' · ' + duplicates + ' repetidas' : ' · sin repetidas');
+  $('inventorySummary').textContent = query ? base + ' · ' + visible + ' coinciden con «' + query + '»' : base;
 }
 function buildWindowLabels(tabs) {
   const ids = [...new Set(tabs.map(tab => tab.windowId))].sort((a, b) => a - b);
@@ -586,6 +607,7 @@ function fillWorkspaceSelect(workspaceSelectId, categorySelectId, categoryFiller
 async function openInventoryDialog() {
   fillWorkspaceSelect('inventoryWorkspace', 'inventoryCategory', id => fillInventoryCategories(id));
   fillWorkspaceSelect('inventoryDupWorkspace', 'inventoryDupCategory', id => fillDupCategories(id));
+  $('inventorySearch').value = '';
   selectInventoryTab('all');
   await refreshInventory();
   openDialog('inventoryDialog');
@@ -675,18 +697,22 @@ async function registerDuplicates() {
   showMessage('Se registraron ' + added + (added === 1 ? ' acceso' : ' accesos') + (name ? ' en ' + name : '') + (skipped ? '; ' + skipped + ' se omitieron.' : '.'));
 }
 function toggleSelectAllInventory() {
-  const boxes = inventoryBoxes();
+  const boxes = inventoryBoxes().filter(box => !box.closest('.inventory-row').hidden);
   const allChecked = boxes.length > 0 && boxes.every(box => box.checked);
   boxes.forEach(box => { box.checked = !allChecked; });
 }
 async function consolidateInventory() {
-  const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
-  const ids = tabs.map(tab => tab.id).filter(Number.isInteger);
-  if (ids.length < 2) { showMessage('No hay suficientes pestañas para reunir.', true); return; }
+  const checked = inventoryBoxes().filter(box => box.checked).map(box => Number(box.dataset.tabId)).filter(Number.isInteger);
+  let ids = checked;
+  if (!ids.length) {
+    const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
+    ids = tabs.map(tab => tab.id).filter(Number.isInteger);
+  }
+  if (ids.length < 2) { showMessage('Elige al menos dos pestañas (o quita el filtro) para reunirlas.', true); return; }
   const current = await chrome.windows.getCurrent();
   await chrome.tabs.move(ids, { windowId: current.id, index: -1 });
   await refreshInventory();
-  showMessage('Se reunieron ' + ids.length + ' pestañas en esta ventana.');
+  showMessage('Se reunieron ' + ids.length + ' pestañas en esta ventana.' + (checked.length ? '' : ' (todas)'));
 }
 async function closeSelectedInventory() {
   const ids = inventoryBoxes().filter(box => box.checked).map(box => Number(box.dataset.tabId)).filter(Number.isInteger);
@@ -770,6 +796,7 @@ onClick('inventoryCloseSelected', closeSelectedInventory);
 onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
+$('inventorySearch').oninput = filterInventory;
 $('inventoryWorkspace').onchange = () => fillInventoryCategories($('inventoryWorkspace').value);
 $('inventoryDupWorkspace').onchange = () => fillDupCategories($('inventoryDupWorkspace').value);
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });

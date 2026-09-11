@@ -125,8 +125,9 @@
         <button id="inventoryDupTab" type="button" role="tab" aria-controls="inventoryDupPanel" aria-selected="false" tabindex="-1">Repetidas</button>
       </div>
       <section id="inventoryAllPanel" role="tabpanel" aria-labelledby="inventoryAllTab">
+        <input id="inventorySearch" type="search" class="inventory-search" placeholder="Filtrar por palabra (título o URL): amazon, docs…" aria-label="Filtrar pestañas por palabra" />
         <div class="inventory-toolbar">
-          <button id="inventorySelectAll" type="button" class="button secondary">Seleccionar todo</button>
+          <button id="inventorySelectAll" type="button" class="button secondary">Seleccionar visibles</button>
           <button id="inventoryConsolidate" type="button" class="button secondary">Reunir en una ventana</button>
         </div>
         <div id="inventoryList" class="inventory-list"></div>
