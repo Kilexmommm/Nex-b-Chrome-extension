@@ -342,6 +342,8 @@ dialog {
   border-radius:8px
 }
 .inventory-row {
+  content-visibility:auto;
+  contain-intrinsic-size:auto 60px;
   display:flex;
   align-items:center;
   gap:10px;

@@ -64,6 +64,13 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ## Últimas actualizaciones
 
+### Inventario de pestañas (PR #9)
+
+- El botón ☰ permite buscar pestañas abiertas, reunir las visibles o seleccionadas, guardar accesos sin duplicar documentos en el Workspace y revisar copias repetidas.
+- Se consulta bajo demanda, sin sondeo ni trabajo adicional permanente en el service worker. El listado se inserta en bloque y Chrome puede omitir el renderizado de filas fuera de pantalla.
+- Antes de cerrar o reunir seleccionadas se comprueba que sigan en la misma URL. El cierre de duplicados excluye pestañas navegando, fijadas o reproduciendo audio, y no incluye copias nuevas que no aparecían en el listado.
+- Las acciones esperan a terminar antes de aceptar otro clic en el mismo botón. El cierre de pestañas puede afectar trabajo no guardado; revisa la selección antes de confirmar.
+
 ### Ajustes de interfaz pendientes de versión
 
 - **Gris Nex** es el estilo predeterminado: una paleta gris neutra con azul sutil para selección, foco y acciones principales.

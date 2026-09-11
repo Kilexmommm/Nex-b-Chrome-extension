@@ -240,7 +240,7 @@ export function tabKey(url) {
 export function duplicateTabGroups(tabs = []) {
     const groups = new Map();
     for (const tab of tabs) {
-        if (!tab || tab.id === undefined || tab.id === null)
+        if (!tab || !Number.isInteger(tab.id) || tab.pendingUrl)
             continue;
         const key = tabKey(tab.url || tab.pendingUrl || "");
         if (!key)

@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules, duplicateTabGroups, tabKey } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
+test('no ofrece como duplicada una pestaña navegando a otro documento', () => {
+  assert.deepEqual(duplicateTabGroups([
+    { id: 1, url: 'https://example.com/a', active: true },
+    { id: 2, url: 'https://example.com/a', pendingUrl: 'https://example.com/b' },
+  ]), []);
+});
 const access = (url, matchType = 'document') => ({ url, matchType });
 
 test('tabKey normaliza web y file, e ignora páginas internas del navegador', () => {

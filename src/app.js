@@ -542,6 +542,12 @@ function tabLabel(tab) {
 function inventoryBoxes() {
   return [...$('inventoryList').querySelectorAll('input[type=checkbox]')];
 }
+async function currentInventorySelection(fallbackVisible = false) {
+  const visible = inventoryBoxes().filter(box => !box.closest('.inventory-row').hidden);
+  const checked = visible.filter(box => box.checked);
+  const selected = new Map((checked.length || !fallbackVisible ? checked : visible).map(box => [Number(box.dataset.tabId), box.dataset.url]));
+  return (await chrome.tabs.query({})).filter(tab => selected.has(tab.id) && !tab.pendingUrl && selected.get(tab.id) === tab.url);
+}
 function fillInventoryCategories(workspaceId, selectedId = '') {
   const categories = data.categories.filter(c => c.workspaceId === workspaceId);
   const options = categories.map(c => {
@@ -554,7 +560,8 @@ function fillInventoryCategories(workspaceId, selectedId = '') {
 async function refreshInventory() {
   const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
   const duplicateIds = new Set(duplicateTabGroups(tabs).flatMap(group => group.duplicates.map(tab => tab.id)));
-  const list = $('inventoryList'); list.replaceChildren();
+  const list = $('inventoryList');
+  const fragment = document.createDocumentFragment();
   for (const tab of tabs) {
     const url = tab.url || tab.pendingUrl || '';
     const row = node('label', 'inventory-row');
@@ -569,8 +576,9 @@ async function refreshInventory() {
     info.append(node('small', 'inventory-row-url', url));
     row.append(checkbox, info);
     if (duplicateIds.has(tab.id)) row.append(node('span', 'inventory-badge', 'repetida'));
-    list.append(row);
+    fragment.append(row);
   }
+  list.replaceChildren(fragment);
   const windows = new Set(tabs.map(tab => tab.windowId)).size;
   $('inventoryList').dataset.total = String(tabs.length);
   $('inventoryList').dataset.windows = String(windows);
@@ -652,6 +660,7 @@ async function refreshDuplicates() {
     const head = node('label', 'dup-group-head');
     const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
     checkbox.dataset.key = group.key;
+    checkbox.dataset.tabIds = JSON.stringify([group.keep, ...group.duplicates].map(tab => tab.id));
     head.append(checkbox, node('span', 'inventory-row-title', tabLabel(group.keep)));
     section.append(head);
     for (const tab of [group.keep, ...group.duplicates]) {
@@ -662,9 +671,10 @@ async function refreshDuplicates() {
   }
 }
 async function passiveCloseDuplicates() {
+  const shown = new Map([...$('inventoryDupList').querySelectorAll('input:checked')].map(box => [box.dataset.key, new Set(JSON.parse(box.dataset.tabIds))]));
   const groups = await selectedDupGroups();
   if (!groups.length) { showMessage('Selecciona al menos un grupo repetido.', true); return; }
-  const ids = groups.flatMap(group => group.duplicates.map(tab => tab.id)).filter(Number.isInteger);
+  const ids = groups.flatMap(group => group.duplicates.filter(tab => shown.get(group.key)?.has(tab.id) && !tab.pendingUrl && !tab.pinned && !tab.audible).map(tab => tab.id)).filter(Number.isInteger);
   if (!ids.length) { showMessage('No hay copias para cerrar.', true); return; }
   await chrome.tabs.remove(ids);
   await refreshDuplicates(); await refreshInventory();
@@ -687,6 +697,7 @@ async function registerDuplicates() {
   let added = 0, skipped = 0;
   for (const group of groups) {
     let url; try { url = accessUrl(group.keep.url); } catch { skipped++; continue; }
+    if (candidate.categories.some(c => c.workspaceId === workspaceId && c.accesses.some(a => tabKey(a.url) === tabKey(url)))) { skipped++; continue; }
     const title = (group.keep.title || '').trim().slice(0, 300) || url;
     try { placeAccess(candidate, { id: uid('access'), title, url, tags: [], matchType: 'document', thumbnail: '' }, { sourceCategoryId: '', workspaceId, categoryId }, uid); added++; }
     catch { skipped++; }
@@ -702,20 +713,15 @@ function toggleSelectAllInventory() {
   boxes.forEach(box => { box.checked = !allChecked; });
 }
 async function consolidateInventory() {
-  const checked = inventoryBoxes().filter(box => box.checked).map(box => Number(box.dataset.tabId)).filter(Number.isInteger);
-  let ids = checked;
-  if (!ids.length) {
-    const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
-    ids = tabs.map(tab => tab.id).filter(Number.isInteger);
-  }
+  const ids = (await currentInventorySelection(true)).map(tab => tab.id);
   if (ids.length < 2) { showMessage('Elige al menos dos pestañas (o quita el filtro) para reunirlas.', true); return; }
   const current = await chrome.windows.getCurrent();
   await chrome.tabs.move(ids, { windowId: current.id, index: -1 });
   await refreshInventory();
-  showMessage('Se reunieron ' + ids.length + ' pestañas en esta ventana.' + (checked.length ? '' : ' (todas)'));
+  showMessage('Se reunieron ' + ids.length + ' pestañas visibles en esta ventana.');
 }
 async function closeSelectedInventory() {
-  const ids = inventoryBoxes().filter(box => box.checked).map(box => Number(box.dataset.tabId)).filter(Number.isInteger);
+  const ids = (await currentInventorySelection()).map(tab => tab.id);
   if (!ids.length) { showMessage('Selecciona al menos una pestaña para cerrar.', true); return; }
   await chrome.tabs.remove(ids);
   await refreshInventory();
@@ -729,6 +735,7 @@ async function addSelectedToCategory() {
   let added = 0, skipped = 0;
   for (const box of boxes) {
     let url; try { url = accessUrl(box.dataset.url); } catch { skipped++; continue; }
+    if (candidate.categories.some(c => c.workspaceId === workspaceId && c.accesses.some(a => tabKey(a.url) === tabKey(url)))) { skipped++; continue; }
     const title = (box.dataset.title || '').trim().slice(0, 300) || url;
     try { placeAccess(candidate, { id: uid('access'), title, url, tags: [], matchType: 'document', thumbnail: '' }, { sourceCategoryId: '', workspaceId, categoryId }, uid); added++; }
     catch { skipped++; }
@@ -759,7 +766,12 @@ function showCardMenu(event, access, categoryId) {
   });
 }
 
-function onClick(id, action) { $(id).onclick = () => run(action); }
+function onClick(id, action) { $(id).onclick = () => run(async () => {
+  const button = $(id);
+  if (button.disabled) return;
+  button.disabled = true;
+  try { await action(); } finally { button.disabled = false; }
+}); }
 function onSubmit(id, action) {
   $(id).onsubmit = event => { event.preventDefault(); run(action); };
 }
@@ -796,7 +808,10 @@ onClick('inventoryCloseSelected', closeSelectedInventory);
 onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
-$('inventorySearch').oninput = filterInventory;
+$('inventorySearch').oninput = () => {
+  // Apply visibility immediately so actions cannot target hidden results.
+  filterInventory();
+};
 $('inventoryWorkspace').onchange = () => fillInventoryCategories($('inventoryWorkspace').value);
 $('inventoryDupWorkspace').onchange = () => fillDupCategories($('inventoryDupWorkspace').value);
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });
