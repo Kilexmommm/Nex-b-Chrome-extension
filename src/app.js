@@ -573,6 +573,13 @@ document.querySelectorAll('dialog').forEach(dialog => {
   const feedback = node('p', 'feedback'); feedback.hidden = true; feedback.setAttribute('role', 'status');
   dialog.querySelector('h2').after(feedback);
   dialog.setAttribute('aria-label', dialog.querySelector('h2').textContent);
+  const closeButton = node('button', 'dialog-close'); closeButton.type = 'button';
+  closeButton.textContent = '×'; closeButton.setAttribute('aria-label', 'Cerrar');
+  dialog.querySelector('.dialog-form').prepend(closeButton);
+  closeButton.onclick = () => { if (!saving) dialog.close(); };
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog && !saving) dialog.close();
+  });
   dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
   dialog.addEventListener('close', () => {
     if (dialog.id === 'accessDialog') { pasteGeneration++; imageBusy = false; pastedImage = ''; showPreview(); run(clearPending); }
