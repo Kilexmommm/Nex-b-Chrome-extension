@@ -219,3 +219,43 @@ export function matches(access, tabUrl) {
         return false;
     }
 }
+// Agrupa pestañas abiertas que apuntan al mismo documento (misma clave que la
+// reutilización de accesos). Solo http/https/file: las páginas internas del
+// navegador y la nueva pestaña no se consideran repetidas. Cada grupo conserva
+// una pestaña (la activa si existe) y marca el resto como cerrables.
+export function duplicateTabGroups(tabs = []) {
+    const groups = new Map();
+    for (const tab of tabs) {
+        if (!tab || tab.id === undefined || tab.id === null)
+            continue;
+        const raw = tab.url || tab.pendingUrl || "";
+        let key;
+        try {
+            const protocol = new URL(raw).protocol;
+            if (protocol === "http:" || protocol === "https:")
+                key = documentKey(raw);
+            else if (protocol === "file:")
+                key = accessUrl(raw);
+            else
+                continue;
+        }
+        catch {
+            continue;
+        }
+        if (!groups.has(key))
+            groups.set(key, []);
+        groups.get(key).push(tab);
+    }
+    const result = [];
+    for (const [key, group] of groups) {
+        if (group.length < 2)
+            continue;
+        const keeperIndex = Math.max(0, group.findIndex(tab => tab.active));
+        result.push({
+            key,
+            keep: group[keeperIndex],
+            duplicates: group.filter((_, index) => index !== keeperIndex),
+        });
+    }
+    return result;
+}

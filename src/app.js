@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -536,6 +536,47 @@ function openRecaptureDialog(access) {
   $('recaptureSummary').textContent = 'Preparar una nueva miniatura para “' + access.title + '”.';
   openDialog('recaptureDialog');
 }
+function tabLabel(tab) {
+  return (tab.title && tab.title.trim()) || tab.url || tab.pendingUrl || 'Pestaña sin título';
+}
+async function openDuplicatesDialog() {
+  const groups = duplicateTabGroups(await chrome.tabs.query({}));
+  const list = $('duplicatesList'); list.replaceChildren();
+  const submit = $('closeDuplicatesSubmit');
+  const total = groups.reduce((sum, group) => sum + group.duplicates.length, 0);
+  if (!total) {
+    $('duplicatesSummary').textContent = 'No hay pestañas repetidas abiertas.';
+    submit.disabled = true;
+    openDialog('duplicatesDialog');
+    return;
+  }
+  $('duplicatesSummary').textContent = (total === 1
+    ? 'Se encontró 1 pestaña repetida.'
+    : 'Se encontraron ' + total + ' pestañas repetidas.') + ' Elige cuáles cerrar; se conserva una de cada una.';
+  for (const group of groups) {
+    const section = node('div', 'duplicate-group');
+    section.append(node('p', 'duplicate-group-title', tabLabel(group.keep)));
+    section.append(node('small', 'duplicate-group-note', group.duplicates.length === 1 ? '1 copia adicional' : group.duplicates.length + ' copias adicionales'));
+    for (const tab of group.duplicates) {
+      const row = node('label', 'duplicate-row');
+      const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
+      checkbox.dataset.tabId = String(tab.id);
+      row.append(checkbox, node('span', 'duplicate-row-text', tabLabel(tab)));
+      section.append(row);
+    }
+    list.append(section);
+  }
+  submit.disabled = false;
+  openDialog('duplicatesDialog');
+}
+async function closeSelectedDuplicates() {
+  const ids = [...$('duplicatesList').querySelectorAll('input[type=checkbox]:checked')]
+    .map(input => Number(input.dataset.tabId)).filter(Number.isInteger);
+  if (!ids.length) { showMessage('Selecciona al menos una pestaña para cerrar.', true); return; }
+  await chrome.tabs.remove(ids);
+  $('duplicatesDialog').close();
+  showMessage(ids.length === 1 ? 'Se cerró 1 pestaña repetida.' : 'Se cerraron ' + ids.length + ' pestañas repetidas.');
+}
 function showCardMenu(event, access, categoryId) {
   const menu = $('cardMenu'); menu.hidden = false;
   menu.style.left = Math.max(0, Math.min(event.clientX, innerWidth - 190)) + 'px';
@@ -584,6 +625,8 @@ document.querySelectorAll('[data-cancel]').forEach(b => {
 });
 document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
+onClick('findDuplicates', openDuplicatesDialog);
+onClick('closeDuplicatesSubmit', closeSelectedDuplicates);
 onClick('newWorkspace', () => { $('workspaceForm').reset(); openDialog('workspaceDialog'); });
 onClick('editWorkspace', () => {
   const workspace = currentWorkspace();

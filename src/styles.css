@@ -315,6 +315,46 @@ dialog {
   grid-template-columns:1fr 1fr;
   gap:12px
 }
+.duplicates-list {
+  max-height:50vh;
+  overflow:auto;
+  margin-top:12px
+}
+.duplicate-group {
+  border:1px solid #3b4969;
+  border-radius:8px;
+  padding:12px;
+  margin-top:10px
+}
+.duplicate-group-title {
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+.duplicate-group-note {
+  display:block;
+  margin:2px 0 8px;
+  color:#8392b4;
+  font-size:11px
+}
+.duplicate-row {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:6px 0
+}
+.duplicate-row input {
+  width:auto;
+  margin:0;
+  flex:0 0 auto
+}
+.duplicate-row-text {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px
+}
 .setting-grid label {
   margin-top:0
 }

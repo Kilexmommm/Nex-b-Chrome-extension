@@ -1,9 +1,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules } from '../src/model.js';
+import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules, duplicateTabGroups } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
 const access = (url, matchType = 'document') => ({ url, matchType });
+
+test('agrupa pestañas repetidas y conserva la activa, ignorando páginas internas', () => {
+  const tabs = [
+    { id: 1, url: 'https://a.com/', active: false },
+    { id: 2, url: 'https://a.com/', active: true },
+    { id: 3, url: 'https://b.com/', active: false },
+    { id: 4, url: 'chrome://newtab/', active: false },
+    { id: 5, url: 'chrome://newtab/', active: false },
+  ];
+  const groups = duplicateTabGroups(tabs);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].keep.id, 2);
+  assert.deepEqual(groups[0].duplicates.map(t => t.id), [1]);
+});
+test('el mismo documento de Google Docs con distinta URL cuenta como repetido', () => {
+  const tabs = [
+    { id: 1, url: 'https://docs.google.com/document/d/ABC/edit', active: false },
+    { id: 2, url: 'https://docs.google.com/document/u/0/d/ABC/edit?usp=drive_web', active: false },
+  ];
+  const groups = duplicateTabGroups(tabs);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].keep.id, 1);
+  assert.deepEqual(groups[0].duplicates.map(t => t.id), [2]);
+});
+test('sin repetidos no devuelve grupos y tolera pestañas sin id o url inválida', () => {
+  const tabs = [
+    { id: 1, url: 'https://a.com/', active: false },
+    { url: 'https://a.com/', active: false },
+    { id: 3, url: 'no-es-una-url', active: false },
+  ];
+  assert.deepEqual(duplicateTabGroups(tabs), []);
+  assert.deepEqual(duplicateTabGroups(), []);
+});
 
 test('migra datos anteriores sin resucitar categorías ni reglas eliminadas', () => {
   const old = fixture(); old.categories = []; old.autoTagRules = {};
