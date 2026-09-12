@@ -91,6 +91,14 @@ export async function syncDriveImages(data) {
           const localHash = await blobHash(local.blob);
           const unchanged = access.driveImageHash && access.driveImageHash === localHash;
           const remoteHash = existing?.appProperties?.nexbHash || '';
+          if (existing && !access.driveImageHash) {
+            access.thumbnail = await downloadFile(token, existing.id);
+            const downloadedImage = dataUrlBlob(access.thumbnail);
+            if (downloadedImage) access.driveImageHash = remoteHash || await blobHash(downloadedImage.blob);
+            access.driveImageId = existing.id;
+            downloaded++;
+            continue;
+          }
           if (existing && access.driveImageHash && !unchanged && remoteHash && remoteHash !== access.driveImageHash)
             throw new Error('Conflicto: esta miniatura cambió también en otro computador. No se sobrescribió.');
           if (unchanged && existing) {

@@ -72,3 +72,22 @@ test('syncDriveImages no sobrescribe una miniatura modificada en otro computador
     globalThis.fetch = previousFetch;
   }
 });
+
+test('syncDriveImages prefiere Drive cuando el acceso antiguo no tiene hash', async () => {
+  const previousChrome = globalThis.chrome;
+  const previousFetch = globalThis.fetch;
+  globalThis.chrome = { identity: { getAuthToken: async () => ({ token: 'token' }), removeCachedAuthToken: async () => {} } };
+  globalThis.fetch = async url => {
+    if (url.includes('/files?q=')) return new Response(JSON.stringify({ files: [{ id: 'drive-image-1', name: 'nexb-image-saved', mimeType: 'image/png', appProperties: { nexbHash: 'remote-hash' } }] }), { status: 200 });
+    return new Response(new Blob(['latest'], { type: 'image/png' }), { status: 200 });
+  };
+  try {
+    const result = await syncDriveImages(fixture({ thumbnail: image, driveImageId: 'drive-image-1' }));
+    assert.equal(result.uploaded, 0);
+    assert.equal(result.downloaded, 1);
+    assert.match(result.data.categories[0].accesses[0].thumbnail, /^data:image\/png;base64,/);
+  } finally {
+    globalThis.chrome = previousChrome;
+    globalThis.fetch = previousFetch;
+  }
+});
