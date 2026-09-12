@@ -7,10 +7,13 @@ import { collectTags, suggestTags, insertTag } from './tags.js';
 import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
+import { createSyncStore, mergeSyncData } from './sync.js';
+import { syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
 const uid = prefix => prefix + '-' + crypto.randomUUID();
 const repository = createRepository(chrome.storage.local, navigator.locks);
+const syncStore = createSyncStore(chrome.storage.sync);
 let data = normalizeData(DEFAULT_DATA), revision = 0;
 let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = false;
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
@@ -18,6 +21,7 @@ let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
+let syncEnabled = false, syncBusy = false, syncTimer = null;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -130,6 +134,7 @@ async function commit(candidate) {
     sessionStorage.setItem('activeWorkspace', data.activeWorkspaceId);
     applySettings();
     render();
+    scheduleSync();
   } finally {
     saving = false;
     document.querySelectorAll('dialog button, dialog input, dialog select, dialog textarea').forEach(b => { b.disabled = false; });
@@ -161,11 +166,15 @@ function parseRules(value) {
 }
 function selectSettingsTab(tab) {
   const design = tab === 'design';
-  $('settingsGeneralPanel').hidden = design;
+  const sync = tab === 'sync';
+  $('settingsSyncPanel').hidden = !sync;
   $('settingsDesignPanel').hidden = !design;
-  $('settingsGeneralTab').setAttribute('aria-selected', String(!design));
+  $('settingsGeneralPanel').hidden = design || sync;
+  $('settingsGeneralTab').setAttribute('aria-selected', String(!design && !sync));
+  $('settingsSyncTab').setAttribute('aria-selected', String(sync));
   $('settingsDesignTab').setAttribute('aria-selected', String(design));
-  $('settingsGeneralTab').tabIndex = design ? -1 : 0;
+  $('settingsGeneralTab').tabIndex = design || sync ? -1 : 0;
+  $('settingsSyncTab').tabIndex = sync ? 0 : -1;
   $('settingsDesignTab').tabIndex = design ? 0 : -1;
 }
 function applySettings() {
@@ -558,8 +567,9 @@ function inventoryBoxes() {
 async function currentInventorySelection(fallbackVisible = false) {
   const visible = inventoryBoxes().filter(box => !box.closest('.inventory-row').hidden);
   const checked = visible.filter(box => box.checked);
-  const selected = new Map((checked.length || !fallbackVisible ? checked : visible).map(box => [Number(box.dataset.tabId), box.dataset.url]));
-  return (await chrome.tabs.query({})).filter(tab => selected.has(tab.id) && !tab.pendingUrl && selected.get(tab.id) === tab.url);
+  const selected = (checked.length || !fallbackVisible ? checked : visible).flatMap(inventorySelectionEntries);
+  const expected = new Map(selected.map(entry => [entry.id, entry.url]));
+  return (await chrome.tabs.query({})).filter(tab => expected.has(tab.id) && !tab.pendingUrl && expected.get(tab.id) === tab.url);
 }
 function fillInventoryCategories(workspaceId, selectedId = '') {
   const categories = data.categories.filter(c => c.workspaceId === workspaceId);
@@ -570,12 +580,71 @@ function fillInventoryCategories(workspaceId, selectedId = '') {
   if (!options.length) options.push(new Option('General (se creará al guardar)', '__new'));
   $('inventoryCategory').replaceChildren(...options);
 }
+function savedAccessForTabKey(key) {
+  for (const category of data.categories) {
+    const access = category.accesses.find(item => tabKey(item.url) === key);
+    if (access) return access;
+  }
+  return null;
+}
+function inventoryThumbnail(access) {
+  const thumbnail = node('span', 'inventory-thumbnail');
+  const placeholder = node('span', 'inventory-thumbnail-placeholder', '◌');
+  thumbnail.append(placeholder);
+  if (!access?.thumbnail) return thumbnail;
+  const image = node('img', 'inventory-thumbnail-image');
+  image.src = access.thumbnail;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  image.referrerPolicy = 'no-referrer';
+  image.onerror = () => image.replaceWith(placeholder);
+  thumbnail.replaceChildren(image);
+  return thumbnail;
+}
+function inventorySelectionEntries(box) {
+  if (box.dataset.tabIds) {
+    const ids = JSON.parse(box.dataset.tabIds);
+    const urls = JSON.parse(box.dataset.tabUrls || '[]');
+    return ids.map((id, index) => ({ id, url: urls[index] || '' }));
+  }
+  return [{ id: Number(box.dataset.tabId), url: box.dataset.url || '' }];
+}
 async function refreshInventory() {
   const tabs = (await chrome.tabs.query({})).filter(tab => tabKey(tab.url || tab.pendingUrl || ''));
-  const duplicateIds = new Set(duplicateTabGroups(tabs).flatMap(group => group.duplicates.map(tab => tab.id)));
+  const groups = duplicateTabGroups(tabs);
+  const duplicateIds = new Set(groups.flatMap(group => [group.keep, ...group.duplicates].map(tab => tab.id)));
   const list = $('inventoryList');
   const fragment = document.createDocumentFragment();
-  for (const tab of tabs) {
+  for (const group of groups) {
+    const access = savedAccessForTabKey(group.key);
+    const total = group.duplicates.length + 1;
+    const title = access?.title || tabLabel(group.keep);
+    const row = node('div', 'inventory-row inventory-group-row');
+    const checkbox = node('input');
+    checkbox.type = 'checkbox';
+    checkbox.setAttribute('aria-label', 'Seleccionar copias repetidas de ' + title);
+    checkbox.dataset.tabIds = JSON.stringify(group.duplicates.map(tab => tab.id));
+    checkbox.dataset.tabUrls = JSON.stringify(group.duplicates.map(tab => tab.url));
+    checkbox.dataset.search = (title + ' ' + group.keep.url).toLowerCase();
+    const open = node('button', 'inventory-group-open');
+    open.type = 'button';
+    open.title = 'Abrir repetidas y preparar cierre pasivo';
+    open.setAttribute('aria-label', 'Ver ' + total + ' pestañas repetidas de ' + title);
+    open.onclick = () => run(async () => {
+      selectInventoryTab('dup');
+      await refreshDuplicates(group.key);
+      $('inventoryDupClose').focus();
+    });
+    const info = node('span', 'inventory-row-info');
+    info.append(node('span', 'inventory-row-title', title + ' (' + total + ')'));
+    info.append(node('small', 'inventory-row-url', group.keep.url));
+    info.append(node('small', 'inventory-group-meta', group.duplicates.length + (group.duplicates.length === 1 ? ' copia cerrable' : ' copias cerrables')));
+    open.append(inventoryThumbnail(access), info);
+    row.append(checkbox, open);
+    fragment.append(row);
+  }
+  for (const tab of tabs.filter(item => !duplicateIds.has(item.id))) {
     const url = tab.url || tab.pendingUrl || '';
     const row = node('label', 'inventory-row');
     const checkbox = node('input'); checkbox.type = 'checkbox';
@@ -583,12 +652,10 @@ async function refreshInventory() {
     checkbox.dataset.url = url;
     checkbox.dataset.title = tab.title || '';
     checkbox.dataset.search = (tabLabel(tab) + ' ' + url).toLowerCase();
-    if (duplicateIds.has(tab.id)) checkbox.dataset.duplicate = '1';
     const info = node('span', 'inventory-row-info');
     info.append(node('span', 'inventory-row-title', tabLabel(tab)));
     info.append(node('small', 'inventory-row-url', url));
     row.append(checkbox, info);
-    if (duplicateIds.has(tab.id)) row.append(node('span', 'inventory-badge', 'repetida'));
     fragment.append(row);
   }
   list.replaceChildren(fragment);
@@ -741,15 +808,15 @@ async function closeSelectedInventory() {
   showMessage(ids.length === 1 ? 'Se cerró 1 pestaña.' : 'Se cerraron ' + ids.length + ' pestañas.');
 }
 async function addSelectedToCategory() {
-  const boxes = inventoryBoxes().filter(box => box.checked);
-  if (!boxes.length) { showMessage('Selecciona al menos una pestaña.', true); return; }
+  const tabs = await currentInventorySelection();
+  if (!tabs.length) { showMessage('Selecciona al menos una pestaña.', true); return; }
   const workspaceId = $('inventoryWorkspace').value, categoryId = $('inventoryCategory').value;
   const candidate = structuredClone(data);
   let added = 0, skipped = 0;
-  for (const box of boxes) {
-    let url; try { url = accessUrl(box.dataset.url); } catch { skipped++; continue; }
+  for (const tab of tabs) {
+    let url; try { url = accessUrl(tab.url); } catch { skipped++; continue; }
     if (candidate.categories.some(c => c.workspaceId === workspaceId && c.accesses.some(a => tabKey(a.url) === tabKey(url)))) { skipped++; continue; }
-    const title = (box.dataset.title || '').trim().slice(0, 300) || url;
+    const title = (tab.title || '').trim().slice(0, 300) || url;
     try { placeAccess(candidate, { id: uid('access'), title, url, tags: [], matchType: 'document', thumbnail: '' }, { sourceCategoryId: '', workspaceId, categoryId }, uid); added++; }
     catch { skipped++; }
   }
@@ -777,6 +844,85 @@ function showCardMenu(event, access, categoryId) {
     category.accesses = category.accesses.filter(a => a.id !== access.id);
     await commit(candidate);
   });
+}
+
+function waitForBatchTab(tabId, timeout = 20000) {
+  return new Promise((resolve, reject) => {
+    let timer;
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      callback(value);
+    };
+    const onUpdated = (updatedId, changeInfo, tab) => {
+      if (updatedId === tabId && changeInfo.status === 'complete') finish(resolve, tab);
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
+    chrome.tabs.get(tabId).then(tab => {
+      if (tab.status === 'complete') finish(resolve, tab);
+    }).catch(error => finish(reject, error));
+  });
+}
+async function captureBatchThumbnail(tab) {
+  const [active] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+  if (active?.id !== tab.id) throw new Error('La pestaña de captura dejó de estar activa.');
+  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 75 });
+  const encoded = dataUrl.split(',')[1];
+  if (!encoded) throw new Error('Chrome no devolvió una imagen.');
+  const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
+  const thumbnail = await resizeImage(new Blob([bytes], { type: 'image/jpeg' }));
+  if (thumbnail.length > 700000) throw new Error('La captura supera el límite permitido.');
+  return thumbnail;
+}
+async function captureAllImages() {
+  const allAccesses = data.categories.flatMap(category => category.accesses);
+  const targets = allAccesses.filter(access => !access.thumbnail && /^https?:/i.test(access.url));
+  const localMissing = allAccesses.filter(access => !access.thumbnail && access.url.startsWith('file:')).length;
+  if (!targets.length) {
+    showMessage(localMissing ? 'No hay páginas web pendientes. Los accesos file:// requieren una captura manual.' : 'Todos los accesos web ya tienen miniatura.');
+    return;
+  }
+  if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
+  if (!await chrome.permissions.request({ origins: ['http://*/*', 'https://*/*'] })) {
+    throw new Error('No se concedió el permiso para capturar páginas web.');
+  }
+  const [origin] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  let temporary;
+  let captured = 0;
+  let failed = 0;
+  try {
+    temporary = await chrome.tabs.create({ url: 'about:blank', active: true, ...(origin?.windowId ? { windowId: origin.windowId } : {}) });
+    for (const [index, access] of targets.entries()) {
+      try {
+        showMessage('Capturando ' + (index + 1) + ' de ' + targets.length + ': ' + access.title);
+        await chrome.tabs.update(temporary.id, { url: accessUrl(access.url), active: true });
+        const loaded = await waitForBatchTab(temporary.id);
+        if (!/^https?:/i.test(loaded.url || '')) throw new Error('La página no terminó en una URL web.');
+        const thumbnail = await captureBatchThumbnail(loaded);
+        const candidate = structuredClone(data);
+        const target = candidate.categories.flatMap(category => category.accesses).find(item => item.id === access.id);
+        if (!target) throw new Error('El acceso ya no existe.');
+        target.thumbnail = thumbnail;
+        await commit(candidate);
+        captured++;
+      } catch {
+        failed++;
+      }
+    }
+  } finally {
+    if (temporary?.id !== undefined) await chrome.tabs.remove(temporary.id).catch(() => {});
+    if (origin?.id !== undefined) {
+      await chrome.tabs.update(origin.id, { active: true }).catch(() => {});
+      if (Number.isInteger(origin.windowId) && chrome.windows?.update) await chrome.windows.update(origin.windowId, { focused: true }).catch(() => {});
+    }
+  }
+  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') : '';
+  const local = localMissing ? ' ' + localMissing + (localMissing === 1 ? ' acceso local requiere captura manual.' : ' accesos locales requieren captura manual.') : '';
+  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local);
 }
 
 function onClick(id, action) { $(id).onclick = () => run(async () => {
@@ -821,6 +967,7 @@ onClick('inventoryCloseSelected', closeSelectedInventory);
 onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
+onClick('captureAllImages', captureAllImages);
 $('inventorySearch').oninput = () => {
   // Apply visibility immediately so actions cannot target hidden results.
   filterInventory();
@@ -891,9 +1038,35 @@ onSubmit('recaptureForm', async () => {
     $('recaptureDialog').querySelectorAll('button').forEach(b => { b.disabled = false; });
   }
 });
+const GITHUB_ARCHIVE_URL = 'https://github.com/Kilexmommm/Nex-b-Chrome-extension/archive/refs/heads/main.zip';
+onClick('openUpdate', async () => {
+  await chrome.tabs.create({ url: GITHUB_ARCHIVE_URL });
+  showMessage('Descarga iniciada. Conserva tu respaldo, reemplaza los archivos de la extensión y pulsa «Recargar» en chrome://extensions.');
+});
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
 onClick('settingsGeneralTab', () => selectSettingsTab('general'));
+onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
+onClick('refreshSyncAccount', updateSyncAccount);
+onClick('syncNow', syncNow);
+onClick('syncDriveNow', async () => {
+  syncEnabled = true;
+  $('syncEnabled').checked = true;
+  await chrome.storage.local.set({ nexbSyncEnabled: true });
+  setSyncStatus('Conectando con Google Drive…');
+  const result = await syncDriveImages(data);
+  if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+  await syncStore.save(data);
+  const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+  setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+});
+onClick('openDriveDocs', () => chrome.tabs.create({ url: 'https://console.cloud.google.com/apis/library/drive.googleapis.com' }));
+$('syncEnabled').onchange = () => run(async () => {
+  syncEnabled = $('syncEnabled').checked;
+  await chrome.storage.local.set({ nexbSyncEnabled: syncEnabled });
+  if (syncEnabled) await syncNow();
+  else setSyncStatus('Sincronización desactivada en este dispositivo.');
+});
 onClick('openSettings', () => {
   const s = data.settings;
   renderStylePresets(s.themeId);
@@ -902,6 +1075,7 @@ onClick('openSettings', () => {
   for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) $(key).value = s[key];
   $('captureEnabled').checked = s.captureEnabled;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
+  $('syncEnabled').checked = syncEnabled;
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
   selectSettingsTab('general');
   openDialog('settingsDialog');
@@ -976,6 +1150,58 @@ onClick('downloadData', () => {
 });
 onClick('importData', () => $('zipImportInput').click());
 
+function setSyncStatus(message, error = false) {
+  const status = $('syncStatus');
+  if (!status) return;
+  status.textContent = message;
+  status.hidden = !message;
+  status.classList.toggle('error', error);
+}
+async function updateSyncAccount() {
+  const status = $('syncAccount');
+  try {
+    const profile = await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' });
+    status.textContent = profile.email ? 'Cuenta de Chrome: ' + profile.email : 'Cuenta de Chrome: no disponible; activa la sincronización del perfil.';
+  } catch {
+    status.textContent = 'Cuenta de Chrome: no se pudo consultar.';
+  }
+}
+async function syncNow() {
+  if (syncBusy) return;
+  syncBusy = true;
+  clearTimeout(syncTimer);
+  try {
+    if (!syncEnabled) {
+      syncEnabled = true;
+      $('syncEnabled').checked = true;
+      await chrome.storage.local.set({ nexbSyncEnabled: true });
+    }
+    setSyncStatus('Leyendo datos sincronizados…');
+    const remote = await syncStore.load();
+    if (remote) {
+      const merged = mergeSyncData(data, remote.data);
+      if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+    }
+    const saved = await syncStore.save(data);
+    setSyncStatus('Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.');
+  } catch (error) {
+    setSyncStatus(error.message || 'No se pudo sincronizar; se conserva la copia local.', true);
+    throw error;
+  } finally {
+    syncBusy = false;
+  }
+}
+function scheduleSync() {
+  if (!syncEnabled || syncBusy) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => run(syncNow), 900);
+}
+async function restoreSyncPreference() {
+  const stored = await chrome.storage.local.get('nexbSyncEnabled');
+  syncEnabled = stored.nexbSyncEnabled === true;
+  $('syncEnabled').checked = syncEnabled;
+}
+
 let bookmarkPath = [], bookmarkChildren = [], bookmarkGeneration = 0, bookmarkBusy = false;
 async function requestBookmarkPermission() {
   // Permission request is reached directly from an explicit button or section icon.
@@ -994,19 +1220,24 @@ async function syncCategoryBookmarks(category) {
 }
 async function syncWorkspaceBookmarks() {
   await requestBookmarkPermission();
-  let candidate = data, linked = 0, unavailable = 0;
+  let candidate = data, linked = 0;
+  const unavailable = [];
   const total = { added: 0, duplicates: 0, unsupported: 0, missing: 0, restored: 0, folders: 0 };
-  for (const category of data.categories.filter(item => item.workspaceId === currentWorkspace().id && item.bookmarkFolderId)) {
+  const linkedCategories = data.categories.filter(item => item.bookmarkFolderId);
+  for (const category of linkedCategories) {
     try {
       const { children } = await readBookmarkFolder(chrome.bookmarks, category.bookmarkFolderId);
       const result = syncBookmarkSection(candidate, category.id, children, uid);
       candidate = result.data; linked++;
       for (const key of Object.keys(total)) total[key] += result.stats[key];
-    } catch { unavailable++; }
+    } catch (error) {
+      unavailable.push(category.name + (error?.message ? ': ' + error.message : ''));
+    }
   }
-  if (!linked && !unavailable) { showMessage('Este Workspace no tiene secciones vinculadas a Favoritos.'); return; }
+  if (!linkedCategories.length) { showMessage('No hay secciones vinculadas a Favoritos.'); return; }
   if (JSON.stringify(candidate) !== JSON.stringify(data)) await commit(candidate);
-  showMessage(linked + ' secciones sincronizadas: ' + syncSummary(total) + (unavailable ? ' ' + unavailable + ' carpetas ya no están disponibles.' : ''));
+  const errors = unavailable.length ? ' No se pudieron sincronizar: ' + unavailable.join(' | ') : '';
+  showMessage(linked + ' secciones sincronizadas: ' + syncSummary(total) + errors);
 }
 function fillBookmarkCategories() {
   const workspaceId = $('bookmarkWorkspace').value;
@@ -1128,6 +1359,7 @@ onClick('removeThumbnail', () => { pasteGeneration++; imageBusy = false; pastedI
 $('accessThumbnailUrl').onchange = () => run(() => { pastedImage = imageUrl($('accessThumbnailUrl').value.trim()); showPreview(); });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && ('workspaceRevision' in changes || 'workspaceData' in changes)) run(reload);
+  if (area === 'sync' && syncEnabled && Object.keys(changes).some(key => key.startsWith('nexb.sync.'))) setSyncStatus('Hay cambios sincronizados disponibles. Pulsa «Sincronizar ahora» para aplicarlos.');
 });
 chrome.tabs.onUpdated.addListener((_id, change) => { if (change.url || change.status === 'complete') scheduleTabRefresh(); });
 chrome.tabs.onCreated.addListener(scheduleTabRefresh);
@@ -1136,8 +1368,13 @@ chrome.tabs.onReplaced.addListener(scheduleTabRefresh);
 
 async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await restoreSyncPreference();
   const snapshot = await repository.load();
   adopt(snapshot); ready = true;
+  $('extensionVersion').textContent = chrome.runtime.getManifest().version;
+  await updateSyncAccount();
+  if (syncEnabled) await syncNow().catch(() => {});
   if (snapshot.recovered) showMessage('Se recuperó la copia anterior en memoria. Descarga un ZIP antes de continuar; los datos originales no se sobrescribieron.');
   await refreshTabs();
   const params = new URLSearchParams(location.search);

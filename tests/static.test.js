@@ -55,6 +55,60 @@ test('la apertura local usa pestañas y ofrece la configuración de archivos', (
   assert.match(read('newtab.html'), /id="openLocalSettings"/);
   assert.doesNotMatch(read('newtab.html'), /Instalar asistente macOS/);
 });
+test('captura por lote usa permiso opcional y conserva miniaturas existentes', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.match(html, /id="captureAllImages"/);
+  assert.match(app, /chrome\.permissions\.request\(\{ origins: \['http:\/\/\*\/\*', 'https:\/\/\*\/\*'\] \}\)/);
+  assert.match(app, /!access\.thumbnail && \/\^https\?:\//);
+  assert.match(app, /chrome\.tabs\.captureVisibleTab/);
+  assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
+});
+test('la sincronización global recorre todas las secciones vinculadas y muestra errores', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.match(app, /const linkedCategories = data\.categories\.filter\(item => item\.bookmarkFolderId\)/);
+  assert.match(app, /unavailable\.push\(category\.name/);
+  assert.match(html, /id="syncWorkspaceBookmarks"[^>]*>↻ Sincronizar favoritos importados/);
+});
+test('la actualización asistida abre el ZIP de GitHub y muestra la versión instalada', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.match(html, /id="openUpdate"[^>]*>Actualizar desde GitHub/);
+  assert.match(html, /id="extensionVersion"/);
+  assert.match(app, /const GITHUB_ARCHIVE_URL = 'https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/archive\/refs\/heads\/main\.zip'/);
+  assert.match(app, /chrome\.runtime\.getManifest\(\)\.version/);
+  assert.match(app, /chrome\.tabs\.create\(\{ url: GITHUB_ARCHIVE_URL \}\)/);
+});
+test('la configuración incluye una pestaña de sincronización sin imágenes en Chrome Sync', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), sync = read('src/sync.js');
+  assert.match(html, /id="settingsSyncTab"/);
+  assert.match(html, /id="settingsSyncPanel"/);
+  assert.match(html, /id="syncEnabled"/);
+  assert.match(html, /id="syncNow"/);
+  assert.match(app, /createSyncStore\(chrome\.storage\.sync\)/);
+  assert.match(app, /chrome\.storage\.sync\.setAccessLevel/);
+  assert.match(sync, /const \{ backgroundImageUrl, \.\.\.settings \}/);
+  assert.match(sync, /const \{ thumbnail, bookmarkMissing, \.\.\.metadata \}/);
+});
+test('Drive usa OAuth privado y la pestaña ofrece subida y descarga de imágenes', () => {
+  const manifest = JSON.parse(read('manifest.json')), app = read('src/app.js'), drive = read('src/drive.js'), html = read('newtab.html');
+  assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/drive.appdata']);
+  assert.ok(manifest.oauth2.client_id.endsWith('.apps.googleusercontent.com'));
+  assert.ok(manifest.permissions.includes('identity'));
+  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/']);
+  assert.match(app, /syncDriveImages\(data\)/);
+  assert.match(drive, /appDataFolder/);
+  assert.match(html, /id="syncDriveNow"/);
+});
+test('el inventario prioriza grupos repetidos con miniatura, contador y cierre pasivo', () => {
+  const app = read('src/app.js'), css = read('src/styles.css');
+  assert.match(app, /const groups = duplicateTabGroups\(tabs\)/);
+  assert.match(app, /for \(const group of groups\)/);
+  assert.match(app, /title \+ ' \(' \+ total \+ '\)'/);
+  assert.match(app, /inventoryThumbnail\(access\)/);
+  assert.match(app, /await refreshDuplicates\(group\.key\)/);
+  assert.match(app, /checkbox\.dataset\.tabIds = JSON\.stringify\(group\.duplicates/);
+  assert.match(css, /\.inventory-group-row \{/);
+  assert.match(css, /\.inventory-thumbnail-image \{/);
+});
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
   assert.match(app, /small: 168, medium: 240, large: 312/);
@@ -190,14 +244,15 @@ test('nombre a 13px, dos líneas, pie transparente y botón importar destacado',
   assert.match(css, /\.card-footer \{[^}]*background: transparent/);
   assert.match(css, /#openBookmarks \{ background: #ffb15c; color: #2a180c/);
 });
-test('manifest MV3: sin hosts, scripts remotos, recursos públicos ni evaluación dinámica', () => {
+test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación dinámica', () => {
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage']);
-  assert.equal(manifest.optional_host_permissions, undefined);
+  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email']);
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
-  for (const key of ['host_permissions', 'content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
+  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/']);
+  for (const key of ['content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /unsafe-eval/);
   for (const path of Object.values(manifest.icons)) assert.ok(existsSync(new URL('../' + path, import.meta.url)));

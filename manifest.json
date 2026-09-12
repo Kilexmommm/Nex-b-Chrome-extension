@@ -2,15 +2,23 @@
   "manifest_version": 3,
   "name": "nex.b",
   "description": "Espacios de trabajo visuales con accesos, etiquetas y reutilización de pestañas.",
-  "version": "1.7.4",
+  "version": "1.7.5",
+  "oauth2": {
+    "client_id": "1072291004977-kj4e2mskp59eunofuj6j5cjliqu83bom.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/drive.appdata"]
+  },
   "optional_permissions": ["bookmarks"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "permissions": [
     "tabs",
     "storage",
     "contextMenus",
     "activeTab",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "identity",
+    "identity.email"
   ],
+  "host_permissions": ["https://www.googleapis.com/"],
   "icons": {
     "16": "icons/nex-b-16.png",
     "32": "icons/nex-b-32.png",
@@ -34,6 +42,6 @@
   },
   "minimum_chrome_version": "123",
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; connect-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; frame-src 'none'; form-action 'none'"
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; connect-src 'self' https://www.googleapis.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; frame-src 'none'; form-action 'none'"
   }
 }

@@ -1,7 +1,7 @@
 export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
-    categories: [{ id: "ypf", name: "YPF", workspaceId: "general", parentId: "", accesses: [] }],
+    categories: [{ id: "ypf", name: "General", workspaceId: "general", parentId: "", accesses: [] }],
     settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal" },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
@@ -131,19 +131,22 @@ export function normalizeData(stored = DEFAULT_DATA) {
             fail("Categoría con Workspace inexistente.");
         const bookmarkFolderId = text(c.bookmarkFolderId ?? "", "Carpeta de favoritos", 120, true);
         const bookmarkFolderTitle = text(c.bookmarkFolderTitle ?? "", "Nombre de carpeta de favoritos", 120, true);
+        const isEmptyLegacyDefault = c.id === "ypf" && c.name === "YPF" && workspaceId === "general" && !c.parentId && (!c.accesses || c.accesses.length === 0);
         return {
-            id: uniqueId(c.id, categoryIds), name: text(c.name, "Categoría", 120), workspaceId,
+            id: uniqueId(c.id, categoryIds), name: isEmptyLegacyDefault ? "General" : text(c.name, "Categoría", 120), workspaceId,
             parentId: text(c.parentId ?? "", "Categoría padre", 120, true),
             ...(bookmarkFolderId ? { bookmarkFolderId, bookmarkFolderTitle } : {}),
             accesses: list(c.accesses ?? [], "Accesos", LIMITS.accesses).map((a) => {
                 record(a, "Acceso");
                 const bookmarkId = text(a.bookmarkId ?? "", "Favorito de Chrome", 120, true);
                 const accessBookmarkFolderId = text(a.bookmarkFolderId ?? "", "Carpeta de favorito", 120, true);
+                const driveImageId = text(a.driveImageId ?? "", "Imagen de Google Drive", 200, true);
                 return { id: uniqueId(a.id, accessIds), title: text(a.title, "Nombre de acceso", 300),
                     url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
                     thumbnail: imageUrl(a.thumbnail ?? ""),
-                    ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}) };
+                    ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}),
+                    ...(driveImageId ? { driveImageId } : {}) };
             })
         };
     });

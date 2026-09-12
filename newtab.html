@@ -12,16 +12,16 @@
     <main class="shell">
       <header class="topbar">
         <h1>nex.b</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
-        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="openInventory" class="button secondary icon-button" title="Inventario de pestañas abiertas" aria-label="Inventario de pestañas abiertas"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 7V3h8l4 4v10h-4"/><path d="M16 3v4h4"/><rect x="4" y="7" width="12" height="14" rx="2"/><path d="M7 12h6M7 16h6"/></svg></button><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
+        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button></div><button id="openInventory" class="button secondary icon-button" title="Inventario de pestañas abiertas" aria-label="Inventario de pestañas abiertas">☰</button><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
       </header>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
       <p id="emptyState" class="empty" hidden>Agrega una categoría para empezar a organizar tus accesos.</p>
-      <div class="bottom-actions"><button id="newCategory" class="add-category-button" title="Nueva categoría" aria-label="Nueva categoría">+</button></div>
+      <div class="bottom-actions"><button id="captureAllImages" class="button secondary capture-all-button" title="Capturar todas las imágenes que faltan" aria-label="Capturar todas las imágenes que faltan">Capturar imágenes faltantes</button><button id="newCategory" class="add-category-button" title="Nueva categoría" aria-label="Nueva categoría">+</button></div>
       <footer class="signature">By.kilex</footer>
     </main>
     <dialog id="categoryDialog"><form method="dialog" id="categoryForm" class="dialog-form">
-      <h2>Nueva categoría</h2><label>Nombre<input id="categoryName" required maxlength="40" placeholder="Trabajo, YPF, Personal" /></label>
+      <h2>Nueva categoría</h2><label>Nombre<input id="categoryName" required maxlength="40" placeholder="Trabajo, Cliente, Personal" /></label>
       <label>Dentro de<select id="categoryParent"><option value="">Categoría principal</option></select></label>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar</button></div>
     </form></dialog>
@@ -58,7 +58,7 @@
     </form></dialog>
     <dialog id="workspaceDialog"><form method="dialog" id="workspaceForm" class="dialog-form">
       <h2>Nuevo Workspace</h2>
-      <label>Nombre<input id="workspaceName" required maxlength="40" placeholder="Trabajo, Personal, Cliente YPF" /></label>
+      <label>Nombre<input id="workspaceName" required maxlength="40" placeholder="Trabajo, Personal, Proyecto" /></label>
       <label>Tipo<select id="workspaceKind"><option value="principal">Principal</option><option value="standard">Estándar</option></select></label>
       <small class="field-help">Usa Principal para tus espacios más importantes. Puedes crear todos los workspaces que necesites.</small>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Crear Workspace</button></div>
@@ -87,6 +87,7 @@
       <h2>Configurar nex.b</h2>
       <div class="settings-tabs" role="tablist" aria-label="Secciones de configuración">
         <button id="settingsGeneralTab" type="button" role="tab" aria-controls="settingsGeneralPanel" aria-selected="true">General</button>
+        <button id="settingsSyncTab" type="button" role="tab" aria-controls="settingsSyncPanel" aria-selected="false" tabindex="-1">Sincronizar</button>
         <button id="settingsDesignTab" type="button" role="tab" aria-controls="settingsDesignPanel" aria-selected="false" tabindex="-1">Diseño</button>
       </div>
       <section id="settingsGeneralPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsGeneralTab">
@@ -95,13 +96,38 @@
         <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
         <section class="settings-utilities"><p>Datos y favoritos</p>
           <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
-          <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar Workspace</button>
-          <small>Chrome pedirá permiso para acceder a favoritos al usar esta opción. nex.b solo los lee.</small>
+           <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar favoritos importados</button>
+           <small>Sincroniza todas las secciones vinculadas, aunque pertenezcan a otro Workspace. Chrome pedirá permiso al usar esta opción; nex.b solo lee tus favoritos.</small>
+           <button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button>
+           <small>Versión instalada: <strong id="extensionVersion"></strong>. Se abrirá el ZIP de GitHub; después reemplaza la carpeta y pulsa «Recargar» en chrome://extensions.</small>
           <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
           <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
           <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
           <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
           <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>
+        </section>
+      </section>
+      <section id="settingsSyncPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsSyncTab" hidden>
+        <h3>Sincronizar Workspaces</h3>
+        <p class="help">Los datos pequeños se sincronizan con tu cuenta de Chrome. Las miniaturas no se suben a Chrome Sync porque tienen una cuota limitada.</p>
+        <p id="syncAccount" class="sync-account" role="status">Cuenta de Chrome: comprobando...</p>
+        <button id="refreshSyncAccount" type="button" class="button secondary">Actualizar cuenta</button>
+        <label class="checkbox-label"><input id="syncEnabled" type="checkbox" /> Activar sincronización de datos pequeños</label>
+        <small>Incluye Workspaces, categorías, nombres, URLs, tags y preferencias. Las imágenes se pueden subir a Drive con el botón de abajo.</small>
+        <p id="syncStatus" class="feedback" role="status" hidden></p>
+        <div class="dialog-actions"><button id="syncNow" type="button" class="button secondary">Sincronizar ahora</button></div>
+        <section class="appearance-editor">
+          <p>Imágenes en Google Drive</p>
+          <small>Drive usa una carpeta privada de la aplicación. Debes activar Drive API, completar OAuth y usar el ID estable registrado para esta extensión.</small>
+          <ol class="sync-instructions">
+            <li>Publica nex.b en Chrome Web Store o fija una clave estable en el manifest.</li>
+            <li>Crea credenciales OAuth de tipo Chrome Extension en Google Cloud.</li>
+            <li>Configura el Client ID y el permiso privado de Drive.</li>
+            <li>Autoriza Google Drive con tu cuenta y pulsa sincronizar.</li>
+          </ol>
+          <button id="syncDriveNow" type="button" class="button secondary">Sincronizar imágenes con Google Drive</button>
+          <button id="openDriveDocs" type="button" class="button secondary">Abrir instrucciones de Google Cloud</button>
+          <small>Si Chrome rechaza la conexión, verifica que el Client ID corresponda al ID de nex.b. El respaldo ZIP sigue disponible.</small>
         </section>
       </section>
       <section id="settingsDesignPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsDesignTab" hidden>
