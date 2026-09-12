@@ -141,12 +141,14 @@ export function normalizeData(stored = DEFAULT_DATA) {
                 const bookmarkId = text(a.bookmarkId ?? "", "Favorito de Chrome", 120, true);
                 const accessBookmarkFolderId = text(a.bookmarkFolderId ?? "", "Carpeta de favorito", 120, true);
                 const driveImageId = text(a.driveImageId ?? "", "Imagen de Google Drive", 200, true);
+                const driveImageHash = text(a.driveImageHash ?? "", "Hash de imagen de Google Drive", 128, true);
                 return { id: uniqueId(a.id, accessIds), title: text(a.title, "Nombre de acceso", 300),
                     url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
                     thumbnail: imageUrl(a.thumbnail ?? ""),
                     ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}),
-                    ...(driveImageId ? { driveImageId } : {}) };
+                    ...(driveImageId ? { driveImageId } : {}),
+                    ...(driveImageHash ? { driveImageHash } : {}) };
             })
         };
     });
