@@ -55,10 +55,10 @@ test('la apertura local usa pestañas y ofrece la configuración de archivos', (
   assert.match(read('newtab.html'), /id="openLocalSettings"/);
   assert.doesNotMatch(read('newtab.html'), /Instalar asistente macOS/);
 });
-test('captura por lote usa permiso opcional y conserva miniaturas existentes', () => {
+test('captura por lote usa acceso de host y conserva miniaturas existentes', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="captureAllImages"/);
-  assert.match(app, /chrome\.permissions\.request\(\{ origins: \['http:\/\/\*\/\*', 'https:\/\/\*\/\*'\] \}\)/);
+  assert.doesNotMatch(app, /permissions\.request\(\{ origins: \['http:\/\/\*\/\*'/);
   assert.match(app, /!access\.thumbnail && \/\^https\?:\//);
   assert.match(app, /chrome\.tabs\.captureVisibleTab/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
@@ -93,7 +93,7 @@ test('Drive usa OAuth privado y la pestaña ofrece subida y descarga de imágene
   assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/drive.appdata']);
   assert.ok(manifest.oauth2.client_id.endsWith('.apps.googleusercontent.com'));
   assert.ok(manifest.permissions.includes('identity'));
-  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/']);
+  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
   assert.match(app, /syncDriveImages\(data\)/);
   assert.match(drive, /appDataFolder/);
   assert.match(html, /id="syncDriveNow"/);
@@ -249,9 +249,9 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
   assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead']);
-  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  assert.equal(manifest.optional_host_permissions, undefined);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
-  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/']);
+  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
   for (const key of ['content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /unsafe-eval/);

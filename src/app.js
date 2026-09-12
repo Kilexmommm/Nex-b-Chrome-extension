@@ -911,9 +911,6 @@ async function captureAllImages() {
     return;
   }
   if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
-  if (!await chrome.permissions.request({ origins: ['http://*/*', 'https://*/*'] })) {
-    throw new Error('No se concedió el permiso para capturar páginas web.');
-  }
   const [origin] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   let temporary;
   let captured = 0;

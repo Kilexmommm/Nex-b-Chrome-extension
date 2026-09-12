@@ -1,4 +1,4 @@
-# nex.b · 1.7.6
+# nex.b · 1.7.7
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -231,7 +231,7 @@ La importación es manual, no una sincronización continua. Solo crea una secci�
 - Desde una página HTTP/HTTPS, el menú contextual o el icono de la extensión abre un acceso pendiente. Revisa la captura y selecciona la categoría antes de guardar.
 - Al agregar un enlace con clic derecho no se captura la página de origen: no representa necesariamente el enlace guardado.
 - Sin categorías se ofrece crear “General” junto con el acceso, solamente al guardar.
-- Al final del Workspace, **Capturar imágenes faltantes** solicita un permiso opcional y recorre las páginas web sin miniatura en una pestaña temporal. Las pestañas cambian de forma visible; se omiten los accesos `file://` y no se reemplazan miniaturas existentes.
+- Al final del Workspace, **Capturar imágenes faltantes** recorre las páginas web sin miniatura en una pestaña temporal. Las pestañas cambian de forma visible; se omiten los accesos `file://` y no se reemplazan miniaturas existentes.
 
 ### Sincronización entre computadores
 
@@ -272,10 +272,10 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | `unlimitedStorage` | Almacenar miniaturas sin la cuota estándar de la extensión. |
 | `identity` | Solicitar el token OAuth de Google para Drive; Chrome gestiona el token y no se guarda en la extensión. |
 | `bookmarks` — opcional | Leer favoritos al solicitar una importación; el código no modifica los favoritos. |
-| `http://*/*`, `https://*/*` — opcionales | Capturar imágenes faltantes en lote, solo después de pulsar el botón y aceptar el permiso. |
+| `http://*/*`, `https://*/*` | Capturar imágenes faltantes en lote en la pestaña temporal iniciada por el usuario. |
 | `https://www.googleapis.com/` | Comunicar con Google Drive para subir y descargar miniaturas privadas. |
 
-El acceso opcional a sitios no se solicita durante la instalación. La captura masiva puede incluir información privada; revisa el resultado antes de compartir un respaldo. La extensión no inyecta scripts en las páginas.
+La captura masiva puede incluir información privada; revisa el resultado antes de compartir un respaldo. La extensión no inyecta scripts en las páginas.
 
 ## Estructura del proyecto
 
