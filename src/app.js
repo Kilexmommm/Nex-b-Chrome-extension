@@ -846,7 +846,7 @@ function showCardMenu(event, access, categoryId) {
   });
 }
 
-function waitForBatchTab(tabId, timeout = 20000) {
+function waitForBatchTab(tabId, expectedUrl, timeout = 20000) {
   return new Promise((resolve, reject) => {
     let timer;
     let settled = false;
@@ -858,12 +858,12 @@ function waitForBatchTab(tabId, timeout = 20000) {
       callback(value);
     };
     const onUpdated = (updatedId, changeInfo, tab) => {
-      if (updatedId === tabId && changeInfo.status === 'complete') finish(resolve, tab);
+      if (updatedId === tabId && changeInfo.status === 'complete' && tab.url && tab.url !== 'about:blank') finish(resolve, tab);
     };
     chrome.tabs.onUpdated.addListener(onUpdated);
     timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
     chrome.tabs.get(tabId).then(tab => {
-      if (tab.status === 'complete') finish(resolve, tab);
+      if (tab.status === 'complete' && tab.url === expectedUrl) finish(resolve, tab);
     }).catch(error => finish(reject, error));
   });
 }
@@ -894,13 +894,15 @@ async function captureAllImages() {
   let temporary;
   let captured = 0;
   let failed = 0;
+  const failures = [];
   try {
     temporary = await chrome.tabs.create({ url: 'about:blank', active: true, ...(origin?.windowId ? { windowId: origin.windowId } : {}) });
     for (const [index, access] of targets.entries()) {
       try {
         showMessage('Capturando ' + (index + 1) + ' de ' + targets.length + ': ' + access.title);
-        await chrome.tabs.update(temporary.id, { url: accessUrl(access.url), active: true });
-        const loaded = await waitForBatchTab(temporary.id);
+        const targetUrl = accessUrl(access.url);
+        await chrome.tabs.update(temporary.id, { url: targetUrl, active: true });
+        const loaded = await waitForBatchTab(temporary.id, targetUrl);
         if (!/^https?:/i.test(loaded.url || '')) throw new Error('La página no terminó en una URL web.');
         const thumbnail = await captureBatchThumbnail(loaded);
         const candidate = structuredClone(data);
@@ -909,8 +911,9 @@ async function captureAllImages() {
         target.thumbnail = thumbnail;
         await commit(candidate);
         captured++;
-      } catch {
+      } catch (error) {
         failed++;
+        failures.push(access.title + ': ' + (error.message || 'fallo desconocido'));
       }
     }
   } finally {
@@ -920,7 +923,7 @@ async function captureAllImages() {
       if (Number.isInteger(origin.windowId) && chrome.windows?.update) await chrome.windows.update(origin.windowId, { focused: true }).catch(() => {});
     }
   }
-  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') : '';
+  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') + ' ' + failures.join(' | ') : '';
   const local = localMissing ? ' ' + localMissing + (localMissing === 1 ? ' acceso local requiere captura manual.' : ' accesos locales requieren captura manual.') : '';
   showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local);
 }
