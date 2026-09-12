@@ -1,4 +1,4 @@
-# nex.b · 1.7.5
+# nex.b · 1.7.6
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
