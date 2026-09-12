@@ -830,6 +830,11 @@ function showCardMenu(event, access, categoryId) {
   menu.style.left = Math.max(0, Math.min(event.clientX, innerWidth - 190)) + 'px';
   menu.style.top = Math.max(0, Math.min(event.clientY, innerHeight - 190)) + 'px';
   menu.querySelector('[data-card-action="capture"]').onclick = () => run(() => { hideCardMenu(); openRecaptureDialog(access); });
+  menu.querySelector('[data-card-action="paste"]').onclick = () => run(async () => {
+    hideCardMenu();
+    openAccessDialog(categoryId, access);
+    await pasteClipboardImage();
+  });
   menu.querySelector('[data-card-action="edit"]').onclick = () => run(() => { hideCardMenu(); openAccessDialog(categoryId, access); });
   menu.querySelector('[data-card-action="move"]').onclick = () => run(() => {
     hideCardMenu(); openAccessDialog(categoryId, access); $('accessWorkspace').focus();
@@ -844,6 +849,25 @@ function showCardMenu(event, access, categoryId) {
     category.accesses = category.accesses.filter(a => a.id !== access.id);
     await commit(candidate);
   });
+}
+async function pasteClipboardImage() {
+  if (!navigator.clipboard?.read) throw new Error('Chrome no permite leer imágenes del portapapeles. Usa Ctrl/⌘V dentro del editor.');
+  const generation = ++pasteGeneration;
+  imageBusy = true;
+  try {
+    const items = await navigator.clipboard.read();
+    const item = items.find(entry => entry.types.some(type => type.startsWith('image/')));
+    if (!item) throw new Error('El portapapeles no contiene una imagen.');
+    const type = item.types.find(value => value.startsWith('image/'));
+    const image = await resizeImage(await item.getType(type));
+    if (generation !== pasteGeneration || !$('accessDialog').open) return;
+    pastedImage = image;
+    $('accessThumbnailUrl').value = '';
+    showPreview();
+    showMessage('Miniatura lista para guardar.');
+  } finally {
+    if (generation === pasteGeneration) imageBusy = false;
+  }
 }
 
 function waitForBatchTab(tabId, expectedUrl, timeout = 20000) {
@@ -1358,6 +1382,7 @@ document.addEventListener('paste', event => {
   });
 });
 onClick('pasteBox', () => $('pasteBox').focus());
+onClick('clipboardPaste', pasteClipboardImage);
 onClick('removeThumbnail', () => { pasteGeneration++; imageBusy = false; pastedImage = ''; $('accessThumbnailUrl').value = ''; showPreview(); });
 $('accessThumbnailUrl').onchange = () => run(() => { pastedImage = imageUrl($('accessThumbnailUrl').value.trim()); showPreview(); });
 chrome.storage.onChanged.addListener((changes, area) => {

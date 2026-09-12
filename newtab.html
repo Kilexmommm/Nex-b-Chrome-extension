@@ -51,8 +51,9 @@
       <div id="tagSuggestions" class="tag-suggestions" hidden></div>
       <label>¿Cómo reconocer una pestaña abierta?<select id="matchType"><option value="document">El mismo documento o página</option><option value="exact">La misma URL exacta</option><option value="domain">Cualquier página de este sitio</option></select></label>
       <small class="field-help">Esto evita abrir duplicados. Para Gmail, Drive o una aplicación completa, usa “Cualquier página de este sitio”.</small>
-      <div id="pasteBox" class="paste-box" tabindex="0">Haz clic aquí y pega una captura<br /><small>⌘V / Ctrl+V</small></div>
-      <button id="removeThumbnail" type="button" class="button secondary">Quitar miniatura</button>
+       <div id="pasteBox" class="paste-box" tabindex="0">Haz clic aquí y pega una captura<br /><small>⌘V / Ctrl+V</small></div>
+       <button id="clipboardPaste" type="button" class="button secondary">Pegar captura desde el portapapeles</button>
+       <button id="removeThumbnail" type="button" class="button secondary">Quitar miniatura</button>
       <img referrerpolicy="no-referrer" id="preview" class="preview" alt="Vista previa" hidden />
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar acceso</button></div>
     </form></dialog>
@@ -183,6 +184,7 @@
       <button type="button" data-card-action="edit">Editar</button>
       <button type="button" data-card-action="move">Mover a Workspace…</button>
       <button type="button" data-card-action="capture">Volver a capturar imagen</button>
+      <button type="button" data-card-action="paste">Pegar captura desde el portapapeles</button>
       <button type="button" data-card-action="copy">Copiar URL</button>
       <button type="button" data-card-action="remove" class="danger">Remover</button>
     </menu>
