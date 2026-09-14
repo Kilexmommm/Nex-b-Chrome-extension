@@ -68,7 +68,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .top-actions { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
 .top-actions button { white-space: nowrap; }
 .top-actions { position: relative; }
-.quick-menu { position: absolute; right: 142px; top: 43px; z-index: 4; display: grid; gap: 2px; min-width: 108px; padding: 5px; border: 1px solid #4a5875; border-radius: 7px; background: #172035; box-shadow: 0 10px 24px #0004; }
+.quick-menu { position: absolute; right: 142px; top: 43px; z-index: 4; display: grid; gap: 2px; min-width: 108px; padding: 5px; border: 1px solid #555; border-radius: 7px; background: #2b2b2b; box-shadow: 0 10px 24px #0004; }
 .quick-menu button { border: 0; border-radius: 4px; padding: 7px 9px; background: transparent; color: #e7edff; text-align: left; cursor: pointer; }
 .quick-menu button:hover { background: #3b3b3b; color: #fff; }
 .quick-menu button[aria-pressed=true] { background: #4b4b4b; border: 1px solid #a7a7a7; color: #fff; }
@@ -80,8 +80,8 @@ button:disabled { opacity: .55; cursor: wait; }
 .card.dragging { opacity: .55; }
 .card.drag-over .thumb { outline: 2px dashed var(--accent-color); outline-offset: 3px; }
 .workspace-tag { background: #664e98d9 !important; color: #f1eaff !important; }
-.light-theme .quick-menu { background: #fffdf8; border-color: #a9b6c8; }
-.light-theme .quick-menu button { color: #26344b; }
+.light-theme .quick-menu { background: #2b2b2b; border-color: #555; }
+.light-theme .quick-menu button { color: #f0f0f0; }
 .tag-suggestions { max-height: 150px; overflow-y: auto; }
 .bookmark-path { margin: 16px 0 10px; font-size: 13px; overflow-wrap: anywhere; }
 .bookmark-folders { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin: 12px 0; }
