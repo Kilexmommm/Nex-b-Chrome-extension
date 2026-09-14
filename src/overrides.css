@@ -70,7 +70,11 @@ button:disabled { opacity: .55; cursor: wait; }
 .top-actions { position: relative; }
 .quick-menu { position: absolute; right: 142px; top: 43px; z-index: 4; display: grid; gap: 2px; min-width: 108px; padding: 5px; border: 1px solid #4a5875; border-radius: 7px; background: #172035; box-shadow: 0 10px 24px #0004; }
 .quick-menu button { border: 0; border-radius: 4px; padding: 7px 9px; background: transparent; color: #e7edff; text-align: left; cursor: pointer; }
-.quick-menu button:hover, .quick-menu button[aria-pressed=true] { background: var(--accent-color); color: var(--accent-ink); }
+.quick-menu button:hover { background: #3b3b3b; color: #fff; }
+.quick-menu button[aria-pressed=true] { background: #4b4b4b; border: 1px solid #a7a7a7; color: #fff; }
+.quick-custom { display: grid; gap: 5px; padding: 8px 9px; border-top: 1px solid #454545; color: #d8d8d8; font-size: 11px; }
+.quick-custom input { width: 100%; border: 1px solid #606060; border-radius: 4px; padding: 5px; background: #252525; color: #fff; }
+.quick-custom button { border: 1px solid #696969; background: #383838; color: #fff; text-align: center; }
 .thumb, .thumb[draggable=true] { cursor: default; }
 .card.holding-thumbnail .thumb, .card.dragging .thumb { cursor: grabbing; }
 .card.dragging { opacity: .55; }

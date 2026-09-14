@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "General", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal" },
+    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal" },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -168,12 +168,15 @@ export function normalizeData(stored = DEFAULT_DATA) {
             fail("Color inválido.");
     // Never accept arbitrary CSS from an imported backup.
     const backgroundPattern = Object.values(THEME_PRESETS).some(p => p.backgroundPattern === s.backgroundPattern) ? s.backgroundPattern : "";
+    const thumbnailSize = enumValue(s.thumbnailSize, ["small", "medium", "large", "custom"], "Miniaturas");
+    const fallbackHeight = { small: 101, medium: 144, large: 187, custom: 144 }[thumbnailSize];
+    const thumbnailHeight = Number.isInteger(s.thumbnailHeight) && s.thumbnailHeight >= 80 && s.thumbnailHeight <= 360 ? s.thumbnailHeight : fallbackHeight;
     return { schemaVersion: 1, workspaces, categories,
         activeWorkspaceId: workspaceIds.has(stored.activeWorkspaceId) ? stored.activeWorkspaceId : workspaces[0].id,
         settings: { themeId, accentColor: s.accentColor, backgroundColor: s.backgroundColor,
             backgroundImageUrl: imageUrl(s.backgroundImageUrl), backgroundPattern,
             captureEnabled: typeof s.captureEnabled === 'boolean' ? s.captureEnabled : true,
-            thumbnailSize: enumValue(s.thumbnailSize, ["small", "medium", "large"], "Miniaturas"),
+            thumbnailSize, thumbnailHeight,
             fontFamily: enumValue(s.fontFamily, ["system", "rounded", "serif", "mono"], "Fuente"),
             cardStyle: enumValue(s.cardStyle, ["flat", "soft", "glass"], "Estilo de tarjeta"),
             cardBorder: enumValue(s.cardBorder, ["none", "soft", "strong"], "Borde de tarjeta"),

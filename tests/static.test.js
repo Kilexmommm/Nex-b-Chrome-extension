@@ -111,13 +111,15 @@ test('el inventario prioriza grupos repetidos con miniatura, contador y cierre p
 });
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
-  assert.match(app, /small: 168, medium: 240, large: 312/);
+  assert.match(app, /thumbnailHeight/);
+  assert.match(app, /thumbnailHeight = height/);
   assert.equal(normalizeData().settings.thumbnailSize, 'small');
   assert.match(css, /--card-min-width:168px/);
   assert.match(css, /minmax\(var\(--card-min-width\),1fr\)/);
   assert.match(css, /\.thumb \{[\s\S]*?aspect-ratio:5 \/ 3/);
   assert.match(css, /\.add-card \{[\s\S]*?aspect-ratio:5 \/ 3/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
+  assert.match(read('newtab.html'), /id="thumbnailCustomHeight"/);
 });
 test('miniaturas se pueden ordenar al arrastrar dentro de su sección', () => {
   const app = read('src/app.js'), css = read('src/overrides.css');
