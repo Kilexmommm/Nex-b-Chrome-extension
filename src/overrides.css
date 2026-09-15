@@ -74,6 +74,8 @@ button:disabled { opacity: .55; cursor: wait; }
 .quick-menu button[aria-pressed=true] { background: #4b4b4b; border: 1px solid #a7a7a7; color: #fff; }
 .quick-custom { display: grid; gap: 5px; padding: 8px 9px; border-top: 1px solid #454545; color: #d8d8d8; font-size: 11px; }
 .quick-custom input { width: 100%; border: 1px solid #606060; border-radius: 4px; padding: 5px; background: #252525; color: #fff; }
+.quick-custom input[type=range] { padding: 0; accent-color: #a7a7a7; }
+.quick-custom output { text-align: right; color: #f0f0f0; }
 .quick-custom button { border: 1px solid #696969; background: #383838; color: #fff; text-align: center; }
 .thumb, .thumb[draggable=true] { cursor: default; }
 .card.holding-thumbnail .thumb, .card.dragging .thumb { cursor: grabbing; }

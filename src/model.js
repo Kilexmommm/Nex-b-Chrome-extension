@@ -170,7 +170,7 @@ export function normalizeData(stored = DEFAULT_DATA) {
     const backgroundPattern = Object.values(THEME_PRESETS).some(p => p.backgroundPattern === s.backgroundPattern) ? s.backgroundPattern : "";
     const thumbnailSize = enumValue(s.thumbnailSize, ["small", "medium", "large", "custom"], "Miniaturas");
     const fallbackHeight = { small: 101, medium: 144, large: 187, custom: 144 }[thumbnailSize];
-    const thumbnailHeight = Number.isInteger(s.thumbnailHeight) && s.thumbnailHeight >= 80 && s.thumbnailHeight <= 360 ? s.thumbnailHeight : fallbackHeight;
+    const thumbnailHeight = Number.isInteger(s.thumbnailHeight) && s.thumbnailHeight >= 80 && s.thumbnailHeight <= 480 ? s.thumbnailHeight : fallbackHeight;
     return { schemaVersion: 1, workspaces, categories,
         activeWorkspaceId: workspaceIds.has(stored.activeWorkspaceId) ? stored.activeWorkspaceId : workspaces[0].id,
         settings: { themeId, accentColor: s.accentColor, backgroundColor: s.backgroundColor,

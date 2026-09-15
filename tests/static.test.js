@@ -115,7 +115,7 @@ test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3
   assert.match(app, /thumbnailHeight = height/);
   assert.equal(normalizeData().settings.thumbnailSize, 'small');
   assert.match(css, /--card-min-width:168px/);
-  assert.match(css, /minmax\(var\(--card-min-width\),1fr\)/);
+  assert.match(css, /minmax\(min\(var\(--card-min-width\),100%\),1fr\)/);
   assert.match(css, /\.thumb \{[\s\S]*?aspect-ratio:5 \/ 3/);
   assert.match(css, /\.add-card \{[\s\S]*?aspect-ratio:5 \/ 3/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);

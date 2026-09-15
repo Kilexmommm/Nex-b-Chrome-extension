@@ -312,6 +312,8 @@ function render() {
   }
   document.querySelectorAll('[data-thumbnail-size]').forEach(control => control.setAttribute('aria-pressed', String(control.dataset.thumbnailSize === data.settings.thumbnailSize)));
   $('thumbnailCustomHeight').value = data.settings.thumbnailHeight;
+  $('thumbnailHeightRange').value = data.settings.thumbnailHeight;
+  $('thumbnailHeightValue').textContent = data.settings.thumbnailHeight + ' px';
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
   $('workspace').replaceChildren();
@@ -1034,15 +1036,22 @@ document.querySelectorAll('[data-thumbnail-size]').forEach(control => {
     await commit(candidate); $('thumbnailSizeMenu').hidden = true;
   });
 });
-onClick('saveThumbnailCustom', async () => {
+async function saveCustomThumbnailHeight() {
   const height = Number($('thumbnailCustomHeight').value);
-  if (!Number.isInteger(height) || height < 80 || height > 360) throw new Error('Escribe un alto entre 80 y 360 px.');
+  if (!Number.isInteger(height) || height < 80 || height > 480) throw new Error('Escribe un alto entre 80 y 480 px.');
   const candidate = structuredClone(data);
   candidate.settings.thumbnailSize = 'custom';
   candidate.settings.thumbnailHeight = height;
   await commit(candidate);
   $('thumbnailSizeMenu').hidden = true;
-});
+}
+onClick('saveThumbnailCustom', saveCustomThumbnailHeight);
+$('thumbnailHeightRange').oninput = () => {
+  $('thumbnailCustomHeight').value = $('thumbnailHeightRange').value;
+  $('thumbnailHeightValue').textContent = $('thumbnailHeightRange').value + ' px';
+};
+$('thumbnailHeightRange').onchange = () => run(saveCustomThumbnailHeight);
+$('thumbnailCustomHeight').onchange = () => run(saveCustomThumbnailHeight);
 onClick('newCategory', () => {
   $('categoryForm').reset();
   $('categoryParent').replaceChildren(new Option('Categoría principal', ''),
@@ -1109,6 +1118,8 @@ onClick('openSettings', () => {
   $('settingsDialog').dataset.pattern = s.backgroundPattern;
   for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) $(key).value = s[key];
   $('thumbnailCustomHeight').value = s.thumbnailHeight;
+  $('thumbnailHeightRange').value = s.thumbnailHeight;
+  $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
   $('captureEnabled').checked = s.captureEnabled;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('syncEnabled').checked = syncEnabled;
