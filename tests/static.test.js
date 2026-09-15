@@ -88,6 +88,12 @@ test('la configuración incluye una pestaña de sincronización sin imágenes en
   assert.match(sync, /const \{ backgroundImageUrl, \.\.\.settings \}/);
   assert.match(sync, /const \{ thumbnail, bookmarkMissing, \.\.\.metadata \}/);
 });
+test('el tamaño de miniaturas se conserva en una preferencia local independiente', () => {
+  const app = read('src/app.js');
+  assert.match(app, /nexbThumbnailPreference/);
+  assert.match(app, /restoreLocalThumbnailPreference/);
+  assert.match(app, /persistLocalThumbnailPreference\(data\.settings\)/);
+});
 test('Drive usa OAuth privado y la pestaña ofrece subida y descarga de imágenes', () => {
   const manifest = JSON.parse(read('manifest.json')), app = read('src/app.js'), drive = read('src/drive.js'), html = read('newtab.html');
   assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/drive.appdata']);

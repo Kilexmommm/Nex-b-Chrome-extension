@@ -22,6 +22,7 @@ let cardStatuses = [], tagCache = new Map();
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
+let localThumbnailPreference = null;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -107,10 +108,30 @@ function currentWorkspace() {
 function currentCategories() {
   return data.categories.filter(c => c.workspaceId === currentWorkspace().id);
 }
+function validThumbnailPreference(value) {
+  if (!value || !['small', 'medium', 'large', 'custom'].includes(value.size)) return null;
+  const height = Number(value.height);
+  if (!Number.isInteger(height) || height < 80 || height > 480) return null;
+  return { size: value.size, height };
+}
+async function restoreLocalThumbnailPreference() {
+  const stored = await chrome.storage.local.get('nexbThumbnailPreference');
+  localThumbnailPreference = validThumbnailPreference(stored.nexbThumbnailPreference);
+}
+function applyLocalThumbnailPreference() {
+  if (!localThumbnailPreference) return;
+  data.settings.thumbnailSize = localThumbnailPreference.size;
+  data.settings.thumbnailHeight = localThumbnailPreference.height;
+}
+async function persistLocalThumbnailPreference(settings) {
+  localThumbnailPreference = { size: settings.thumbnailSize, height: settings.thumbnailHeight };
+  await chrome.storage.local.set({ nexbThumbnailPreference: localThumbnailPreference });
+}
 function adopt(snapshot) {
   const selected = sessionStorage.getItem('activeWorkspace');
   data = snapshot.data;
   if (data.workspaces.some(w => w.id === selected)) data.activeWorkspaceId = selected;
+  applyLocalThumbnailPreference();
   revision = snapshot.revision;
   applySettings();
   render();
@@ -132,6 +153,7 @@ async function commit(candidate) {
     data = snapshot.data;
     revision = snapshot.revision;
     sessionStorage.setItem('activeWorkspace', data.activeWorkspaceId);
+    await persistLocalThumbnailPreference(data.settings);
     applySettings();
     render();
     scheduleSync();
@@ -1417,6 +1439,7 @@ chrome.tabs.onReplaced.addListener(scheduleTabRefresh);
 async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await restoreLocalThumbnailPreference();
   await restoreSyncPreference();
   const snapshot = await repository.load();
   adopt(snapshot); ready = true;
