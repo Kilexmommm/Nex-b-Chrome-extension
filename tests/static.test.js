@@ -7,17 +7,21 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 test('configuración separa los ajustes generales del diseño visual', () => {
   const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css'), baseCss = read('src/styles.css');
   const form = html.split('id="settingsForm"')[1].split('</form>')[0];
-  assert.match(form, /id="settingsGeneralTab"/);
-  assert.match(form, /id="settingsDesignTab"/);
-  assert.match(form, /id="settingsGeneralPanel"/);
-  assert.match(form, /id="settingsDesignPanel"/);
+  for (const id of ['settingsGeneralTab', 'settingsDesignTab', 'settingsSyncTab', 'settingsDataTab', 'settingsGeneralPanel', 'settingsDesignPanel', 'settingsSyncPanel', 'settingsDataPanel']) assert.match(form, new RegExp('id="' + id + '"'));
+  assert.equal((form.match(/role="tab"/g) || []).length, 4);
+  assert.equal((form.match(/role="tabpanel"/g) || []).length, 4);
   assert.ok(form.indexOf('id="settingsGeneralPanel"') < form.indexOf('id="settingsDesignPanel"'));
+  const dataPanel = form.split('id="settingsDataPanel"')[1].split('</section>')[0];
+  for (const id of ['downloadData', 'importData', 'restorePrevious', 'dataJson']) assert.match(dataPanel, new RegExp('id="' + id + '"'));
+  assert.match(form, /id="settingsClose"[^>]*aria-label="Cerrar configuración"/);
   for (const id of ['fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) assert.match(form, new RegExp('id="' + id + '"'));
   assert.match(app, /function selectSettingsTab\(tab\)/);
+  assert.match(app, /settingsDataPanel/);
   assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
   assert.match(app, /dataset\.iconStyle = s\.iconStyle/);
   assert.match(css, /--card-border-width/);
   assert.match(baseCss, /--card-gap/);
+  assert.match(css, /#settingsDialog \.settings-layout \{[^}]*grid-template-columns: 172px minmax\(0, 1fr\)/);
 });
 test('las miniaturas nuevas no tienen borde por defecto', () => {
   assert.equal(normalizeData().settings.cardBorder, 'none');
@@ -242,11 +246,13 @@ test('paletas de miniaturas y bordes coordinadas; editar discreto y accesible', 
   assert.match(app, /thumb.classList.add\('has-thumbnail'\)/);
   assert.match(app, /img.onerror[^\n]*thumb.classList.remove\('has-thumbnail'\)/);
 });
-test('Estilos es la última sección antes de Guardar configuración', () => {
+test('Estilos y datos permanecen en sus paneles antes de Guardar configuración', () => {
   const form = read('newtab.html').split('id="settingsForm"')[1].split('</form>')[0];
-  assert.ok(form.indexOf('id="stylePresets"') > form.indexOf('id="restorePrevious"'));
-  const after = form.slice(form.indexOf('id="stylePresets"'));
-  assert.match(after, /Guardar configuración/);
+  const designStart = form.indexOf('id="settingsDesignPanel"'), dataStart = form.indexOf('id="settingsDataPanel"');
+  assert.ok(designStart < dataStart);
+  assert.match(form.slice(designStart, dataStart), /id="stylePresets"/);
+  assert.match(form.slice(dataStart), /id="restorePrevious"/);
+  assert.match(form, /Guardar configuración/);
 });
 test('Alegre es claro y Bosque se valida y conserva como estilo', () => {
   assert.equal(THEME_PRESETS.alegre.light, true);
