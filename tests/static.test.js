@@ -137,6 +137,20 @@ test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
   assert.match(read('newtab.html'), /id="thumbnailCustomHeight"/);
 });
+test('el encabezado ocupa el ancho disponible y ordena sus acciones con un icono de inventario propio', () => {
+  const html = read('newtab.html'), css = read('src/styles.css');
+  const start = html.indexOf('<div class="top-actions">');
+  const end = html.indexOf('</div>\n       </header>', start);
+  const actions = html.slice(start, end);
+  const actionIds = ['thumbnailSizeToggle', 'openInventory', 'newWorkspace', 'editWorkspace', 'openSettings'];
+  const positions = actionIds.map(id => actions.indexOf(`id="${id}"`));
+  assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])));
+  assert.ok(actions.indexOf('id="thumbnailSizeMenu"') > actions.indexOf('id="thumbnailSizeToggle"'));
+  assert.doesNotMatch(actions, /id="openInventory"[^>]*>☰/);
+  assert.match(actions, /id="openInventory"[^>]*>[\s\S]*class="inventory-icon"/);
+  assert.match(css, /\.shell \{[^}]*width:100%/);
+  assert.match(css, /\.inventory-icon \{[^}]*width:20px/);
+});
 test('miniaturas se pueden ordenar al arrastrar dentro de su sección', () => {
   const app = read('src/app.js'), css = read('src/overrides.css');
   assert.match(app, /thumb\.draggable = viewMode === 'workspace'/);
