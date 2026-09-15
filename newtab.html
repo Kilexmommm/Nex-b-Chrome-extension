@@ -144,6 +144,8 @@
               <small>Versión instalada: <strong id="extensionVersion"></strong>. Se abrirá el ZIP de GitHub; después reemplaza la carpeta y pulsa «Recargar» en chrome://extensions.</small>
               <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
               <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
+              <button id="openSidePanel" type="button" class="button secondary">Abrir Side panel</button>
+              <small>Abre esta misma interfaz en el panel lateral de Chrome.</small>
               <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
               <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
               <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>

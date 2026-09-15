@@ -6,6 +6,7 @@ const PAGE = 'workspace-add-page';
 const LINK = 'workspace-add-link';
 const ACTION = 'workspace-add-site';
 const UPDATE_CAPTURE = 'workspace-update-capture';
+const SIDE_PANEL = 'workspace-open-side-panel';
 const TTL = 30 * 60 * 1000;
 
 function createMenu(properties) {
@@ -25,6 +26,7 @@ async function install() {
   await createMenu({ id: PAGE, title: 'Agregar página al acceso', contexts: ['page'], documentUrlPatterns: ['http://*/*', 'https://*/*'] });
   await createMenu({ id: LINK, title: 'Agregar enlace al acceso', contexts: ['link'], targetUrlPatterns: ['http://*/*', 'https://*/*'] });
   await createMenu({ id: ACTION, title: 'Agregar sitio a NEX.B', contexts: ['action'] });
+  await createMenu({ id: SIDE_PANEL, title: 'Abrir Side panel', contexts: ['action'] });
   await createMenu({ id: UPDATE_CAPTURE, title: 'Actualizar captura del acceso', contexts: ['page', 'action'] });
 }
 
@@ -94,6 +96,12 @@ async function openHome() {
   } else await chrome.tabs.create({ url });
 }
 
+async function openSidePanel(windowId) {
+  if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function' || typeof chrome.sidePanel.open !== 'function') return;
+  await chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true });
+  await chrome.sidePanel.open({ windowId });
+}
+
 function reportFailure(error) {
   chrome.action.setBadgeText({ text: '!' }).catch(() => {});
   chrome.action.setBadgeBackgroundColor({ color: '#a32929' }).catch(() => {});
@@ -103,7 +111,11 @@ function reportFailure(error) {
 // Top-level listeners are registered synchronously; no timers keep the worker alive.
 chrome.runtime.onInstalled.addListener(() => { install().catch(reportFailure); });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (![PAGE, LINK, ACTION, UPDATE_CAPTURE].includes(info.menuItemId) || !tab) return;
+  if (![PAGE, LINK, ACTION, SIDE_PANEL, UPDATE_CAPTURE].includes(info.menuItemId) || !tab) return;
+  if (info.menuItemId === SIDE_PANEL) {
+    openSidePanel(tab.windowId).catch(reportFailure);
+    return;
+  }
   const isLink = info.menuItemId === LINK;
   if (isLink) addDraft(info.linkUrl, 'Nuevo acceso', tab, true).catch(reportFailure);
   else handlePageAction(tab, info.pageUrl || tab.url, info.menuItemId === UPDATE_CAPTURE).catch(reportFailure);

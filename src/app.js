@@ -292,6 +292,13 @@ async function openAccess(access) {
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
 }
+async function openSidePanel() {
+  if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function' || typeof chrome.sidePanel.open !== 'function') throw new Error('El panel lateral no está disponible en esta versión de Chrome.');
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!Number.isInteger(tab?.windowId)) throw new Error('No se pudo identificar la ventana actual.');
+  await chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true });
+  await chrome.sidePanel.open({ windowId: tab.windowId });
+}
 function render() {
   cardStatuses = [];
   tagCache = new Map();
@@ -1115,6 +1122,7 @@ onClick('openUpdate', async () => {
   showMessage('Descarga iniciada. Conserva tu respaldo, reemplaza los archivos de la extensión y pulsa «Recargar» en chrome://extensions.');
 });
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
+onClick('openSidePanel', openSidePanel);
 onClick('settingsGeneralTab', () => selectSettingsTab('general'));
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
 onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });

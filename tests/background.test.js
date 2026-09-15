@@ -7,6 +7,7 @@ test('worker: menús, borradores concurrentes, captura opcional y errores', asyn
   const listeners = {}, session = memoryArea(), local = memoryArea({ captureEnabled: false });
   const mutex = locks(), created = [], menus = [], badges = [];
   let removedMenus = 0, captures = 0;
+  const sidePanelOptions = [], sidePanelWindows = [];
   const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   const previousCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
   const previousBitmap = Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap');
@@ -29,6 +30,10 @@ test('worker: menús, borradores concurrentes, captura opcional y errores', asyn
     action: {
       onClicked: { addListener: fn => { listeners.action = fn; } },
       setBadgeText: async value => badges.push(value), setBadgeBackgroundColor: async () => {}, setTitle: async () => {}
+    },
+    sidePanel: {
+      setOptions: async options => sidePanelOptions.push(options),
+      open: async options => sidePanelWindows.push(options)
     }
   };
   try {
@@ -37,12 +42,17 @@ test('worker: menús, borradores concurrentes, captura opcional y errores', asyn
     assert.deepEqual(Object.keys(listeners).sort(), ['action', 'install', 'menu', 'removed']);
     listeners.install();
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(removedMenus, 1); assert.equal(menus.length, 4);
+    assert.equal(removedMenus, 1); assert.equal(menus.length, 5);
     assert.deepEqual(menus.find(menu => menu.id === 'workspace-update-capture').contexts, ['page', 'action']);
     assert.deepEqual(menus.find(menu => menu.id === 'workspace-add-site').contexts, ['action']);
+    assert.deepEqual(menus.find(menu => menu.id === 'workspace-open-side-panel'), { id: 'workspace-open-side-panel', title: 'Abrir Side panel', contexts: ['action'] });
     const tab = { id: 1, windowId: 1, title: 'Page', url: 'https://example.com/' };
     listeners.menu({ menuItemId: 'unrelated', pageUrl: tab.url }, tab);
     assert.equal(created.length, 0);
+    listeners.menu({ menuItemId: 'workspace-open-side-panel' }, tab);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(sidePanelOptions, [{ path: 'newtab.html', enabled: true }]);
+    assert.deepEqual(sidePanelWindows, [{ windowId: 1 }]);
     listeners.menu({ menuItemId: 'workspace-add-link', linkUrl: 'https://example.com/a' }, tab);
     listeners.menu({ menuItemId: 'workspace-add-link', linkUrl: 'https://example.com/b' }, tab);
     await mutex.idle();
