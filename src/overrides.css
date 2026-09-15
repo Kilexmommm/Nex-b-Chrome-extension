@@ -101,7 +101,7 @@ dialog::backdrop { background: #080b12aa; }
 .preset-section { margin-top: 4px; }
 .settings-tabs { display: flex; gap: 4px; margin: 4px 0 18px; border-bottom: 1px solid #3b4969; }
 .settings-tabs [role=tab] { border: 0; border-bottom: 2px solid transparent; border-radius: 5px 5px 0 0; padding: 8px 12px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
-.settings-tabs [role=tab][aria-selected=true] { border-bottom-color: var(--accent-color); color: var(--accent-color); font-weight: 700; }
+.settings-tabs [role=tab][aria-selected=true], .settings-tabs [role=tab].active { border-bottom-color: var(--accent-color); color: var(--accent-color); font-weight: 700; }
 .settings-panel { display: grid; gap: 14px; }
 .settings-utilities { display: grid; gap: 10px; margin-top: 8px; padding-top: 18px; border-top: 1px solid #3b4969; }
 .settings-utilities > p { margin: 0; font-size: 14px; font-weight: 700; }
@@ -121,7 +121,12 @@ dialog::backdrop { background: #080b12aa; }
 
 /* Regla de oro Gris Nex: editar, crear y capturar comparten una sola superficie. */
 .dialog-form { width: min(540px, calc(100vw - 32px)); min-width: 0; max-height: 85vh; overflow: auto; border-color: #454545; border-radius: 12px; background: #212121; color: #ececec; box-shadow: 0 24px 72px #00000080; }
-.settings-form { width: min(720px, calc(100vw - 32px)); }
+.settings-form { position: relative; width: min(940px, calc(100vw - 32px)); overflow: hidden; }
+#settingsDialog .settings-layout { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 24px; min-height: 0; }
+.settings-content { min-width: 0; min-height: 0; max-height: calc(85vh - 150px); overflow-y: auto; padding-right: 4px; }
+.dialog-close { position: absolute; top: 14px; right: 14px; z-index: 1; border: 0; border-radius: 6px; padding: 3px 9px; background: transparent; color: #bcbcbc; font-size: 24px; line-height: 1; cursor: pointer; }
+.dialog-close:hover { background: #363636; color: #fff; }
+.dialog-close:focus-visible { outline: 2px solid #4d8dff; outline-offset: 2px; }
 .dialog-form h2 { margin-bottom: 18px; font-size: 21px; letter-spacing: -.02em; }
 .dialog-form label, .dialog-form .preset-section > p { color: #d0d0d0; }
 .dialog-form small, .dialog-form .help, .dialog-form .field-help { color: #969696; }
@@ -153,10 +158,10 @@ dialog::backdrop { background: #00000099; }
 #settingsDialog .setting-grid .field-row { grid-template-columns: minmax(0, 1fr) minmax(130px, 170px); }
 
 /* Configurar mantiene su anchura mayor y pestañas, pero usa la misma regla base. */
-#settingsDialog .settings-tabs { gap: 14px; margin: 0 -2px 20px; border-color: #3d3d3d; }
-#settingsDialog .settings-tabs [role=tab] { padding: 8px 4px 10px; color: #a8a8a8; }
+#settingsDialog .settings-tabs { flex-direction: column; align-items: stretch; gap: 4px; margin: 0; border-right: 1px solid #3d3d3d; border-bottom: 0; padding: 4px 14px 4px 0; }
+#settingsDialog .settings-tabs [role=tab] { border-right: 3px solid transparent; border-bottom: 0; border-radius: 5px; padding: 10px 12px; color: #a8a8a8; text-align: left; }
 #settingsDialog .settings-tabs [role=tab]:hover { color: #ededed; }
-#settingsDialog .settings-tabs [role=tab][aria-selected=true] { border-bottom-color: #4d8dff; color: #dbe8ff; }
+#settingsDialog .settings-tabs [role=tab][aria-selected=true], #settingsDialog .settings-tabs [role=tab].active { border-right-color: #4d8dff; color: #dbe8ff; }
 #settingsDialog .settings-utilities, #settingsDialog .appearance-editor, #settingsDialog .preset-section { border-color: #3d3d3d; }
 #settingsDialog .style-preset.selected { border-color: #4d8dff; box-shadow: 0 0 0 1px #4d8dff; }
 .native-host-link { display: inline-flex; align-items: center; text-decoration: none; }
@@ -189,6 +194,11 @@ dialog::backdrop { background: #00000099; }
 
 @media (max-width: 700px) { .style-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
+  #settingsDialog .settings-layout { grid-template-columns: 1fr; gap: 14px; }
+  #settingsDialog .settings-tabs { flex-direction: row; align-items: stretch; gap: 4px; border-right: 0; border-bottom: 1px solid #3d3d3d; padding: 0 0 4px; overflow-x: auto; }
+  #settingsDialog .settings-tabs [role=tab] { flex: 0 0 auto; border-right: 0; border-bottom: 3px solid transparent; padding: 8px 10px; text-align: center; white-space: nowrap; }
+  #settingsDialog .settings-tabs [role=tab][aria-selected=true], #settingsDialog .settings-tabs [role=tab].active { border-bottom-color: #4d8dff; }
+  #settingsDialog .settings-content { max-height: calc(85vh - 220px); overflow-x: hidden; }
   .dialog-form .field-row, #settingsDialog .setting-grid .field-row { grid-template-columns: 1fr; gap: 9px; }
   .dialog-form .field-row > :is(input, select, textarea) { grid-column: 1; grid-row: auto; }
   .dialog-form .field-row > input[type=checkbox] { justify-self: start; }

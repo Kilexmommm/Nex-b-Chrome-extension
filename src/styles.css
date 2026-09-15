@@ -333,6 +333,19 @@ dialog {
   max-height:85vh;
   overflow:auto
 }
+.settings-layout {
+  display:grid;
+  grid-template-columns:180px minmax(0,1fr);
+  gap:24px;
+  min-height:0
+}
+.settings-content {
+  min-width:0;
+  min-height:0;
+  max-height:calc(85vh - 150px);
+  overflow-y:auto;
+  padding-right:4px
+}
 .setting-grid {
   display:grid;
   grid-template-columns:1fr 1fr;
