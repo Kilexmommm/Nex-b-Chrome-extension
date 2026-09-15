@@ -28,6 +28,18 @@ test('mergeSyncData conserva miniaturas locales al aplicar metadatos remotos', (
   assert.equal(merged.categories[0].accesses[0].thumbnail, 'https://example.com/image.png');
 });
 
+test('mergeSyncData no revierte el tamaño de miniaturas local', () => {
+  const local = fixture();
+  local.settings.thumbnailSize = 'custom';
+  local.settings.thumbnailHeight = 320;
+  const remote = projectSyncData(local);
+  remote.settings.thumbnailSize = 'medium';
+  remote.settings.thumbnailHeight = 144;
+  const merged = mergeSyncData(local, remote);
+  assert.equal(merged.settings.thumbnailSize, 'custom');
+  assert.equal(merged.settings.thumbnailHeight, 320);
+});
+
 test('mergeSyncData conserva un workspace/categoría/acceso creado localmente que remoto todavía no conoce', () => {
   const local = fixture();
   const remote = projectSyncData(local);

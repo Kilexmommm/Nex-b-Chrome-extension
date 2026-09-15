@@ -61,6 +61,9 @@ export function mergeSyncData(local, remote) {
   const candidate = structuredClone(remote);
   candidate.activeWorkspaceId = local.activeWorkspaceId;
   candidate.settings = { ...local.settings, ...candidate.settings, backgroundImageUrl: local.settings.backgroundImageUrl };
+  // Thumbnail size is a local layout preference; stale sync metadata must not undo it.
+  candidate.settings.thumbnailSize = local.settings.thumbnailSize;
+  candidate.settings.thumbnailHeight = local.settings.thumbnailHeight;
   candidate.workspaces = unionById(candidate.workspaces, local.workspaces);
   const remoteCategoryIds = new Set(candidate.categories.map(category => category.id));
   // Categorías que ya existían en remoto: se conservan sus datos (remoto
