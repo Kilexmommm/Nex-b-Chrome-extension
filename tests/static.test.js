@@ -370,3 +370,44 @@ test('cardBorder permite tarjetas sin borde y conserva las variantes de estilo',
   assert.match(css, /\[data-card-style="glass"\]/);
   assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
 });
+test('el ancho reducido simplifica la cabecera con marca oculta y menú de tres puntos', () => {
+  const html = read('newtab.html'), css = read('src/overrides.css');
+  assert.match(html, /id="mainMenuToggle"[^>]*aria-haspopup="menu"/);
+  assert.match(html, /id="mainMenuToggle"[^>]*aria-expanded="false"/);
+  assert.match(html, /id="mainMenuToggle"[^>]*aria-label="M[aá]s acciones"/);
+  const start = html.indexOf('<div class="top-actions">');
+  const actions = html.slice(start, html.indexOf('</div>\n       </header>', start));
+  for (const id of ['thumbnailSizeToggle', 'openInventory', 'newWorkspace', 'editWorkspace', 'openSettings']) {
+    assert.ok(actions.indexOf(`id="${id}"`) < actions.indexOf('id="mainMenuToggle"'));
+  }
+  const menu = html.split('id="mainMenu"')[1].split('</menu>')[0];
+  for (const action of ['edit', 'new', 'thumbnail', 'inventory', 'sync', 'settings', 'tags']) {
+    assert.match(menu, new RegExp('data-main-action="' + action + '"'));
+  }
+  assert.match(menu, /data-narrow-columns="1"/);
+  assert.match(menu, /data-narrow-columns="2"/);
+  assert.match(css, /\[data-narrow="true"\] \.topbar > h1 \{ display: none/);
+  assert.match(css, /\[data-narrow="true"\] #mainMenuToggle \{ display: inline-flex/);
+  assert.match(css, /\[data-narrow="true"\] \.top-actions > :is\(#thumbnailSizeToggle, #openInventory, #newWorkspace, #editWorkspace, #openSettings\) \{ display: none/);
+});
+test('app.js detecta el ancho reducido y alterna picker, pestañas y botón de tres puntos', () => {
+  const app = read('src/app.js');
+  assert.match(app, /matchMedia\('\(max-width: 600px\)'\)/);
+  assert.match(app, /documentElement\.dataset\.narrow = String\(matches\)/);
+  assert.match(app, /addEventListener\('change'/);
+  assert.match(app, /const narrow = document\.documentElement\.dataset\.narrow === 'true'/);
+  assert.match(app, /const workspaceTabsHidden = narrow \|\| data\.settings\.showWorkspaceTabs === false/);
+  assert.match(app, /\$\('workspaceTabs'\)\.hidden = workspaceTabsHidden/);
+  assert.match(app, /\$\('workspacePicker'\)\.hidden = !workspaceTabsHidden/);
+  assert.match(app, /toggle\.hidden = !matches/);
+  assert.match(app, /setAttribute\('aria-expanded', 'false'\)/);
+});
+test('la preferencia narrowColumns se guarda por dispositivo en chrome.storage.local', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /chrome\.storage\.local\.set\(\{ 'nexb\.narrowColumns': narrowColumns \}\)/);
+  assert.match(app, /chrome\.storage\.local\.get\('nexb\.narrowColumns'\)/);
+  assert.match(app, /restoreNarrowColumns/);
+  assert.match(app, /applyNarrowColumns/);
+  assert.match(app, /data-narrow-columns/);
+  assert.match(css, /html\[data-narrow="true"\] \.cards \{ grid-template-columns: repeat\(var\(--narrow-columns, 1\), minmax\(0, 1fr\)\)/);
+});

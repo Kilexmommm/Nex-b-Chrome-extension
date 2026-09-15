@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules, duplicateTabGroups, tabKey } from '../src/model.js';
+import { DEFAULT_DATA, accessUrl, normalizeData, normalizeNarrowColumns, matches, imageUrl, webUrl, validateRules, duplicateTabGroups, tabKey } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
 test('no ofrece como duplicada una pestaña navegando a otro documento', () => {
@@ -123,4 +123,8 @@ test('showWorkspaceTabs se conserva y por defecto es visible', () => {
   const invalid = fixture();
   invalid.settings.showWorkspaceTabs = 'sí';
   assert.equal(normalizeData(invalid).settings.showWorkspaceTabs, true);
+});
+test('las columnas del ancho reducido solo admiten 1 o 2 y por defecto son 1', () => {
+  assert.equal(normalizeNarrowColumns(2), 2);
+  for (const value of [1, 3, 0, '2', '1', null, undefined, true, {}, []]) assert.equal(normalizeNarrowColumns(value), 1);
 });

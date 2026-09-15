@@ -81,6 +81,9 @@ export function imageUrl(value = "") {
         fail("Las imágenes remotas deben usar HTTPS.");
     return url;
 }
+export function normalizeNarrowColumns(value) {
+    return value === 2 ? 2 : 1;
+}
 export function domainOf(value) {
     try {
         return new URL(value).hostname.replace(/^www\./, "");
