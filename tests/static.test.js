@@ -179,10 +179,11 @@ test('Aurora y Dunas usan fondos locales incluidos y válidos', () => {
     assert.equal(normalizeData(data).settings.backgroundPattern, preset.backgroundPattern);
   }
 });
-test('nombre a 13px, dos líneas, pie transparente y botón importar destacado', () => {
+test('nombre a 12px con peso normal, dos líneas, pie transparente y botón importar destacado', () => {
   const css = read('src/overrides.css');
   const title = css.match(/\.card-footer \.card-title \{([^}]+)\}/)[1];
-  assert.match(title, /font-size: 13px/);
+  assert.match(title, /font-size: 12px/);
+  assert.match(title, /font-weight: 400/);
   assert.match(title, /-webkit-line-clamp: 2/);
   assert.match(title, /overflow: hidden/);
   assert.match(title, /text-overflow: ellipsis/);
