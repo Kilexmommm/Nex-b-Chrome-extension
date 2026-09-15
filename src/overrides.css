@@ -91,10 +91,10 @@ button:disabled { opacity: .55; cursor: wait; }
 .bookmark-state { margin: 2px 0 10px; color: #d7a35f; font-size: 12px; }
 .light-theme .bookmark-state { color: #8a5524; }
 @media (max-width: 600px) {
-  .topbar { gap: 8px; flex-wrap: wrap; }
+  .topbar { gap: 8px; flex-direction: row; flex-wrap: wrap; }
   .topbar > h1 { font-size: 21px; }
-  .top-actions { order: 2; }
-  .workspace-row { order: 3; flex-basis: 100%; }
+  .top-actions { order: 2; flex: 1 1 100%; min-width: 0; justify-content: flex-end; flex-wrap: wrap; }
+  .workspace-row { order: 1; flex: 1 1 0; min-width: 0; }
 }
 dialog::backdrop { background: #080b12aa; }
 
