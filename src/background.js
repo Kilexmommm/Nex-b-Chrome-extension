@@ -97,9 +97,12 @@ async function openHome() {
 }
 
 async function openSidePanel(windowId) {
-  if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function' || typeof chrome.sidePanel.open !== 'function') return;
-  await chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true });
+  if (!chrome.sidePanel || typeof chrome.sidePanel.open !== 'function') throw new Error('El panel lateral no está disponible en esta versión de Chrome.');
+  if (!Number.isInteger(windowId)) throw new Error('No se pudo identificar la ventana actual.');
+  // No esperes nada antes de open(): el gesto de usuario caduca con los await.
+  const options = typeof chrome.sidePanel.setOptions === 'function' ? chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true }).catch(() => {}) : Promise.resolve();
   await chrome.sidePanel.open({ windowId });
+  await options;
 }
 
 function reportFailure(error) {
@@ -111,11 +114,11 @@ function reportFailure(error) {
 // Top-level listeners are registered synchronously; no timers keep the worker alive.
 chrome.runtime.onInstalled.addListener(() => { install().catch(reportFailure); });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (![PAGE, LINK, ACTION, SIDE_PANEL, UPDATE_CAPTURE].includes(info.menuItemId) || !tab) return;
   if (info.menuItemId === SIDE_PANEL) {
-    openSidePanel(tab.windowId).catch(reportFailure);
+    openSidePanel(tab?.windowId).catch(reportFailure);
     return;
   }
+  if (![PAGE, LINK, ACTION, UPDATE_CAPTURE].includes(info.menuItemId) || !tab) return;
   const isLink = info.menuItemId === LINK;
   if (isLink) addDraft(info.linkUrl, 'Nuevo acceso', tab, true).catch(reportFailure);
   else handlePageAction(tab, info.pageUrl || tab.url, info.menuItemId === UPDATE_CAPTURE).catch(reportFailure);

@@ -42,6 +42,9 @@
       "48": "icons/nex-b-48.png"
     }
   },
+  "side_panel": {
+    "default_path": "newtab.html"
+  },
   "minimum_chrome_version": "123",
   "content_security_policy": {
     "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; connect-src 'self' https://www.googleapis.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; frame-src 'none'; form-action 'none'"

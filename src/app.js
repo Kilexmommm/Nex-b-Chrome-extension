@@ -293,12 +293,15 @@ async function openAccess(access) {
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
 }
+let sidePanelWindowId = null;
+if (chrome.windows?.getCurrent) chrome.windows.getCurrent().then(window => { sidePanelWindowId = window?.id ?? null; }).catch(() => {});
 async function openSidePanel() {
-  if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function' || typeof chrome.sidePanel.open !== 'function') throw new Error('El panel lateral no está disponible en esta versión de Chrome.');
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (!Number.isInteger(tab?.windowId)) throw new Error('No se pudo identificar la ventana actual.');
-  await chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true });
-  await chrome.sidePanel.open({ windowId: tab.windowId });
+  if (!chrome.sidePanel || typeof chrome.sidePanel.open !== 'function') throw new Error('El panel lateral no está disponible en esta versión de Chrome.');
+  if (!Number.isInteger(sidePanelWindowId)) sidePanelWindowId = (await chrome.windows.getCurrent()).id;
+  if (!Number.isInteger(sidePanelWindowId)) throw new Error('No se pudo identificar la ventana actual.');
+  const options = typeof chrome.sidePanel.setOptions === 'function' ? chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true }).catch(() => {}) : Promise.resolve();
+  await chrome.sidePanel.open({ windowId: sidePanelWindowId });
+  await options;
 }
 function render() {
   cardStatuses = [];
