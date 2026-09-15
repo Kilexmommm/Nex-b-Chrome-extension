@@ -178,10 +178,11 @@ test('los accesos locales muestran un identificador visual diferente', () => {
   assert.match(app, /'tag link-type local-link', '⌂ Archivo local'/);
   assert.match(css, /\.tag\.link-type\.local-link \{[^}]*background: #4b3a25/);
 });
-test('capturar imagen es un enlace discreto y alineado a la derecha', () => {
-  const app = read('src/app.js'), css = read('src/overrides.css');
-  assert.match(app, /node\('a', 'card-recapture', 'Capturar imagen'\)/);
-  assert.match(css, /\[data-theme\] \.card-recapture \{[^}]*margin: 8px 2px 0 auto[^}]*font-weight: 400/);
+test('la captura vive solo en el menú contextual y ya no se crea en la tarjeta', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.doesNotMatch(app, /card-recapture/);
+  assert.match(app, /data-card-action="capture"\]'\)\.onclick = \(\) => run\(\(\) => \{ hideCardMenu\(\); openRecaptureDialog\(access\)/);
+  assert.match(html, /data-card-action="capture"/);
 });
 test('los Workspaces se ordenan al arrastrar sus etiquetas, sin flechas de orden', () => {
   const app = read('src/app.js'), html = read('newtab.html'), css = read('src/overrides.css');
@@ -271,14 +272,18 @@ test('Aurora y Dunas usan fondos locales incluidos y válidos', () => {
     assert.equal(normalizeData(data).settings.backgroundPattern, preset.backgroundPattern);
   }
 });
-test('nombre a 12px con peso normal, dos líneas, pie transparente y botón importar destacado', () => {
+test('nombre a 11px con color tenue, dos líneas, pie transparente y botón importar destacado', () => {
   const css = read('src/overrides.css');
   const title = css.match(/\.card-footer \.card-title \{([^}]+)\}/)[1];
-  assert.match(title, /font-size: 12px/);
+  assert.match(title, /font-size: 11px/);
+  assert.match(title, /color: #b6b3b3/);
   assert.match(title, /font-weight: 400/);
   assert.match(title, /-webkit-line-clamp: 2/);
   assert.match(title, /overflow: hidden/);
   assert.match(title, /text-overflow: ellipsis/);
+  assert.match(title, /overflow-wrap: anywhere/);
+  assert.match(title, /line-height: 1\.4/);
+  assert.match(title, /max-height: 2\.8em/);
   assert.match(css, /\.card, \.light-theme \.card \{ border: 0; background: transparent/);
   assert.match(css, /\.card-footer \{[^}]*background: transparent/);
   assert.match(css, /#openBookmarks \{ background: #ffb15c; color: #2a180c/);
@@ -322,7 +327,7 @@ test('interfaz: todos los IDs usados existen y son únicos; módulo local sin in
   assert.doesNotMatch(html, /id="rulesDialog"/);
   assert.match(app, /footer\.append\(status, title\)/);
   assert.match(app, /open\.append\(thumb\)/);
-  assert.match(app, /card\.append\(open, footer, edit, recapture\)/);
+  assert.match(app, /card\.append\(open, footer, edit\)/);
   assert.doesNotMatch(app, /overlay\.append\(node\('div', 'card-title'/);
 });
 test('regresión de CSS: una base, hidden respetado y tag activo claro con contraste', () => {
@@ -331,4 +336,36 @@ test('regresión de CSS: una base, hidden respetado y tag activo claro con contr
   assert.match(overrides, /\[hidden\] \{ display: none !important/);
   assert.match(overrides, /\.light-theme \.workspace-tab\.active:hover \{ background: #2f3437; border-color: #2f3437; color: #fff/);
   assert.match(overrides, /\.card \{ min-height: 0/);
+});
+test('las tarjetas sin miniatura ocultan el texto pero conservan una señal accesible', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /node\('span', 'image-error visually-hidden', 'Sin miniatura'\)/);
+  assert.doesNotMatch(app, /node\('span', 'image-error', 'Sin miniatura'\)/);
+  assert.match(css, /\.visually-hidden \{[^}]*clip: rect\(0 0 0 0\)/);
+});
+test('la zona de miniaturas ocupa el 90% en escritorio y vuelve al 100% en móvil', () => {
+  const css = read('src/overrides.css');
+  assert.match(css, /#workspace \{ width: 90%; margin-inline: auto; \}/);
+  assert.match(css, /@media \(max-width: 600px\) \{ #workspace \{ width: 100%; \} \}/);
+  assert.match(read('src/styles.css'), /\.shell \{[^}]*width:100%/);
+});
+test('showWorkspaceTabs existe, persiste y se aplica sin romper Tags', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), model = read('src/model.js');
+  assert.match(html, /<input id="showWorkspaceTabs" type="checkbox"/);
+  assert.match(model, /showWorkspaceTabs: true/);
+  assert.match(model, /showWorkspaceTabs: typeof s\.showWorkspaceTabs === 'boolean' \? s\.showWorkspaceTabs : true/);
+  assert.match(app, /\$\('showWorkspaceTabs'\)\.checked = s\.showWorkspaceTabs/);
+  assert.match(app, /showWorkspaceTabs: \$\('showWorkspaceTabs'\)\.checked/);
+  assert.match(app, /\$\('workspaceTabs'\)\.hidden = workspaceTabsHidden/);
+  assert.match(html, /id="workspacePicker"/);
+  assert.match(app, /\$\('workspacePicker'\)\.hidden = !workspaceTabsHidden/);
+  assert.match(html, /id="tagRules"/);
+});
+test('cardBorder permite tarjetas sin borde y conserva las variantes de estilo', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /\{ none: '0px', soft: '1px', strong: '2px' \}\[s\.cardBorder\]/);
+  assert.match(css, /\.card \.thumb \{ border: var\(--card-border-width/);
+  assert.match(css, /\[data-card-style="soft"\] \.card \.thumb/);
+  assert.match(css, /\[data-card-style="glass"\]/);
+  assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
 });

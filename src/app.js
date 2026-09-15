@@ -59,6 +59,7 @@ function arrangeDialogFields() {
     cardBorderColor: 'Solo se usa si activas un borde.',
     cardSpacing: 'Espacio entre tarjetas del Workspace.',
     iconStyle: 'Aspecto de los controles con icono.',
+    showWorkspaceTabs: 'Muestra la fila de pestañas para cambiar de Workspace.',
     settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
     captureEnabled: 'Crea una miniatura al agregar un acceso.',
     bookmarkLink: 'Mantiene la sección vinculada a esa carpeta de Chrome.'
@@ -339,6 +340,16 @@ function render() {
     };
     $('workspaceTabs').append(b);
   }
+  const workspaceTabsHidden = data.settings.showWorkspaceTabs === false;
+  $('workspaceTabs').hidden = workspaceTabsHidden;
+  $('workspacePicker').hidden = !workspaceTabsHidden;
+  $('workspacePicker').replaceChildren(...data.workspaces.map(workspace => new Option(workspace.name, workspace.id, false, workspace.id === currentWorkspace().id && viewMode === 'workspace')));
+  $('workspacePicker').onchange = () => {
+    data.activeWorkspaceId = $('workspacePicker').value;
+    sessionStorage.setItem('activeWorkspace', data.activeWorkspaceId);
+    viewMode = 'workspace';
+    render();
+  };
   document.querySelectorAll('[data-thumbnail-size]').forEach(control => control.setAttribute('aria-pressed', String(control.dataset.thumbnailSize === data.settings.thumbnailSize)));
   $('thumbnailCustomHeight').value = data.settings.thumbnailHeight;
   $('thumbnailHeightRange').value = data.settings.thumbnailHeight;
@@ -424,18 +435,13 @@ function makeCard(access, categoryId) {
   const thumb = node('div', 'thumb');
   thumb.title = access.url;
   thumb.draggable = viewMode === 'workspace';
-  const recapture = node('a', 'card-recapture', 'Capturar imagen');
-  recapture.href = '#';
-  recapture.title = 'Volver a capturar ' + access.title;
-  recapture.onclick = event => { event.preventDefault(); run(() => openRecaptureDialog(access)); };
-  recapture.hidden = Boolean(access.thumbnail);
   if (access.thumbnail) {
     thumb.classList.add('has-thumbnail');
     const img = node('img', 'thumbnail-image'); img.src = access.thumbnail; img.alt = ''; img.title = access.url;
     img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
-    img.onerror = () => { img.remove(); thumb.classList.remove('has-thumbnail'); thumb.prepend(node('span', 'image-error', 'Imagen no disponible')); recapture.hidden = false; };
+    img.onerror = () => { img.remove(); thumb.classList.remove('has-thumbnail'); thumb.prepend(node('span', 'image-error', 'Imagen no disponible')); };
     thumb.append(img);
-  } else thumb.append(node('span', 'image-error', 'Sin miniatura'));
+  } else thumb.append(node('span', 'image-error visually-hidden', 'Sin miniatura'));
   const overlay = node('div', 'card-overlay');
   overlay.title = access.url;
   if (viewMode === 'tags') {
@@ -468,7 +474,7 @@ function makeCard(access, categoryId) {
   open.append(thumb);
   cardStatuses.push({ access, status, duplicateBadge });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  card.append(open, footer, edit, recapture);
+  card.append(open, footer, edit);
   thumb.ondragstart = event => {
     if (viewMode !== 'workspace') return;
     draggedAccess = { categoryId, accessId: access.id };
@@ -1166,6 +1172,7 @@ onClick('openSettings', () => {
   $('thumbnailHeightRange').value = s.thumbnailHeight;
   $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
   $('captureEnabled').checked = s.captureEnabled;
+  $('showWorkspaceTabs').checked = s.showWorkspaceTabs;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('syncEnabled').checked = syncEnabled;
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
@@ -1222,7 +1229,8 @@ onSubmit('settingsForm', async () => {
      backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize: $('thumbnailSize').value, thumbnailHeight: data.settings.thumbnailHeight,
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
-    captureEnabled: $('captureEnabled').checked
+    captureEnabled: $('captureEnabled').checked,
+    showWorkspaceTabs: $('showWorkspaceTabs').checked
   };
   candidate.autoTagRules = parseRules($('settingsTagRules').value);
   await commit(candidate); $('settingsDialog').close();

@@ -114,3 +114,13 @@ test('rutas locales: coincidencia exacta incluso con detección por dominio o do
   assert.equal(matches(folder, 'file:///Users/test/carpeta/'), true);
   assert.equal(matches(folder, 'file:///Users/test/carpeta/hijo.html'), false);
 });
+test('showWorkspaceTabs se conserva y por defecto es visible', () => {
+  assert.equal(DEFAULT_DATA.settings.showWorkspaceTabs, true);
+  assert.equal(normalizeData().settings.showWorkspaceTabs, true);
+  const hidden = fixture();
+  hidden.settings.showWorkspaceTabs = false;
+  assert.equal(normalizeData(hidden).settings.showWorkspaceTabs, false);
+  const invalid = fixture();
+  invalid.settings.showWorkspaceTabs = 'sí';
+  assert.equal(normalizeData(invalid).settings.showWorkspaceTabs, true);
+});
