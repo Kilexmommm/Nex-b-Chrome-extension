@@ -1,4 +1,4 @@
-# nex.b · 1.7.7
+# nex.b · 1.8.0
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -64,9 +64,17 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ## Últimas actualizaciones
 
+### Novedades 1.8.0
+
+- **Encabezado reorganizado:** marca, Workspaces y Tags a la izquierda; acciones a la derecha en orden Alto de miniaturas, Inventario, + Workspace, Editar Workspace y Configurar. El Inventario usa un icono de ventanas en lugar de `☰`.
+- **Configuración con navegación lateral:** General, Diseño, Sincronizar y Datos/Respaldo en una columna, con botón X de cierre y navegación por teclado.
+- **Side Panel de Chrome:** abre nex.b en el panel lateral derecho desde el menú de la extensión, reutilizando la misma interfaz y sin duplicar datos.
+- **Home más compacto:** la zona de miniaturas usa el 90% en escritorio; el título de cada acceso es más ligero (11 px, `#b6b3b3`); se quitó el texto «Sin miniatura» y «Capturar imagen» del home (la captura queda en el menú de clic derecho).
+- **Nuevo ajuste** para mostrar u ocultar las pestañas de Workspace.
+
 ### Inventario de pestañas (PR #9)
 
-- El botón ☰ permite buscar pestañas abiertas, reunir las visibles o seleccionadas, guardar accesos sin duplicar documentos en el Workspace y revisar copias repetidas.
+- El botón de Inventario permite buscar pestañas abiertas, reunir las visibles o seleccionadas, guardar accesos sin duplicar documentos en el Workspace y revisar copias repetidas.
 - Se consulta bajo demanda, sin sondeo ni trabajo adicional permanente en el service worker. El listado se inserta en bloque y Chrome puede omitir el renderizado de filas fuera de pantalla.
 - Antes de cerrar o reunir seleccionadas se comprueba que sigan en la misma URL. El cierre de duplicados excluye pestañas navegando, fijadas o reproduciendo audio, y no incluye copias nuevas que no aparecían en el listado.
 - Las acciones esperan a terminar antes de aceptar otro clic en el mismo botón. El cierre de pestañas puede afectar trabajo no guardado; revisa la selección antes de confirmar.
