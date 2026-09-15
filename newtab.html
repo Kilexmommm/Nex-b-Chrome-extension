@@ -54,7 +54,8 @@
        <div id="pasteBox" class="paste-box" tabindex="0">Haz clic aquí y pega una captura<br /><small>⌘V / Ctrl+V</small></div>
        <button id="clipboardPaste" type="button" class="button secondary">Pegar captura desde el portapapeles</button>
        <button id="removeThumbnail" type="button" class="button secondary">Quitar miniatura</button>
-      <img referrerpolicy="no-referrer" id="preview" class="preview" alt="Vista previa" hidden />
+       <img referrerpolicy="no-referrer" id="preview" class="preview" alt="Vista previa" hidden />
+       <input id="thumbnailFileInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar acceso</button></div>
     </form></dialog>
     <dialog id="workspaceDialog"><form method="dialog" id="workspaceForm" class="dialog-form">
@@ -180,14 +181,18 @@
       </section>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cerrar</button></div>
     </form></dialog>
-    <menu id="cardMenu" class="card-menu" hidden>
-      <button type="button" data-card-action="edit">Editar</button>
-      <button type="button" data-card-action="move">Mover a Workspace…</button>
-      <button type="button" data-card-action="capture">Volver a capturar imagen</button>
-      <button type="button" data-card-action="paste">Pegar captura desde el portapapeles</button>
-      <button type="button" data-card-action="copy">Copiar URL</button>
-      <button type="button" data-card-action="remove" class="danger">Remover</button>
-    </menu>
+     <menu id="cardMenu" class="card-menu" hidden>
+       <button type="button" data-card-action="edit"><span class="menu-icon" aria-hidden="true">✎</span>Editar</button>
+       <button type="button" data-card-action="move"><span class="menu-icon" aria-hidden="true">⇥</span>Mover a Workspace…</button>
+       <li class="menu-separator" role="separator"></li>
+       <button type="button" data-card-action="capture"><span class="menu-icon" aria-hidden="true">↻</span>Volver a capturar imagen</button>
+       <button type="button" data-card-action="paste"><span class="menu-icon" aria-hidden="true">▣</span>Pegar captura desde el portapapeles</button>
+       <button type="button" data-card-action="upload"><span class="menu-icon" aria-hidden="true">↑</span>Subir imagen desde el computador</button>
+       <li class="menu-separator" role="separator"></li>
+       <button type="button" data-card-action="copy"><span class="menu-icon" aria-hidden="true">⧉</span>Copiar dirección del enlace</button>
+       <li class="menu-separator" role="separator"></li>
+       <button type="button" data-card-action="remove" class="danger"><span class="menu-icon" aria-hidden="true">⌫</span>Remover</button>
+     </menu>
     <script type="module" src="src/app.js"></script>
   </body>
 </html>

@@ -860,6 +860,11 @@ function showCardMenu(event, access, categoryId) {
     openAccessDialog(categoryId, access);
     await pasteClipboardImage();
   });
+  menu.querySelector('[data-card-action="upload"]').onclick = () => run(() => {
+    hideCardMenu();
+    openAccessDialog(categoryId, access);
+    $('thumbnailFileInput').click();
+  });
   menu.querySelector('[data-card-action="edit"]').onclick = () => run(() => { hideCardMenu(); openAccessDialog(categoryId, access); });
   menu.querySelector('[data-card-action="move"]').onclick = () => run(() => {
     hideCardMenu(); openAccessDialog(categoryId, access); $('accessWorkspace').focus();
@@ -1422,6 +1427,23 @@ document.addEventListener('paste', event => {
       pastedImage = image; $('accessThumbnailUrl').value = ''; showPreview(); showMessage('Miniatura lista para guardar.');
     } finally { if (generation === pasteGeneration) imageBusy = false; }
   });
+});
+$('thumbnailFileInput').onchange = () => run(async () => {
+  const file = $('thumbnailFileInput').files?.[0];
+  $('thumbnailFileInput').value = '';
+  if (!file) return;
+  const generation = ++pasteGeneration;
+  imageBusy = true;
+  try {
+    const image = await resizeImage(file);
+    if (generation !== pasteGeneration || !$('accessDialog').open) return;
+    pastedImage = image;
+    $('accessThumbnailUrl').value = '';
+    showPreview();
+    showMessage('Miniatura lista para guardar.');
+  } finally {
+    if (generation === pasteGeneration) imageBusy = false;
+  }
 });
 onClick('pasteBox', () => $('pasteBox').focus());
 onClick('clipboardPaste', pasteClipboardImage);

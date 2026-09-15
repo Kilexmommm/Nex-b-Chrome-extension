@@ -115,6 +115,16 @@ test('el inventario prioriza grupos repetidos con miniatura, contador y cierre p
   assert.match(css, /\.inventory-group-row \{/);
   assert.match(css, /\.inventory-thumbnail-image \{/);
 });
+test('el menú contextual de accesos está en español, agrupado con iconos y permite subir imágenes', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), css = read('src/styles.css');
+  assert.match(html, /data-card-action="upload"[^>]*><span class="menu-icon"/);
+  assert.match(html, /Subir imagen desde el computador/);
+  assert.match(html, /class="menu-separator"/);
+  assert.match(html, /id="thumbnailFileInput"/);
+  assert.match(app, /data-card-action="upload/);
+  assert.match(css, /\.card-menu \.menu-separator/);
+  assert.match(css, /background:#2b2b2b/);
+});
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
   assert.match(app, /thumbnailHeight/);
