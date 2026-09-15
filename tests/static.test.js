@@ -296,6 +296,7 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   assert.equal(manifest.optional_host_permissions, undefined);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
+  assert.deepEqual(manifest.side_panel, { default_path: 'newtab.html' });
   for (const key of ['content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /unsafe-eval/);
@@ -313,7 +314,7 @@ test('el panel lateral reutiliza newtab, ofrece menú de acción y conserva el c
   assert.match(worker, /title: 'Abrir Side panel', contexts: \['action'\]/);
   assert.match(worker, /chrome\.action\.onClicked\.addListener\(tab => \{[\s\S]*?openHome\(\)\.catch/);
   assert.match(html, /id="openSidePanel"[^>]*>Abrir Side panel/);
-  assert.match(app, /chrome\.sidePanel\.open\(\{ windowId: tab\.windowId \}\)/);
+  assert.match(app, /chrome\.sidePanel\.open\(\{ windowId: sidePanelWindowId \}\)/);
   assert.match(css, /@media \(max-width: 480px\)/);
   assert.match(css, /overflow-x: hidden/);
 });
