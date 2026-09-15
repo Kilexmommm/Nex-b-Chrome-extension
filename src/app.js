@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -23,6 +23,8 @@ let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
 let localThumbnailPreference = null;
+let narrowColumns = 1;
+const narrowMedia = window.matchMedia('(max-width: 600px)');
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -127,6 +129,37 @@ function applyLocalThumbnailPreference() {
 async function persistLocalThumbnailPreference(settings) {
   localThumbnailPreference = { size: settings.thumbnailSize, height: settings.thumbnailHeight };
   await chrome.storage.local.set({ nexbThumbnailPreference: localThumbnailPreference });
+}
+function applyNarrowColumns() {
+  document.documentElement.dataset.narrowColumns = String(narrowColumns);
+  document.documentElement.style.setProperty('--narrow-columns', String(narrowColumns));
+  document.querySelectorAll('[data-narrow-columns]').forEach(item => {
+    item.setAttribute('aria-pressed', String(Number(item.dataset.narrowColumns) === narrowColumns));
+  });
+}
+async function restoreNarrowColumns() {
+  const stored = await chrome.storage.local.get('nexb.narrowColumns');
+  narrowColumns = normalizeNarrowColumns(stored['nexb.narrowColumns']);
+  applyNarrowColumns();
+}
+async function setNarrowColumns(value) {
+  narrowColumns = normalizeNarrowColumns(value);
+  await chrome.storage.local.set({ 'nexb.narrowColumns': narrowColumns });
+  applyNarrowColumns();
+}
+function closeMainMenu(restoreFocus = false) {
+  const menu = $('mainMenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  $('mainMenuToggle').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('mainMenuToggle').focus();
+}
+function setNarrow(matches) {
+  document.documentElement.dataset.narrow = String(matches);
+  const toggle = $('mainMenuToggle');
+  if (toggle) toggle.hidden = !matches;
+  if (!matches) closeMainMenu();
+  if (ready) render();
 }
 function adopt(snapshot) {
   const selected = sessionStorage.getItem('activeWorkspace');
@@ -343,7 +376,8 @@ function render() {
     };
     $('workspaceTabs').append(b);
   }
-  const workspaceTabsHidden = data.settings.showWorkspaceTabs === false;
+  const narrow = document.documentElement.dataset.narrow === 'true';
+  const workspaceTabsHidden = narrow || data.settings.showWorkspaceTabs === false;
   $('workspaceTabs').hidden = workspaceTabsHidden;
   $('workspacePicker').hidden = !workspaceTabsHidden;
   $('workspacePicker').replaceChildren(...data.workspaces.map(workspace => new Option(workspace.name, workspace.id, false, workspace.id === currentWorkspace().id && viewMode === 'workspace')));
@@ -1025,8 +1059,42 @@ document.querySelectorAll('dialog').forEach(dialog => {
 document.querySelectorAll('[data-cancel]').forEach(b => {
   b.onclick = () => { if (!saving) b.closest('dialog').close(); };
 });
-document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
+document.addEventListener('click', event => {
+  hideCardMenu();
+  if (!event.target.closest('.top-actions')) {
+    $('thumbnailSizeMenu').hidden = true;
+    closeMainMenu();
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideCardMenu(); closeMainMenu(true); } });
+onClick('mainMenuToggle', () => {
+  const menu = $('mainMenu');
+  const open = menu.hidden;
+  menu.hidden = !open;
+  $('mainMenuToggle').setAttribute('aria-expanded', String(open));
+  if (open) menu.querySelector('button')?.focus();
+});
+const MAIN_MENU_TARGETS = { edit: 'editWorkspace', new: 'newWorkspace', thumbnail: 'thumbnailSizeToggle', inventory: 'openInventory', settings: 'openSettings', tags: 'tagRules' };
+document.querySelectorAll('[data-main-action]').forEach(item => {
+  item.onclick = () => run(async () => {
+    const action = item.dataset.mainAction;
+    closeMainMenu();
+    if (action === 'sync') {
+      $('openSettings').click();
+      $('settingsSyncTab').click();
+      return;
+    }
+    const target = MAIN_MENU_TARGETS[action];
+    if (target) $(target).click();
+  });
+});
+document.querySelectorAll('[data-narrow-columns]').forEach(item => {
+  item.onclick = () => run(async () => {
+    closeMainMenu();
+    await setNarrowColumns(Number(item.dataset.narrowColumns));
+  });
+});
+narrowMedia.addEventListener('change', event => setNarrow(event.matches));
 onClick('openInventory', openInventoryDialog);
 onClick('inventoryAllTab', () => selectInventoryTab('all'));
 onClick('inventoryDupTab', async () => { selectInventoryTab('dup'); await refreshDuplicates(); });
@@ -1491,6 +1559,7 @@ async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await restoreLocalThumbnailPreference();
+  await restoreNarrowColumns();
   await restoreSyncPreference();
   const snapshot = await repository.load();
   adopt(snapshot); ready = true;
@@ -1526,4 +1595,5 @@ async function initialize() {
     showMessage(pending.notice || 'Revisa el acceso y elige su categoría antes de guardar.');
   } else if (pendingKey) { pendingKey = ''; showMessage('El acceso pendiente ya no está disponible. Agrégalo de nuevo desde la página.'); }
 }
+setNarrow(narrowMedia.matches);
 run(initialize);

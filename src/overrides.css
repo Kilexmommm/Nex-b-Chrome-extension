@@ -102,6 +102,25 @@ button:disabled { opacity: .55; cursor: wait; }
   .top-actions { order: 2; flex: 1 1 100%; min-width: 0; justify-content: flex-end; flex-wrap: wrap; }
   .workspace-row { order: 1; flex: 1 1 0; min-width: 0; }
 }
+/* Ancho reducido (Side Panel ~400px y móvil): cabecera simplificada. */
+#mainMenuToggle { display: none; }
+[data-narrow="true"] .topbar > h1 { display: none; }
+[data-narrow="true"] #mainMenuToggle { display: inline-flex; }
+[data-narrow="true"] .top-actions > :is(#thumbnailSizeToggle, #openInventory, #newWorkspace, #editWorkspace, #openSettings) { display: none; }
+[data-narrow="true"] .workspace-row #tagRules { display: none; }
+[data-narrow="true"] .workspace-picker { flex: 1 1 auto; min-width: 0; width: 100%; }
+/* Miniaturas por fila en ancho reducido: 1 por defecto, 2 si el usuario lo elige. */
+html[data-narrow="true"] .cards { grid-template-columns: repeat(var(--narrow-columns, 1), minmax(0, 1fr)); }
+html[data-narrow="true"], html[data-narrow="true"] body { overflow-x: hidden; }
+[data-narrow="true"] .quick-menu { right: 0; top: 38px; }
+.main-menu { position: absolute; right: 0; top: 42px; z-index: 5; display: grid; gap: 2px; min-width: 210px; margin: 0; padding: 5px; border: 1px solid #555; border-radius: 7px; background: #2b2b2b; box-shadow: 0 10px 24px #0004; list-style: none; }
+.main-menu button { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; border-radius: 4px; padding: 8px 9px; background: transparent; color: #e7edff; text-align: left; cursor: pointer; font: 13px inherit; }
+.main-menu button:hover, .main-menu button:focus-visible { background: #3b3b3b; color: #fff; }
+.main-menu button[aria-pressed=true] { background: #4b4b4b; border: 1px solid #a7a7a7; color: #fff; }
+.main-menu .menu-separator { height: 1px; margin: 6px 3px; background: #555; }
+.main-menu .main-menu-label { padding: 5px 9px 2px; color: #a8a8a8; font-size: 11px; }
+.light-theme .main-menu { background: #2b2b2b; border-color: #555; }
+.light-theme .main-menu button { color: #f0f0f0; }
 dialog::backdrop { background: #080b12aa; }
 
 .preset-section { margin-top: 4px; }
