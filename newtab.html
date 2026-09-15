@@ -12,7 +12,7 @@
     <main class="shell">
       <header class="topbar">
         <h1>nex.b</h1><div class="workspace-row"><nav id="workspaceTabs" class="workspace-tabs" aria-label="Workspaces"></nav><button id="tagRules" class="tags-button" title="Ver accesos por tag">Tags</button></div>
-        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button><label class="quick-custom">Personalizado <output id="thumbnailHeightValue">101 px</output><input id="thumbnailHeightRange" type="range" min="80" max="480" step="1" /><input id="thumbnailCustomHeight" type="number" min="80" max="480" step="1" /><button id="saveThumbnailCustom" type="button">Aplicar</button></label></div><button id="openInventory" class="button secondary icon-button" title="Inventario de pestañas abiertas" aria-label="Inventario de pestañas abiertas">☰</button><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button><button id="newWorkspace" class="button secondary">+ Workspace</button></div>
+        <div class="top-actions"><button id="thumbnailSizeToggle" class="button secondary icon-button" title="Alto de miniaturas" aria-label="Alto de miniaturas">↕</button><div id="thumbnailSizeMenu" class="quick-menu" hidden><button data-thumbnail-size="small" type="button">Bajo · −30%</button><button data-thumbnail-size="medium" type="button">Mediano</button><button data-thumbnail-size="large" type="button">Alto · +30%</button><label class="quick-custom">Personalizado <output id="thumbnailHeightValue">101 px</output><input id="thumbnailHeightRange" type="range" min="80" max="480" step="1" /><input id="thumbnailCustomHeight" type="number" min="80" max="480" step="1" /><button id="saveThumbnailCustom" type="button">Aplicar</button></label></div><button id="openInventory" class="button secondary icon-button" title="Inventario de pestañas abiertas" aria-label="Inventario de pestañas abiertas"><svg class="inventory-icon" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="2.5" width="15" height="4" rx="1" /><rect x="2.5" y="8" width="15" height="4" rx="1" /><rect x="2.5" y="13.5" width="15" height="4" rx="1" /></svg></button><button id="newWorkspace" class="button secondary">+ Workspace</button><button id="editWorkspace" class="button secondary icon-button" title="Editar Workspace" aria-label="Editar Workspace">✎</button><button id="openSettings" class="button secondary icon-button" title="Configurar" aria-label="Configurar">⚙</button></div>
       </header>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
@@ -86,32 +86,22 @@
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="bookmarkImportSubmit" class="button" disabled>Importar nuevos</button></div>
     </form></dialog>
     <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
+      <button id="settingsClose" type="button" data-cancel class="dialog-close" aria-label="Cerrar configuración">×</button>
       <h2>Configurar nex.b</h2>
-      <div class="settings-tabs" role="tablist" aria-label="Secciones de configuración">
-        <button id="settingsGeneralTab" type="button" role="tab" aria-controls="settingsGeneralPanel" aria-selected="true">General</button>
-        <button id="settingsSyncTab" type="button" role="tab" aria-controls="settingsSyncPanel" aria-selected="false" tabindex="-1">Sincronizar</button>
-        <button id="settingsDesignTab" type="button" role="tab" aria-controls="settingsDesignPanel" aria-selected="false" tabindex="-1">Diseño</button>
-      </div>
-      <section id="settingsGeneralPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsGeneralTab">
-        <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
-        <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
-        <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
-        <section class="settings-utilities"><p>Datos y favoritos</p>
-          <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
-           <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar favoritos importados</button>
-           <small>Sincroniza todas las secciones vinculadas, aunque pertenezcan a otro Workspace. Chrome pedirá permiso al usar esta opción; nex.b solo lee tus favoritos.</small>
-           <button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button>
-           <small>Versión instalada: <strong id="extensionVersion"></strong>. Se abrirá el ZIP de GitHub; después reemplaza la carpeta y pulsa «Recargar» en chrome://extensions.</small>
-           <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
-           <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
-           <button id="openSidePanel" type="button" class="button secondary">Abrir Side panel</button>
-           <small>Abre esta misma interfaz en el panel lateral de Chrome.</small>
-           <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
-          <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
-          <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>
-        </section>
-      </section>
-      <section id="settingsSyncPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsSyncTab" hidden>
+      <div class="settings-layout">
+        <nav class="settings-tabs" role="tablist" aria-label="Secciones de configuración">
+          <button id="settingsGeneralTab" type="button" role="tab" class="active" aria-controls="settingsGeneralPanel" aria-selected="true" tabindex="0">General</button>
+          <button id="settingsDesignTab" type="button" role="tab" aria-controls="settingsDesignPanel" aria-selected="false" tabindex="-1">Diseño</button>
+          <button id="settingsSyncTab" type="button" role="tab" aria-controls="settingsSyncPanel" aria-selected="false" tabindex="-1">Sincronizar</button>
+          <button id="settingsDataTab" type="button" role="tab" aria-controls="settingsDataPanel" aria-selected="false" tabindex="-1">Datos/Respaldo</button>
+        </nav>
+        <div class="settings-content">
+          <section id="settingsGeneralPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsGeneralTab">
+            <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
+            <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
+            <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
+          </section>
+          <section id="settingsSyncPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsSyncTab" hidden>
         <h3>Sincronizar Workspaces</h3>
         <p class="help">Los datos pequeños se sincronizan con tu cuenta de Chrome. Las miniaturas no se suben a Chrome Sync porque tienen una cuota limitada.</p>
         <p id="syncAccount" class="sync-account" role="status">Cuenta de Chrome: comprobando...</p>
@@ -133,8 +123,8 @@
           <button id="openDriveDocs" type="button" class="button secondary">Abrir instrucciones de Google Cloud</button>
           <small>Si Chrome rechaza la conexión, verifica que el Client ID corresponda al ID de nex.b. El respaldo ZIP sigue disponible.</small>
         </section>
-      </section>
-      <section id="settingsDesignPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsDesignTab" hidden>
+          </section>
+          <section id="settingsDesignPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsDesignTab" hidden>
         <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
         <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>
         <label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option><option value="custom">Personalizado</option></select></label>
@@ -144,7 +134,25 @@
         <div class="setting-grid"><label>Separación de tarjetas<select id="cardSpacing"><option value="compact">Compacta</option><option value="normal">Normal</option><option value="wide">Amplia</option></select></label><label>Estilo de iconos<select id="iconStyle"><option value="minimal">Minimalista</option><option value="filled">Rellenos</option><option value="round">Redondos</option></select></label></div>
         </section>
         <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
-      </section>
+          </section>
+          <section id="settingsDataPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsDataTab" hidden>
+            <section class="settings-utilities"><p>Datos y favoritos</p>
+              <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
+              <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar favoritos importados</button>
+              <small>Sincroniza todas las secciones vinculadas, aunque pertenezcan a otro Workspace. Chrome pedirá permiso al usar esta opción; nex.b solo lee tus favoritos.</small>
+              <button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button>
+              <small>Versión instalada: <strong id="extensionVersion"></strong>. Se abrirá el ZIP de GitHub; después reemplaza la carpeta y pulsa «Recargar» en chrome://extensions.</small>
+              <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
+              <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
+              <button id="openSidePanel" type="button" class="button secondary">Abrir Side panel</button>
+              <small>Abre esta misma interfaz en el panel lateral de Chrome.</small>
+              <label>Datos de enlaces (JSON)<textarea readonly id="dataJson" rows="7" spellcheck="false"></textarea><small>El ZIP guarda Workspaces, accesos, estilos e imágenes pegadas. Las imágenes por URL siguen siendo enlaces externos. Guarda el ZIP antes de desinstalar; no está cifrado.</small></label>
+              <input id="zipImportInput" type="file" accept=".zip,application/zip" hidden />
+              <div class="json-actions"><button id="copyData" type="button" class="button secondary">Copiar JSON</button><button id="downloadData" type="button" class="button secondary">Descargar ZIP</button><button id="importData" type="button" class="button secondary">Importar ZIP</button><button id="restorePrevious" type="button" class="button secondary">Restaurar versión anterior</button></div>
+            </section>
+          </section>
+        </div>
+      </div>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar configuración</button></div>
     </form></dialog>
     <dialog id="inventoryDialog"><form method="dialog" id="inventoryForm" class="dialog-form inventory-form">

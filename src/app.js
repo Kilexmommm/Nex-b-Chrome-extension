@@ -187,17 +187,17 @@ function parseRules(value) {
   return validateRules(rules);
 }
 function selectSettingsTab(tab) {
-  const design = tab === 'design';
-  const sync = tab === 'sync';
-  $('settingsSyncPanel').hidden = !sync;
-  $('settingsDesignPanel').hidden = !design;
-  $('settingsGeneralPanel').hidden = design || sync;
-  $('settingsGeneralTab').setAttribute('aria-selected', String(!design && !sync));
-  $('settingsSyncTab').setAttribute('aria-selected', String(sync));
-  $('settingsDesignTab').setAttribute('aria-selected', String(design));
-  $('settingsGeneralTab').tabIndex = design || sync ? -1 : 0;
-  $('settingsSyncTab').tabIndex = sync ? 0 : -1;
-  $('settingsDesignTab').tabIndex = design ? 0 : -1;
+  const panelByTab = { general: 'settingsGeneralPanel', design: 'settingsDesignPanel', sync: 'settingsSyncPanel', data: 'settingsDataPanel' };
+  const tabByPanel = Object.fromEntries(Object.entries(panelByTab).map(([key, panel]) => [panel, 'settings' + key[0].toUpperCase() + key.slice(1) + 'Tab']));
+  const selected = panelByTab[tab] ? tab : 'general';
+  for (const [key, panelId] of Object.entries(panelByTab)) {
+    const active = key === selected;
+    const tabElement = $(tabByPanel[panelId]);
+    $(panelId).hidden = !active;
+    tabElement.setAttribute('aria-selected', String(active));
+    tabElement.classList.toggle('active', active);
+    tabElement.tabIndex = active ? 0 : -1;
+  }
 }
 function applySettings() {
   const s = data.settings;
@@ -1124,8 +1124,18 @@ onClick('openUpdate', async () => {
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
 onClick('openSidePanel', openSidePanel);
 onClick('settingsGeneralTab', () => selectSettingsTab('general'));
-onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
+onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });
+onClick('settingsDataTab', () => selectSettingsTab('data'));
+document.querySelector('#settingsDialog .settings-tabs').addEventListener('keydown', event => {
+  if (!['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+  const tabs = [...event.currentTarget.querySelectorAll('[role=tab]')];
+  const current = tabs.indexOf(document.activeElement);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  event.preventDefault();
+  tabs[next].focus();
+  tabs[next].click();
+});
 onClick('refreshSyncAccount', updateSyncAccount);
 onClick('syncNow', syncNow);
 onClick('syncDriveNow', async () => {
