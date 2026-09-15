@@ -266,7 +266,7 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead']);
+  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead', 'sidePanel']);
   assert.equal(manifest.optional_host_permissions, undefined);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
@@ -274,6 +274,22 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /unsafe-eval/);
   for (const path of Object.values(manifest.icons)) assert.ok(existsSync(new URL('../' + path, import.meta.url)));
+});
+test('el panel lateral reutiliza newtab, ofrece menú de acción y conserva el clic normal', () => {
+  const manifest = JSON.parse(read('manifest.json'));
+  const worker = read('src/background.js');
+  const app = read('src/app.js');
+  const html = read('newtab.html');
+  const css = read('src/overrides.css');
+  assert.ok(manifest.permissions.includes('sidePanel'));
+  assert.match(worker, /chrome\.sidePanel\.setOptions\(\{ path: 'newtab\.html', enabled: true \}\)/);
+  assert.match(worker, /chrome\.sidePanel\.open\(\{ windowId \}\)/);
+  assert.match(worker, /title: 'Abrir Side panel', contexts: \['action'\]/);
+  assert.match(worker, /chrome\.action\.onClicked\.addListener\(tab => \{[\s\S]*?openHome\(\)\.catch/);
+  assert.match(html, /id="openSidePanel"[^>]*>Abrir Side panel/);
+  assert.match(app, /chrome\.sidePanel\.open\(\{ windowId: tab\.windowId \}\)/);
+  assert.match(css, /@media \(max-width: 480px\)/);
+  assert.match(css, /overflow-x: hidden/);
 });
 test('interfaz: todos los IDs usados existen y son únicos; módulo local sin innerHTML', () => {
   const html = read('newtab.html'), app = read('src/app.js');

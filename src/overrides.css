@@ -194,6 +194,27 @@ dialog::backdrop { background: #00000099; }
   .dialog-form .field-row > input[type=checkbox] { justify-self: start; }
 }
 
+/* El panel lateral puede ser mucho más estrecho que una pestaña nueva. */
+@media (max-width: 480px) {
+  html, body { min-width: 0; max-width: 100%; overflow-x: hidden; }
+  .shell { width: 100%; padding: 16px 12px 48px; }
+  .topbar { align-items: stretch; flex-direction: column; gap: 10px; }
+  .topbar > h1 { font-size: 21px; }
+  .workspace-row { width: 100%; order: initial; }
+  .top-actions { width: 100%; margin-left: 0; flex-wrap: wrap; gap: 6px; }
+  .top-actions .button { flex: 0 0 auto; }
+  .top-actions #newWorkspace { flex: 1 1 120px; }
+  .cards { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .category { margin: 22px 0 30px; }
+  .category-heading { align-items: flex-start; }
+  .category-heading h2 { min-width: 0; overflow-wrap: anywhere; }
+  .category-actions { width: 100%; margin-left: 0; justify-content: flex-end; }
+  .dialog-form, .settings-form, .inventory-form { width: calc(100vw - 20px); max-width: calc(100vw - 20px); padding: 16px; }
+  .dialog-actions { flex-wrap: wrap; }
+  .dialog-actions > button { flex: 1 1 120px; }
+  .setting-grid, .style-presets { grid-template-columns: 1fr; }
+}
+
 /* Paletas locales: no modifican las imágenes ni las preferencias guardadas. */
 [data-theme="papel"] { color: #3e352c; }
 [data-theme="papel"] .card .thumb { background: radial-gradient(ellipse at top left, #fffaf0, transparent 70%), linear-gradient(145deg, #eee1cd, #d8c3a6); border-color: #b9a28680; color: #6e5843; }

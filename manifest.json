@@ -17,7 +17,8 @@
     "unlimitedStorage",
     "identity",
     "identity.email",
-    "clipboardRead"
+    "clipboardRead",
+    "sidePanel"
   ],
   "host_permissions": ["http://*/*", "https://*/*", "https://www.googleapis.com/"],
   "icons": {
