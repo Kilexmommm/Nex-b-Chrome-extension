@@ -13,7 +13,13 @@ body { min-height: 100vh; }
 [data-theme="aurora"] { --empty-tile: #19313d; --empty-ink: #b8d9d6; }
 [data-theme="espacio"] { --empty-tile: #202642; --empty-ink: #c3c9ea; }
 [data-theme] .card .thumb:not(.has-thumbnail) { background: var(--empty-tile); color: var(--empty-ink); }
-.signature { margin-top: 40px; padding: 16px 0 8px; text-align: center; font-size: 11px; color: inherit; opacity: .7; }
+.signature { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; margin-top: 40px; padding: 16px 0 8px; text-align: center; font-size: 11px; color: inherit; }
+.signature-author, .footer-version { opacity: .7; }
+.footer-version { font-variant-numeric: tabular-nums; }
+.footer-feedback { color: inherit; opacity: 1; text-decoration: underline; text-underline-offset: 2px; border-radius: 3px; }
+.footer-feedback:hover { color: var(--accent-color); }
+.footer-feedback:focus-visible { outline: 2px solid #769bff; outline-offset: 2px; }
+@media (max-width: 480px) { .signature { gap: 4px 8px; } }
 .card { min-height: 0; }
 .card, .light-theme .card { border: 0; background: transparent; overflow: visible; }
 .card .thumb { border: var(--card-border-width, 1px) solid var(--card-border-color, #40506b); border-radius: 7px; overflow: hidden; }

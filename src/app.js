@@ -1583,7 +1583,9 @@ async function initialize() {
   await restoreSyncPreference();
   const snapshot = await repository.load();
   adopt(snapshot); ready = true;
-  $('extensionVersion').textContent = chrome.runtime.getManifest().version;
+  const installedVersion = chrome.runtime.getManifest().version;
+  $('extensionVersion').textContent = installedVersion;
+  $('footerVersion').textContent = 'v' + installedVersion;
   await updateSyncAccount();
   if (syncEnabled) await syncNow().catch(() => {});
   if (snapshot.recovered) showMessage('Se recuperó la copia anterior en memoria. Descarga un ZIP antes de continuar; los datos originales no se sobrescribieron.');

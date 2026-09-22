@@ -240,7 +240,19 @@ test('contadores numéricos, iconos sin borde y firma al final', () => {
   assert.match(app, /accessCount\(items.length\)/);
   assert.match(app, /accessCount\(category.accesses.length\)/);
   assert.match(read('src/styles.css'), /\.category-icon \{[^}]*border:0;/);
-  assert.match(html, /<footer class="signature">By.kilex<\/footer>\s*<\/main>/);
+  assert.match(html, /<footer class="signature">[\s\S]*By\.kilex[\s\S]*<\/footer>\s*<\/main>/);
+});
+test('el pie muestra la versión real del manifest y un Feedback accesible a issues', () => {
+  const html = read('newtab.html'), app = read('src/app.js');
+  const manifest = JSON.parse(read('manifest.json')), pkg = JSON.parse(read('package.json'));
+  assert.equal(manifest.version, pkg.version);
+  assert.match(html, /id="footerVersion"/);
+  assert.match(app, /\$\('footerVersion'\)\.textContent = 'v' \+ installedVersion/);
+  assert.match(app, /const installedVersion = chrome\.runtime\.getManifest\(\)\.version/);
+  const footer = html.match(/<footer class="signature">([\s\S]*?)<\/footer>/)[1];
+  assert.match(footer, /By\.kilex/);
+  assert.match(footer, /<a[^>]*href="https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/issues"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>Feedback<\/a>/);
+  assert.match(read('src/overrides.css'), /\.footer-feedback:focus-visible \{ outline: 2px solid #769bff/);
 });
 test('paletas de miniaturas y bordes coordinadas; editar discreto y accesible', () => {
   const css = read('src/overrides.css'), app = read('src/app.js');
