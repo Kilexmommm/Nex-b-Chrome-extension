@@ -70,6 +70,13 @@ test('el indicador abierto y la reutilización comparten la misma identidad de d
   assert.match(model, /return matchOrigin\(access\.url\) === matchOrigin\(tabUrl\)/);
   assert.match(tabs, /matches\(access, tab\.pendingUrl \|\| tab\.url\)/);
 });
+test('cada sección ofrece abrir todas sus ventanas sin duplicar', () => {
+  const app = read('src/app.js'), tabs = read('src/tabs.js');
+  assert.match(app, /openOrFocusMany\(category\.accesses, chrome, navigator\.locks\)/);
+  assert.match(app, /button\('⧉', 'Abrir todas las ventanas de esta sección'/);
+  assert.match(app, /openCategoryAccesses/);
+  assert.match(tabs, /export async function openOrFocusMany/);
+});
 test('captura por lote usa acceso de host y conserva miniaturas existentes', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="captureAllImages"/);

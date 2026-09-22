@@ -1,4 +1,4 @@
-# nex.b · 1.9.0
+# nex.b · 1.9.1
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,12 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 1.9.1
+
+- **Versión unificada:** reúne la línea 1.8.1 (Side Panel adaptable y abrir toda una sección) con la 1.9.0 (enfoque sin pestaña duplicada, Diseño persistente, borrado seguro de Workspace e integración continua) en una sola entrega.
+- **Side Panel con ancho reducido:** oculta la marca, cambia las pestañas por un selector de Workspace, agrupa las acciones en un menú ⋮ y permite 1 o 2 miniaturas por fila, guardado por dispositivo.
+- **Abrir toda una sección:** el botón ⧉ de cada sección/subsección abre todos sus accesos y enfoca los que ya están abiertos.
 
 ### Novedades 1.9.0
 
