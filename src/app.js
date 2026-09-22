@@ -1,6 +1,6 @@
 import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
 import { createRepository } from './storage.js';
-import { openOrFocusTab } from './tabs.js';
+import { openOrFocusTab, openOrFocusMany } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
 import { resizeImage } from './images.js';
 import { collectTags, suggestTags, insertTag } from './tags.js';
@@ -326,6 +326,13 @@ async function openAccess(access) {
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
 }
+async function openCategoryAccesses(category) {
+  const { opened, focused, failed } = await openOrFocusMany(category.accesses, chrome, navigator.locks);
+  scheduleTabRefresh();
+  let message = 'Se abrieron ' + opened + ' y se enfocaron ' + focused + '.';
+  if (failed) message += ' ' + failed + ' no se pudieron abrir.';
+  showMessage(message, failed > 0 && !opened && !focused);
+}
 let sidePanelWindowId = null;
 if (chrome.windows?.getCurrent) chrome.windows.getCurrent().then(window => { sidePanelWindowId = window?.id ?? null; }).catch(() => {});
 async function openSidePanel() {
@@ -449,6 +456,7 @@ function renderCategory(category, subcategory) {
   const heading = node('div', 'category-heading');
   const actions = node('div', 'category-actions');
   actions.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'button quiet category-icon'),
+    button('⧉', 'Abrir todas las ventanas de esta sección', () => openCategoryAccesses(category), 'button quiet category-icon'),
     button('✎', 'Editar categoría', () => renameCategory(category), 'button quiet category-icon'),
     button('⇥', 'Mover sección a otro Workspace', () => openMoveSectionDialog(category), 'button quiet category-icon'));
   if (category.bookmarkFolderId) actions.append(button('↻', 'Sincronizar sección con Favoritos de Chrome', () => syncCategoryBookmarks(category), 'button quiet category-icon'));
