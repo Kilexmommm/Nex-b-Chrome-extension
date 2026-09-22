@@ -1,4 +1,4 @@
-# nex.b · 1.8.0
+# nex.b · 1.9.0
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,15 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 1.9.0
+
+- **Enfoque sin pestaña duplicada:** al abrir un acceso se busca primero si su documento o dominio ya está abierto y se enfoca esa pestaña y su ventana. El indicador de «abierto» y la reutilización comparten la misma identidad, de modo que una URL con `?consulta`, `#fragmento` o `www.` de más ya no abre una copia.
+- **Diseño que persiste y se aplica:** el alto de miniaturas se deriva del tamaño elegido y se guarda; el color de borde elegido se aplica y, si coincide con el predeterminado, cada tema conserva su propio borde como reserva.
+- **Eliminación segura de Workspace:** Editar Workspace permite eliminar un Workspace con un resumen previo de categorías, subcategorías y accesos. Exige confirmación, no permite borrar el último Workspace, navega a otro existente y conserva la copia anterior como respaldo local restaurable desde Configuración → Datos.
+- **Integración continua:** GitHub Actions ejecuta `npm test` con Node.js 20 en cada `pull_request` y en cada push a `main`. Se añade `CONTRIBUTING.md` con requisitos, ejecución de pruebas y alcance de los cambios.
+
+Detalle completo: [Novedades 1.9.0](docs/NOVEDADES-1.9.0.md).
 
 ### Novedades 1.8.0
 
