@@ -25,6 +25,29 @@ test('consulta actual y enfoca la ventana de la pestaña existente', async () =>
   assert.deepEqual(api.state.updates, [4]); assert.deepEqual(api.state.windows, [9]);
   assert.equal(api.state.creates, 0);
 });
+test('reutiliza la pestaña aunque su URL tenga query o fragmento agregado', async () => {
+  const docAccess = { ...access, matchType: 'document' };
+  for (const url of ['https://example.com/?utm=1', 'https://example.com/#ruta', 'https://example.com/#ruta?x=1']) {
+    const api = mock([{ id: 7, windowId: 3, url }]);
+    await openOrFocusTab(docAccess, api, locks());
+    assert.deepEqual(api.state.updates, [7]);
+    assert.deepEqual(api.state.windows, [3]);
+    assert.equal(api.state.creates, 0);
+  }
+});
+test('reutiliza la pestaña en otra ventana y la enfoca', async () => {
+  const api = mock([{ id: 11, windowId: 42, url: access.url }]);
+  await openOrFocusTab(access, api, locks());
+  assert.deepEqual(api.state.updates, [11]);
+  assert.deepEqual(api.state.windows, [42]);
+  assert.equal(api.state.creates, 0);
+});
+test('estado obsoleto: si la pestaña ya no está, abre exactamente una', async () => {
+  const api = mock();
+  await openOrFocusTab(access, api, locks());
+  assert.equal(api.state.creates, 1);
+  assert.deepEqual(api.state.updates, []);
+});
 test('fallo al enfocar no crea un duplicado', async () => {
   const api = mock([{ id: 4, windowId: 9, url: access.url }]);
   api.windows.update = async () => { throw new Error('Window unavailable'); };

@@ -30,7 +30,7 @@
       <section id="workspace" aria-live="polite"></section>
       <p id="emptyState" class="empty" hidden>Agrega una categoría para empezar a organizar tus accesos.</p>
       <div class="bottom-actions"><button id="captureAllImages" class="button secondary capture-all-button" title="Capturar todas las imágenes que faltan" aria-label="Capturar todas las imágenes que faltan">Capturar imágenes faltantes</button><button id="newCategory" class="add-category-button" title="Nueva categoría" aria-label="Nueva categoría">+</button></div>
-      <footer class="signature">By.kilex</footer>
+      <footer class="signature"><span class="signature-author">By.kilex</span><span id="footerVersion" class="footer-version"></span><a id="footerFeedback" class="footer-feedback" href="https://github.com/Kilexmommm/Nex-b-Chrome-extension/issues" target="_blank" rel="noopener noreferrer">Feedback</a></footer>
     </main>
     <dialog id="categoryDialog"><form method="dialog" id="categoryForm" class="dialog-form">
       <h2>Nueva categoría</h2><label>Nombre<input id="categoryName" required maxlength="40" placeholder="Trabajo, Cliente, Personal" /></label>
@@ -80,7 +80,13 @@
     <dialog id="editWorkspaceDialog"><form method="dialog" id="editWorkspaceForm" class="dialog-form">
       <h2>Editar Workspace</h2><label>Nombre<input id="editWorkspaceName" required maxlength="40" /></label>
       <label>Tipo<select id="editWorkspaceKind"><option value="principal">Principal</option><option value="standard">Estándar</option></select></label>
-      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar Workspace</button></div>
+      <div class="dialog-actions"><button type="button" id="deleteWorkspace" class="button danger">Eliminar Workspace</button><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar Workspace</button></div>
+    </form></dialog>
+    <dialog id="deleteWorkspaceDialog"><form method="dialog" id="deleteWorkspaceForm" class="dialog-form">
+      <h2>Eliminar Workspace</h2>
+      <p id="deleteWorkspaceSummary" class="help"></p>
+      <small>Se eliminarán sus categorías, subcategorías y accesos. La copia anterior quedará como respaldo local para restaurarla desde Configuración → Datos.</small>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button danger">Eliminar Workspace</button></div>
     </form></dialog>
     <dialog id="bookmarksDialog"><form id="bookmarksForm" class="dialog-form" method="dialog">
       <h2>Importar favoritos de Chrome</h2>

@@ -1,4 +1,4 @@
-# nex.b · 1.8.1
+# nex.b · 1.9.1
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -64,10 +64,20 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ## Últimas actualizaciones
 
-### Novedades 1.8.1
+### Novedades 1.9.1
 
-- **Side Panel con ancho reducido:** oculta la marca, cambia las pestañas por un selector de Workspace, agrupa las acciones en un menú **⋮** (Editar, + Workspace, Alto de miniaturas, Inventario, Sincronizar, Configurar, Tags) y permite elegir **1 o 2 miniaturas por fila**, guardado por dispositivo.
-- **Abrir toda una sección:** el botón **⧉** en cada sección/subsección abre todos sus accesos de una vez; si una ventana ya está abierta la enfoca en lugar de duplicarla y muestra cuántas se abrieron o enfocaron.
+- **Versión unificada:** reúne la línea 1.8.1 (Side Panel adaptable y abrir toda una sección) con la 1.9.0 (enfoque sin pestaña duplicada, Diseño persistente, borrado seguro de Workspace e integración continua) en una sola entrega.
+- **Side Panel con ancho reducido:** oculta la marca, cambia las pestañas por un selector de Workspace, agrupa las acciones en un menú ⋮ y permite 1 o 2 miniaturas por fila, guardado por dispositivo.
+- **Abrir toda una sección:** el botón ⧉ de cada sección/subsección abre todos sus accesos y enfoca los que ya están abiertos.
+
+### Novedades 1.9.0
+
+- **Enfoque sin pestaña duplicada:** al abrir un acceso se busca primero si su documento o dominio ya está abierto y se enfoca esa pestaña y su ventana. El indicador de «abierto» y la reutilización comparten la misma identidad, de modo que una URL con `?consulta`, `#fragmento` o `www.` de más ya no abre una copia.
+- **Diseño que persiste y se aplica:** el alto de miniaturas se deriva del tamaño elegido y se guarda; el color de borde elegido se aplica y, si coincide con el predeterminado, cada tema conserva su propio borde como reserva.
+- **Eliminación segura de Workspace:** Editar Workspace permite eliminar un Workspace con un resumen previo de categorías, subcategorías y accesos. Exige confirmación, no permite borrar el último Workspace, navega a otro existente y conserva la copia anterior como respaldo local restaurable desde Configuración → Datos.
+- **Integración continua:** GitHub Actions ejecuta `npm test` con Node.js 20 en cada `pull_request` y en cada push a `main`. Se añade `CONTRIBUTING.md` con requisitos, ejecución de pruebas y alcance de los cambios.
+
+Detalle completo: [Novedades 1.9.0](docs/NOVEDADES-1.9.0.md).
 
 ### Novedades 1.8.0
 
