@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -6,6 +6,7 @@ import { resizeImage } from './images.js';
 import { collectTags, suggestTags, insertTag } from './tags.js';
 import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
+import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { createSyncStore, mergeSyncData } from './sync.js';
 import { syncDriveImages } from './drive.js';
@@ -245,7 +246,9 @@ function applySettings() {
   // La relación 5:3 se calcula en CSS desde el ancho de cada tarjeta.
   document.documentElement.style.setProperty('--card-min-width', Math.round(s.thumbnailHeight * 5 / 3) + 'px');
   document.documentElement.style.setProperty('--ui-font', ({ system: 'Inter,ui-sans-serif,system-ui,-apple-system,sans-serif', rounded: 'ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif', serif: 'ui-serif,Georgia,serif', mono: 'ui-monospace,SFMono-Regular,Menlo,monospace' }[s.fontFamily]));
-  document.documentElement.style.setProperty('--card-border-color', s.cardBorderColor);
+  const borderOverride = borderColorOverride(s.cardBorderColor);
+  if (borderOverride) document.documentElement.style.setProperty('--card-border-color', borderOverride);
+  else document.documentElement.style.removeProperty('--card-border-color');
   document.documentElement.style.setProperty('--card-border-width', ({ none: '0px', soft: '1px', strong: '2px' }[s.cardBorder]));
   document.documentElement.style.setProperty('--card-gap', ({ compact: '9px', normal: '16px', wide: '25px' }[s.cardSpacing]));
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
@@ -286,7 +289,7 @@ function renderStylePresets(themeId) {
 function isOpen(access) {
   try {
     if (access.url.startsWith('file:')) return openIndex.exact.has(accessUrl(access.url));
-    const key = access.matchType === 'domain' ? new URL(access.url).origin : access.matchType === 'exact' ? webUrl(access.url) : documentKey(access.url);
+    const key = access.matchType === 'domain' ? matchOrigin(access.url) : access.matchType === 'exact' ? webUrl(access.url) : documentMatchKey(access.url);
     return openIndex[access.matchType].has(key);
   } catch { return false; }
 }
@@ -311,8 +314,8 @@ async function refreshTabs() {
       const url = accessUrl(tab.pendingUrl || tab.url);
       openIndex.exact.add(url);
       if (url.startsWith('file:')) continue;
-      openIndex.domain.add(new URL(url).origin);
-      openIndex.document.add(documentKey(url));
+      openIndex.domain.add(matchOrigin(url));
+      openIndex.document.add(documentMatchKey(url));
     } catch { /* Internal browser pages cannot match saved accesses. */ }
   }
   updateStatuses();
@@ -1118,7 +1121,23 @@ onClick('editWorkspace', () => {
   $('editWorkspaceDialog').dataset.workspaceId = workspace.id;
   $('editWorkspaceName').value = workspace.name;
   $('editWorkspaceKind').value = workspace.type;
+  const onlyWorkspace = data.workspaces.length <= 1;
+  $('deleteWorkspace').disabled = onlyWorkspace;
+  $('deleteWorkspace').title = onlyWorkspace ? 'No puedes eliminar el último Workspace' : 'Eliminar este Workspace y sus datos';
   openDialog('editWorkspaceDialog');
+});
+onClick('deleteWorkspace', () => {
+  const workspaceId = $('editWorkspaceDialog').dataset.workspaceId;
+  $('deleteWorkspaceDialog').dataset.workspaceId = workspaceId;
+  $('deleteWorkspaceSummary').textContent = workspaceDeletionSummary(data, workspaceId);
+  $('editWorkspaceDialog').close();
+  openDialog('deleteWorkspaceDialog');
+});
+onSubmit('deleteWorkspaceForm', async () => {
+  const candidate = deleteWorkspace(data, $('deleteWorkspaceDialog').dataset.workspaceId, true);
+  await commit(candidate);
+  $('deleteWorkspaceDialog').close();
+  showMessage('Workspace eliminado. Puedes restaurarlo desde Configuración → Datos.');
 });
 async function moveWorkspaceToPosition(sourceId, targetId, after) {
   if (sourceId === targetId) return;
@@ -1143,7 +1162,7 @@ document.querySelectorAll('[data-thumbnail-size]').forEach(control => {
   control.onclick = () => run(async () => {
     const candidate = structuredClone(data);
     candidate.settings.thumbnailSize = control.dataset.thumbnailSize;
-    candidate.settings.thumbnailHeight = ({ small: 101, medium: 144, large: 187 }[control.dataset.thumbnailSize]);
+    candidate.settings.thumbnailHeight = thumbnailHeightForSize(control.dataset.thumbnailSize, candidate.settings.thumbnailHeight);
     await commit(candidate); $('thumbnailSizeMenu').hidden = true;
   });
 });
@@ -1294,10 +1313,11 @@ $('accessTags').onkeydown = event => {
 };
 onSubmit('settingsForm', async () => {
   const candidate = structuredClone(data);
+  const thumbnailSize = $('thumbnailSize').value;
   candidate.settings = {
     themeId: $('settingsDialog').dataset.themeId, backgroundPattern: $('settingsDialog').dataset.pattern,
     accentColor: $('accentColor').value, backgroundColor: $('backgroundColor').value,
-     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize: $('thumbnailSize').value, thumbnailHeight: data.settings.thumbnailHeight,
+     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
     captureEnabled: $('captureEnabled').checked,

@@ -3,7 +3,7 @@
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 body { min-height: 100vh; }
 /* Solo los espacios sin imagen: color sólido, sin alterar capturas ni fondos. */
-:root { --empty-tile: #202a3b; --empty-ink: #bac5d9; }
+:root { --empty-tile: #202a3b; --empty-ink: #bac5d9; --card-border-color: #4a4a4a; }
 .light-theme { --empty-tile: #e7ebf1; --empty-ink: #556071; }
 [data-theme="minimalista"] { --empty-tile: #e6e1d7; --empty-ink: #625e54; }
 [data-theme="papel"] { --empty-tile: #ecdfcc; --empty-ink: #6e5843; }
@@ -162,6 +162,9 @@ dialog::backdrop { background: #080b12aa; }
 .dialog-form .button.secondary:hover, .dialog-form .style-preset:hover { border-color: #646464; background: #313131; filter: none; }
 .dialog-form .button:not(.secondary) { background: #4d8dff; color: #ffffff; }
 .dialog-form .button:not(.secondary):hover { background: #639bff; filter: none; }
+.dialog-form .button.danger { margin-right: auto; background: #7a2434; color: #ffe3e8; }
+.dialog-form .button.danger:hover { background: #93303f; filter: none; }
+.dialog-form .button.danger:disabled { background: #3a2a2e; color: #8f7c81; cursor: not-allowed; }
 .dialog-form .button { font-weight: 500; }
 .dialog-form #recaptureStart { margin-left: auto; text-align: right; }
 .dialog-form .dialog-actions { margin-top: 28px; padding-top: 18px; border-top: 1px solid #3d3d3d; }
@@ -251,8 +254,8 @@ dialog::backdrop { background: #00000099; }
 }
 
 /* Paletas locales: no modifican las imágenes ni las preferencias guardadas. */
-[data-theme="papel"] { color: #3e352c; }
-[data-theme="papel"] .card .thumb { background: radial-gradient(ellipse at top left, #fffaf0, transparent 70%), linear-gradient(145deg, #eee1cd, #d8c3a6); border-color: #b9a28680; color: #6e5843; }
+[data-theme="papel"] { color: #3e352c; --card-border-color: #b9a28680; }
+[data-theme="papel"] .card .thumb { background: radial-gradient(ellipse at top left, #fffaf0, transparent 70%), linear-gradient(145deg, #eee1cd, #d8c3a6); border-color: var(--card-border-color); color: #6e5843; }
 [data-theme="papel"] .card:hover .thumb { border-color: var(--accent-color); }
 [data-theme="papel"] .card-overlay { background: linear-gradient(transparent, #5c39251a); padding-top: 18px; }
 [data-theme="papel"] .tag { background: #fff5e8ed; color: #79432e; }
@@ -267,6 +270,7 @@ dialog::backdrop { background: #00000099; }
 [data-theme="minimalista"] {
   --tile-gradient: radial-gradient(ellipse at 12% 8%, #fffdf8 0%, transparent 65%), linear-gradient(145deg, #eee9df, #d8d3c8 58%, #c6c9bd);
   --tile-border: #b8b4a680;
+  --card-border-color: var(--tile-border);
   --tile-ink: #625e54;
   --tile-soft: #e5e1d580;
   --tag-surface: #faf8f0e6;
@@ -275,13 +279,14 @@ dialog::backdrop { background: #00000099; }
 [data-theme="bosque"] {
   --tile-gradient: radial-gradient(ellipse at 8% 0%, #557763 0%, transparent 68%), linear-gradient(145deg, #344f40, #213d32 58%, #122c26);
   --tile-border: #8aaf9860;
+  --card-border-color: var(--tile-border);
   --tile-ink: #c0d5c7;
   --tile-soft: #7599851a;
   --tag-surface: #193d30e6;
   --tag-ink: #d4eddb;
 }
 :is([data-theme="minimalista"], [data-theme="bosque"]) .card .thumb {
-  background: var(--tile-gradient); border-color: var(--tile-border); color: var(--tile-ink);
+  background: var(--tile-gradient); border-color: var(--card-border-color); color: var(--tile-ink);
 }
 :is([data-theme="minimalista"], [data-theme="bosque"]) .card:hover .thumb { border-color: var(--accent-color); }
 :is([data-theme="minimalista"], [data-theme="bosque"]) .card-overlay { background: linear-gradient(transparent, #101c1426); padding-top: 18px; }

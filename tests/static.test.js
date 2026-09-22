@@ -59,6 +59,17 @@ test('la apertura local usa pestañas y ofrece la configuración de archivos', (
   assert.match(read('newtab.html'), /id="openLocalSettings"/);
   assert.doesNotMatch(read('newtab.html'), /Instalar asistente macOS/);
 });
+test('el indicador abierto y la reutilización comparten la misma identidad de documento', () => {
+  const app = read('src/app.js'), model = read('src/model.js'), tabs = read('src/tabs.js');
+  // app.js construye la clave del indicador con documentMatchKey/matchOrigin...
+  assert.match(app, /openIndex\.document\.add\(documentMatchKey\(url\)\)/);
+  assert.match(app, /openIndex\.domain\.add\(matchOrigin\(url\)\)/);
+  assert.match(app, /: documentMatchKey\(access\.url\)/);
+  // ...y model.js usa exactamente las mismas claves para decidir el foco.
+  assert.match(model, /return documentMatchKey\(access\.url\) === documentMatchKey\(tabUrl\)/);
+  assert.match(model, /return matchOrigin\(access\.url\) === matchOrigin\(tabUrl\)/);
+  assert.match(tabs, /matches\(access, tab\.pendingUrl \|\| tab\.url\)/);
+});
 test('captura por lote usa acceso de host y conserva miniaturas existentes', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="captureAllImages"/);
@@ -361,6 +372,27 @@ test('showWorkspaceTabs existe, persiste y se aplica sin romper Tags', () => {
   assert.match(html, /id="workspacePicker"/);
   assert.match(app, /\$\('workspacePicker'\)\.hidden = !workspaceTabsHidden/);
   assert.match(html, /id="tagRules"/);
+});
+test('el tamaño de miniaturas del panel Diseño deriva su alto y se aplica al guardar', () => {
+  const app = read('src/app.js'), model = read('src/model.js');
+  assert.match(model, /export function thumbnailHeightForSize\(size, fallback\)/);
+  assert.match(app, /const thumbnailSize = \$\('thumbnailSize'\)\.value/);
+  assert.match(app, /thumbnailSize, thumbnailHeight: thumbnailHeightForSize\(thumbnailSize, data\.settings\.thumbnailHeight\)/);
+  assert.match(app, /thumbnailHeightForSize\(control\.dataset\.thumbnailSize/);
+});
+test('el color de borde elegido gana en los temas y el color de tema queda como reserva', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /borderColorOverride\(s\.cardBorderColor\)/);
+  assert.match(app, /removeProperty\('--card-border-color'\)/);
+  assert.match(css, /:root \{[^}]*--card-border-color: #4a4a4a/);
+  for (const theme of ['papel', 'minimalista', 'bosque']) {
+    const palette = [...css.matchAll(new RegExp('\\[data-theme="' + theme + '"\\] \\{([^}]+)\\}', 'g'))].map(match => match[1]).join(' ');
+    assert.match(palette, /--card-border-color:/, 'Falta el color de borde reserva en ' + theme);
+  }
+  assert.match(css, /\[data-theme="papel"\] \.card \.thumb \{[^}]*border-color: var\(--card-border-color\)/);
+  assert.match(css, /:is\(\[data-theme="minimalista"\], \[data-theme="bosque"\]\) \.card \.thumb \{[^}]*border-color: var\(--card-border-color\)/);
+  assert.doesNotMatch(css, /\[data-theme="papel"\] \.card \.thumb \{[^}]*border-color: #b9a28680/);
+  assert.doesNotMatch(css, /:is\(\[data-theme="minimalista"\], \[data-theme="bosque"\]\) \.card \.thumb \{[^}]*border-color: var\(--tile-border\)/);
 });
 test('cardBorder permite tarjetas sin borde y conserva las variantes de estilo', () => {
   const app = read('src/app.js'), css = read('src/overrides.css');
