@@ -8,7 +8,7 @@ import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSectio
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { createSyncStore, mergeSyncData } from './sync.js';
-import { syncDriveImages } from './drive.js';
+import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
 const uid = prefix => prefix + '-' + crypto.randomUUID();
@@ -1049,15 +1049,28 @@ onClick('settingsSyncTab', () => selectSettingsTab('sync'));
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
 onClick('syncNow', syncNow);
 onClick('syncDriveNow', async () => {
-  syncEnabled = true;
-  $('syncEnabled').checked = true;
-  await chrome.storage.local.set({ nexbSyncEnabled: true });
   setSyncStatus('Conectando con Google Drive…');
-  const result = await syncDriveImages(data);
-  if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
-  await syncStore.save(data);
-  const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
-  setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+  try {
+    const result = await syncDriveImages(data);
+    if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+    setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+  } catch (error) {
+    setSyncStatus(error.message, true);
+    throw error;
+  }
+});
+onClick('cleanupDriveOrphans', async () => {
+  if (!confirm('Esta acción borra de Google Drive las imágenes de accesos que no existen en ESTE equipo. Sincroniza todos los equipos antes de continuar, o se perderán sus imágenes. ¿Deseas continuar?')) return;
+  setSyncStatus('Buscando imágenes huérfanas en Drive…');
+  try {
+    const result = await cleanupDriveOrphans(data);
+    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+    setSyncStatus('Drive limpio: ' + result.deleted + ' imágenes huérfanas borradas.' + detail, result.errors.length > 0);
+  } catch (error) {
+    setSyncStatus(error.message, true);
+    throw error;
+  }
 });
 onClick('openDriveDocs', () => chrome.tabs.create({ url: 'https://console.cloud.google.com/apis/library/drive.googleapis.com' }));
 $('syncEnabled').onchange = () => run(async () => {

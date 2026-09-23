@@ -49,6 +49,19 @@ test('la categoría inicial no muestra una referencia específica del producto',
   const legacy = { ...fixture(), categories: [{ id: 'ypf', name: 'YPF', workspaceId: 'general', parentId: '', accesses: [] }] };
   assert.equal(normalizeData(legacy).categories[0].name, 'General');
 });
+test('acepta driveImageHash hexadecimal e ignora uno inválido sin romper la biblioteca', () => {
+  const access = { id: 'saved', title: 'Imagen', url: 'https://example.com/', tags: [], thumbnail: '', matchType: 'document' };
+  const valid = fixture();
+  valid.categories[0].accesses.push({ ...access, driveImageId: 'drive-1', driveImageHash: 'a1b2c3d4' });
+  assert.equal(normalizeData(valid).categories[0].accesses[0].driveImageHash, 'a1b2c3d4');
+  for (const driveImageHash of ['XYZ', 'a'.repeat(129), 42]) {
+    const invalid = fixture();
+    invalid.categories[0].accesses.push({ ...access, driveImageId: 'drive-1', driveImageHash });
+    const normalized = normalizeData(invalid).categories[0].accesses[0];
+    assert.equal(normalized.driveImageId, 'drive-1');
+    assert.equal(Object.hasOwn(normalized, 'driveImageHash'), false);
+  }
+});
 test('rechaza tipos corruptos, esquemas futuros e identificadores duplicados', () => {
   for (const value of [null, [], {}, { categories: null }, { ...fixture(), schemaVersion: 4 }]) assert.throws(() => normalizeData(value));
   const value = fixture(); value.workspaces.push(value.workspaces[0]);

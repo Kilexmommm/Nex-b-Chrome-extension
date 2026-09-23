@@ -116,7 +116,7 @@
         <div class="dialog-actions"><button id="syncNow" type="button" class="button secondary">Sincronizar ahora</button></div>
         <section class="appearance-editor">
           <p>Imágenes en Google Drive</p>
-          <small>Drive usa una carpeta privada de la aplicación. Debes activar Drive API, completar OAuth y usar el ID estable registrado para esta extensión.</small>
+          <small>Las imágenes de Drive son independientes de la sincronización de datos y requieren un ID de extensión estable: instala nex.b desde Chrome Web Store o fija una clave en el manifest. Drive usa una carpeta privada de la aplicación; debes activar Drive API y completar OAuth.</small>
           <ol class="sync-instructions">
             <li>Publica nex.b en Chrome Web Store o fija una clave estable en el manifest.</li>
             <li>Crea credenciales OAuth de tipo Chrome Extension en Google Cloud.</li>
@@ -124,6 +124,8 @@
             <li>Autoriza Google Drive con tu cuenta y pulsa sincronizar.</li>
           </ol>
           <button id="syncDriveNow" type="button" class="button secondary">Sincronizar imágenes con Google Drive</button>
+          <button id="cleanupDriveOrphans" type="button" class="button secondary">Limpiar imágenes huérfanas en Drive</button>
+          <small>La limpieza borra de Drive las imágenes de accesos que no existen en este equipo; sincroniza primero todos tus equipos.</small>
           <button id="openDriveDocs" type="button" class="button secondary">Abrir instrucciones de Google Cloud</button>
           <small>Si Chrome rechaza la conexión, verifica que el Client ID corresponda al ID de nex.b. El respaldo ZIP sigue disponible.</small>
         </section>
