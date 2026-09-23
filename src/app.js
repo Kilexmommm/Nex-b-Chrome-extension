@@ -1241,8 +1241,8 @@ async function syncNow() {
       return;
     }
     if (action === 'apply') {
-      const merged = mergeThreeWay(data, remote.data, { preferLocal: false });
-      if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged, { markDirty: false });
+      const applied = applyRemoteData(data, remote.data);
+      if (JSON.stringify(applied) !== JSON.stringify(data)) await commit(applied, { markDirty: false });
       await setSyncLastRevision(remote.revision);
       setSyncStatus('Se aplicaron los datos sincronizados.');
       return;
@@ -1258,6 +1258,7 @@ async function syncNow() {
     throw error;
   } finally {
     syncBusy = false;
+    if (syncEnabled && syncDirty) scheduleSync();
   }
 }
 function scheduleSync() {

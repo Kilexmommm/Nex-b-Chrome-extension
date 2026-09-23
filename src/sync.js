@@ -74,6 +74,8 @@ function mergeById(localList, remoteList, preferLocal) {
 // en ambos, gana el remoto salvo que `preferLocal` sea true (hay cambios locales
 // pendientes de subir), en cuyo caso gana el local. Las miniaturas locales nunca
 // viajan por sync y se conservan siempre. El resultado se valida con normalizeData.
+// Limitación: la unión no detecta borrados concurrentes; si en "merge" un equipo
+// eliminó un acceso que el otro conserva, el acceso puede reaparecer al combinarse.
 export function mergeThreeWay(local, remote, { preferLocal = false } = {}) {
   if (!remote || remote.schemaVersion !== 1) throw new Error('La configuración sincronizada no es compatible.');
   const images = localImages(local);
@@ -102,8 +104,9 @@ export function mergeThreeWay(local, remote, { preferLocal = false } = {}) {
 }
 
 // Reconstruye la biblioteca completa desde la proyección remota, conservando las
-// miniaturas locales que ya existan para los mismos accesos. Se usa al elegir
-// "usar los de la nube" en la primera activación.
+// miniaturas locales que ya existan para los mismos accesos, el Workspace activo
+// y la imagen de fondo (que no viajan por sync). Se usa al elegir "usar los de la
+// nube" en la primera activación y al aplicar cambios remotos sin cambios locales.
 export function applyRemoteData(local, remote) {
   if (!remote || remote.schemaVersion !== 1) throw new Error('La configuración sincronizada no es compatible.');
   const images = localImages(local);
@@ -111,6 +114,8 @@ export function applyRemoteData(local, remote) {
   for (const category of full.categories)
     for (const access of category.accesses)
       access.thumbnail = images.get(access.id) || '';
+  full.settings.backgroundImageUrl = local.settings.backgroundImageUrl;
+  full.activeWorkspaceId = local.activeWorkspaceId;
   return normalizeData(full);
 }
 
@@ -122,17 +127,29 @@ export function decideSyncAction(remoteRevision, lastRevision, dirty) {
   return dirty ? 'merge' : 'apply';
 }
 
-export function assertWithinQuota(values, area) {
-  const limits = {
+function quotaLimits(area) {
+  return {
     bytes: area.QUOTA_BYTES ?? SYNC_QUOTA.QUOTA_BYTES,
     perItem: area.QUOTA_BYTES_PER_ITEM ?? SYNC_QUOTA.QUOTA_BYTES_PER_ITEM,
     maxItems: area.MAX_ITEMS ?? SYNC_QUOTA.MAX_ITEMS
   };
+}
+
+function itemSize(key, value) {
+  return key.length + JSON.stringify(value).length;
+}
+
+function valuesSize(values) {
+  return Object.entries(values).reduce((sum, [key, value]) => sum + itemSize(key, value), 0);
+}
+
+export function assertWithinQuota(values, area) {
+  const limits = quotaLimits(area);
   const entries = Object.entries(values);
   if (entries.length > limits.maxItems) throw new Error('Demasiados elementos para Chrome Sync. Usa el respaldo ZIP.');
   let total = 0;
   for (const [key, value] of entries) {
-    const size = key.length + JSON.stringify(value).length;
+    const size = itemSize(key, value);
     if (size > limits.perItem) throw new Error('Un fragmento supera el límite de ' + Math.round(limits.perItem / 1024) + ' KB por elemento de Chrome Sync. Usa el respaldo ZIP.');
     total += size;
   }
@@ -157,6 +174,14 @@ export function createSyncStore(area) {
       const values = { [SYNC_MANIFEST_KEY]: { schemaVersion: 1, count: chunks.length, revision, length: encoded.length, checksum: checksum(encoded) } };
       chunks.forEach((chunk, index) => { values[chunkKey(revision, index)] = chunk; });
       assertWithinQuota(values, area);
+      // La cuota se mide sobre el estado total: si los fragmentos nuevos caben solos
+      // pero no junto con los de la revisión anterior, se borran primero (y se acepta
+      // la ventana breve en que load() reportará "Faltan datos sincronizados").
+      const existing = await area.get(null);
+      const retained = Object.keys(existing)
+        .filter(key => !(key in values))
+        .reduce((sum, key) => sum + itemSize(key, existing[key]), 0);
+      if (valuesSize(values) + retained > quotaLimits(area).bytes) await removeOrphanChunks(revision);
       await area.set(values);
       await removeOrphanChunks(revision);
       return { revision, bytes: encoded.length };
