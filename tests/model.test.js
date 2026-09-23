@@ -44,6 +44,11 @@ test('las reglas iniciales reconocen GitHub Pages como GitHub', () => {
   assert.equal(DEFAULT_DATA.autoTagRules['github.com'], 'GitHub');
   assert.equal(DEFAULT_DATA.autoTagRules['github.io'], 'GitHub');
 });
+test('la categoría inicial no muestra una referencia específica del producto', () => {
+  assert.equal(normalizeData().categories[0].name, 'General');
+  const legacy = { ...fixture(), categories: [{ id: 'ypf', name: 'YPF', workspaceId: 'general', parentId: '', accesses: [] }] };
+  assert.equal(normalizeData(legacy).categories[0].name, 'General');
+});
 test('rechaza tipos corruptos, esquemas futuros e identificadores duplicados', () => {
   for (const value of [null, [], {}, { categories: null }, { ...fixture(), schemaVersion: 4 }]) assert.throws(() => normalizeData(value));
   const value = fixture(); value.workspaces.push(value.workspaces[0]);

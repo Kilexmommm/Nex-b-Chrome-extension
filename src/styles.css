@@ -237,8 +237,13 @@ h2 {
 }
 .bottom-actions {
   display:flex;
+  align-items:center;
+  gap:12px;
   justify-content:center;
   margin:8px 0 28px
+}
+.capture-all-button {
+  font-size:12px
 }
 .add-category-button {
   width:42px;
@@ -315,6 +320,17 @@ dialog {
   grid-template-columns:1fr 1fr;
   gap:12px
 }
+.settings-panel h3 {
+  margin:0 0 12px;
+  font-size:16px
+}
+.sync-instructions {
+  margin:12px 0;
+  padding-left:22px;
+  color:#b9c4df;
+  font-size:12px;
+  line-height:1.6
+}
 .inventory-form {
   width:min(640px,calc(100vw - 48px))
 }
@@ -364,6 +380,48 @@ dialog {
   min-width:0;
   flex:1 1 auto
 }
+.inventory-group-row {
+  background:#202b42
+}
+.inventory-group-open {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  flex:1 1 auto;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  cursor:pointer
+}
+.inventory-group-open:hover .inventory-row-title,
+.inventory-group-open:focus-visible .inventory-row-title {
+  color:#bcd1ff;
+  text-decoration:underline
+}
+.inventory-thumbnail {
+  display:grid;
+  place-items:center;
+  width:48px;
+  height:29px;
+  flex:0 0 48px;
+  overflow:hidden;
+  border:1px solid #52627f;
+  border-radius:4px;
+  background:#111724;
+  color:#8292b5
+}
+.inventory-thumbnail-image {
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover
+}
+.inventory-thumbnail-placeholder {
+  font-size:18px
+}
 .inventory-row-title {
   overflow:hidden;
   text-overflow:ellipsis;
@@ -375,6 +433,9 @@ dialog {
   text-overflow:ellipsis;
   white-space:nowrap;
   margin-top:2px
+}
+.inventory-group-meta {
+  color:#aebddb
 }
 .inventory-badge {
   flex:0 0 auto;

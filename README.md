@@ -1,4 +1,4 @@
-# nex.b · 1.7.3
+# nex.b · 1.7.5
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -132,7 +132,7 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 ### Ajustes 1.5.0
 
 - Una sección puede vincularse a una carpeta de Favoritos de Chrome al importarla.
-- `↻` sincroniza manualmente esa sección; **Sincronizar Workspace** ejecuta todas las secciones vinculadas del espacio actual.
+- `↻` sincroniza manualmente esa sección; **Sincronizar favoritos importados** ejecuta todas las secciones vinculadas, incluso si están en otros Workspaces.
 - La sincronización agrega solo URLs nuevas y conserva nombre, tags, imagen y edición de los accesos existentes.
 - Si un favorito se quitó de Chrome, NEX.B no lo borra: aparece con un aviso solo al editar ese acceso. Si vuelve a Favoritos, el aviso desaparece al sincronizar.
 
@@ -161,6 +161,8 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 Extensión local Chrome Manifest V3 para Workspaces, categorías, accesos visuales y tags. Requiere Chrome 123 o posterior. No necesita dependencias ni compilación para usarse.
 
 ## Actualizar sin perder datos
+
+También puedes usar **⚙ → Actualizar desde GitHub**. El botón descarga el ZIP de la rama `main`; no reemplaza archivos automáticamente porque Chrome protege la carpeta de una extensión cargada como “descomprimida”.
 
 1. Descarga un ZIP de tu configuración desde ⚙ antes de actualizar. No es el ZIP del código.
 2. Descarga la nueva versión del código y reemplaza los archivos del programa dentro de la misma carpeta que Chrome ya tiene cargada. Conserva la carpeta y la instalación de la extensión.
@@ -196,7 +198,7 @@ Después de abrir el sitio desde Capturar imagen, usa clic derecho en la página
 
 - El nombre completo del acceso aparece debajo de la imagen y puede ocupar varias líneas. El punto verde/gris está al lado del nombre. Los tags siguen sobre la miniatura.
 - Cuando falta la imagen o su URL falla, aparece **↻ Capturar imagen**. Para reemplazar una imagen existente, usa clic derecho en la tarjeta → **Volver a capturar imagen**.
-- La recaptura se realiza en tres pasos: **Abrir sitio para capturar** → esperar a que cargue y pulsar el icono naranja de NEX.B en Chrome → revisar la imagen y **Guardar acceso**. Se edita el acceso original, conservando sus tags, nombre y categoría. No es una captura silenciosa ni automática desde otra pestaña; no añade permisos generales de sitios. La recaptura manual funciona aunque la captura automática esté desactivada.
+- La recaptura individual se realiza en tres pasos: **Abrir sitio para capturar** → esperar a que cargue y pulsar el icono naranja de NEX.B en Chrome → revisar la imagen y **Guardar acceso**. Se edita el acceso original, conservando sus tags, nombre y categoría. No es una captura silenciosa ni automática desde otra pestaña; no solicita el permiso opcional de captura masiva. La recaptura manual funciona aunque la captura automática esté desactivada.
 - En cada sección, **⇥** la mueve a otro Workspace con sus accesos y subcategorías. Mover solo una subcategoría la convierte en sección principal en el destino. No se fusionan ni reemplazan secciones por tener el mismo nombre.
 - **↑ / ↓** suben y bajan las secciones entre las del mismo nivel en su Workspace. Las subcategorías se ordenan dentro de su categoría padre. El orden se guarda y se conserva en el ZIP.
 
@@ -229,6 +231,13 @@ La importación es manual, no una sincronización continua. Solo crea una secci�
 - Desde una página HTTP/HTTPS, el menú contextual o el icono de la extensión abre un acceso pendiente. Revisa la captura y selecciona la categoría antes de guardar.
 - Al agregar un enlace con clic derecho no se captura la página de origen: no representa necesariamente el enlace guardado.
 - Sin categorías se ofrece crear “General” junto con el acceso, solamente al guardar.
+- Al final del Workspace, **Capturar imágenes faltantes** solicita un permiso opcional y recorre las páginas web sin miniatura en una pestaña temporal. Las pestañas cambian de forma visible; se omiten los accesos `file://` y no se reemplazan miniaturas existentes.
+
+### Sincronización entre computadores
+
+En ⚙ → **Sincronizar**, activa la sincronización de datos pequeños para guardar Workspaces, categorías, URLs, nombres, tags y preferencias en `chrome.storage.sync`. Las imágenes no se guardan allí porque Chrome impone una cuota pequeña; las miniaturas permanecen en la copia local.
+
+La pestaña incluye las instrucciones para conectar Google Drive. La integración requiere que el OAuth Client ID corresponda al ID estable de la extensión; si aún no está publicado o configurado, usa **Descargar ZIP** para trasladar imágenes y datos completos.
 
 ## Guardado y privacidad
 
@@ -261,9 +270,12 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | `contextMenus` | Agregar sitios y actualizar capturas desde los menús de Chrome. |
 | `activeTab` | Capturar la pestaña tras una acción del usuario. |
 | `unlimitedStorage` | Almacenar miniaturas sin la cuota estándar de la extensión. |
+| `identity` | Solicitar el token OAuth de Google para Drive; Chrome gestiona el token y no se guarda en la extensión. |
 | `bookmarks` — opcional | Leer favoritos al solicitar una importación; el código no modifica los favoritos. |
+| `http://*/*`, `https://*/*` — opcionales | Capturar imágenes faltantes en lote, solo después de pulsar el botón y aceptar el permiso. |
+| `https://www.googleapis.com/` | Comunicar con Google Drive para subir y descargar miniaturas privadas. |
 
-No declara permisos generales para todos los sitios ni inyecta scripts en las páginas. No publiques respaldos personales, credenciales ni capturas privadas en este repositorio.
+El acceso opcional a sitios no se solicita durante la instalación. La captura masiva puede incluir información privada; revisa el resultado antes de compartir un respaldo. La extensión no inyecta scripts en las páginas.
 
 ## Estructura del proyecto
 
