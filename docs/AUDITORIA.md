@@ -7,7 +7,7 @@ Alcance: revisión de los archivos locales de workspace-launcher-mvp y refactori
 
 La versión revisada tenía riesgos relevantes de pérdida de datos y varios problemas de rendimiento y mantenimiento. No encontré en estos archivos código de analítica, envío de enlaces a un servidor, scripts remotos ni una vulnerabilidad XSS crítica demostrada. Eso no constituye una certificación de ausencia de vulnerabilidades.
 
-Implementé una versión refactorizada con 28 pruebas aprobadas. El código y las pruebas están entregados; la aceptación visual y las pruebas con APIs reales en Chrome quedan pendientes porque el navegador aislado no arrancó en este entorno. No recomiendo presentarla como “producción verificada” hasta completar esas comprobaciones.
+Implementé una versión refactorizada con 28 pruebas aprobadas (en 1.9.2 la suite tiene 170). El código y las pruebas están entregados; la aceptación visual y las pruebas con APIs reales en Chrome quedan pendientes porque el navegador aislado no arrancó en este entorno. No recomiendo presentarla como “producción verificada” hasta completar esas comprobaciones.
 
 ## 1. Diagnóstico y control de calidad
 

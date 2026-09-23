@@ -1,4 +1,4 @@
-# nex.b · 1.9.1
+# nex.b · 1.9.2
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,16 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 1.9.2
+
+- **Sincronización que no deshace tus cambios:** cada equipo recuerda la última versión sincronizada. Tus ediciones se suben en vez de ser reemplazadas por la copia de la nube, y los borrados se propagan a los demás equipos.
+- **Primera activación con datos en ambos lados:** nex.b pregunta si usar los datos de este equipo, los de la nube o combinarlos.
+- **Cuota de Chrome Sync:** si la biblioteca no cabe, aparece un aviso claro y no se escribe nada a medias.
+- **Drive:** recorre todas las páginas de archivos, explica un Client ID inválido y ofrece **Limpiar imágenes huérfanas en Drive** como acción manual. Sincronizar imágenes ya no activa la sincronización de datos.
+- **Captura masiva:** espera la navegación real (incluidas redirecciones), deja pintar la página, respeta el límite de capturas de Chrome, guarda por lotes y se puede cancelar.
+
+Detalle en [docs/NOVEDADES-1.9.2.md](docs/NOVEDADES-1.9.2.md).
 
 ### Novedades 1.9.1
 
