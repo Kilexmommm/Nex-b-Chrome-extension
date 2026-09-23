@@ -46,7 +46,8 @@ export function waitForCaptureTab(api, tabId, targetUrl, { timeout = 20000, navi
     timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
     api.get(tabId).then(tab => {
       if (tab && (tab.status === 'loading' || destinationMatches(tab.pendingUrl || '', targetUrl))) navigating = true;
-      if (accept(tab)) finish(resolve, tab);
+      // With `navigate`, this snapshot predates the navigation: only events may resolve.
+      if (!navigate && tab?.status === 'complete' && accept(tab)) finish(resolve, tab);
     }).catch(error => finish(reject, error));
     if (navigate) navigate().catch(error => finish(reject, error));
   });

@@ -145,3 +145,9 @@ test('no reemplaza una miniatura que ya existía', async () => {
   assert.equal(findAccess(state.data, 'a1').thumbnail, 'existente');
   assert.equal(findAccess(state.data, 'a2').thumbnail, 'img-2');
 });
+
+test('con navigate, la foto inicial en loading de la página anterior no resuelve', async () => {
+  const api = captureApi({ id: 9, url: 'https://anterior.example/', status: 'loading' });
+  const pending = waitForCaptureTab(api, 9, 'https://example.com/nueva', { timeout: 30, navigate: async () => {} });
+  await assert.rejects(pending, /tardó demasiado/);
+});
