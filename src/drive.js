@@ -107,7 +107,7 @@ export async function syncDriveImages(data) {
   const files = await listFiles(token);
   const byName = new Map(files.map(file => [file.name, file]));
   const candidate = structuredClone(data);
-  let uploaded = 0, unchanged = 0, downloaded = 0, deleted = 0, skipped = 0;
+  let uploaded = 0, unchanged = 0, downloaded = 0, skipped = 0;
   const errors = [];
   for (const category of candidate.categories) {
     for (const access of category.accesses) {
@@ -138,8 +138,18 @@ export async function syncDriveImages(data) {
       }
     }
   }
-  // Borra las imágenes de Drive cuyo acceso ya no existe en la biblioteca.
-  const accessIds = new Set(candidate.categories.flatMap(category => category.accesses.map(access => access.id)));
+  return { data: normalizeData(candidate), uploaded, unchanged, downloaded, skipped, errors };
+}
+
+// Borra de appDataFolder las imágenes cuyo acceso ya no existe en la biblioteca.
+// Es una acción destructiva: solo debe ejecutarse cuando todos los equipos ya
+// sincronizaron sus accesos, porque la lista local puede estar incompleta.
+export async function cleanupDriveOrphans(data) {
+  const token = await authToken(true);
+  const files = await listFiles(token);
+  const accessIds = new Set(data.categories.flatMap(category => category.accesses.map(access => access.id)));
+  let deleted = 0;
+  const errors = [];
   for (const file of files) {
     if (!file.name?.startsWith('nexb-image-') || accessIds.has(file.name.slice('nexb-image-'.length))) continue;
     try {
@@ -149,5 +159,5 @@ export async function syncDriveImages(data) {
       errors.push(file.name + ': ' + (error.message || 'No se pudo borrar la imagen huérfana.'));
     }
   }
-  return { data: normalizeData(candidate), uploaded, unchanged, downloaded, deleted, skipped, errors };
+  return { deleted, errors };
 }

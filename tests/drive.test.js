@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeData } from '../src/model.js';
-import { dataUrlBlob, imageHash, syncDriveImages } from '../src/drive.js';
+import { cleanupDriveOrphans, dataUrlBlob, imageHash, syncDriveImages } from '../src/drive.js';
 
 const image = 'data:image/webp;base64,aW1hZ2U=';
 function fixture(access = {}) {
@@ -84,7 +84,27 @@ test('syncDriveImages actualiza con PATCH la imagen cambiada y su hash', async (
   }
 });
 
-test('syncDriveImages borra imágenes huérfanas y respeta otros nombres', async () => {
+test('syncDriveImages no borra imágenes de accesos ausentes en este equipo', async () => {
+  const previousChrome = globalThis.chrome;
+  const previousFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.chrome = { identity: { getAuthToken: async () => ({ token: 'token' }), removeCachedAuthToken: async () => {} } };
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push([url, options.method || 'GET']);
+    if (url.includes('/files?q=')) return new Response(JSON.stringify({ files: [{ id: 'orphan', name: 'nexb-image-eliminado' }] }), { status: 200 });
+    return new Response(JSON.stringify({ id: 'x' }), { status: 200 });
+  };
+  try {
+    const result = await syncDriveImages(fixture());
+    assert.equal(result.deleted, undefined);
+    assert.ok(!calls.some(([, method]) => method === 'DELETE'));
+  } finally {
+    globalThis.chrome = previousChrome;
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test('cleanupDriveOrphans borra solo los nexb-image-* sin acceso', async () => {
   const previousChrome = globalThis.chrome;
   const previousFetch = globalThis.fetch;
   const calls = [];
@@ -99,12 +119,35 @@ test('syncDriveImages borra imágenes huérfanas y respeta otros nombres', async
     return new Response(JSON.stringify({ id: 'x' }), { status: 200 });
   };
   try {
-    const result = await syncDriveImages(fixture());
+    const result = await cleanupDriveOrphans(fixture());
     assert.equal(result.deleted, 1);
     assert.deepEqual(result.errors, []);
     const deletes = calls.filter(([, method]) => method === 'DELETE').map(([url]) => url);
     assert.equal(deletes.length, 1);
     assert.ok(deletes[0].includes('/files/orphan'));
+  } finally {
+    globalThis.chrome = previousChrome;
+    globalThis.fetch = previousFetch;
+  }
+});
+
+test('cleanupDriveOrphans acumula errores de borrado sin abortar el resto', async () => {
+  const previousChrome = globalThis.chrome;
+  const previousFetch = globalThis.fetch;
+  globalThis.chrome = { identity: { getAuthToken: async () => ({ token: 'token' }), removeCachedAuthToken: async () => {} } };
+  globalThis.fetch = async (url, options = {}) => {
+    if (url.includes('/files?q=')) return new Response(JSON.stringify({ files: [
+      { id: 'bad', name: 'nexb-image-uno' },
+      { id: 'good', name: 'nexb-image-dos' }
+    ] }), { status: 200 });
+    if (options.method === 'DELETE') return new Response(JSON.stringify({ error: { message: 'boom' } }), { status: 500 });
+    return new Response(JSON.stringify({ id: 'x' }), { status: 200 });
+  };
+  try {
+    const result = await cleanupDriveOrphans(fixture());
+    assert.equal(result.deleted, 0);
+    assert.equal(result.errors.length, 2);
+    assert.match(result.errors[0], /nexb-image-/);
   } finally {
     globalThis.chrome = previousChrome;
     globalThis.fetch = previousFetch;
