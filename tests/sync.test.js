@@ -28,7 +28,7 @@ function makeDevice(area) {
         this.lastRevision = saved.revision;
         this.dirty = false;
       } else if (action === 'apply') {
-        this.data = mergeThreeWay(this.data, remote.data, { preferLocal: false });
+        this.data = applyRemoteData(this.data, remote.data);
         this.lastRevision = remote.revision;
       } else if (action === 'merge') {
         this.data = mergeThreeWay(this.data, remote.data, { preferLocal: true });
@@ -150,6 +150,35 @@ test('applyRemoteData reconstruye desde la nube conservando miniaturas locales',
   assert.equal(full.categories[0].accesses[0].thumbnail, 'https://example.com/image.png');
 });
 
+test('applyRemoteData conserva el Workspace activo y la imagen de fondo locales', () => {
+  const local = fixture();
+  local.workspaces.push({ id: 'segundo', name: 'Segundo', type: 'standard' });
+  local.activeWorkspaceId = 'segundo';
+  local.settings.backgroundImageUrl = 'https://example.com/fondo.jpg';
+  const remote = projectSyncData(local);
+  const full = applyRemoteData(local, remote);
+  assert.equal(full.activeWorkspaceId, 'segundo');
+  assert.equal(full.settings.backgroundImageUrl, 'https://example.com/fondo.jpg');
+});
+
+test('un borrado se propaga al aplicar remoto sin cambios locales', async () => {
+  const area = memoryArea();
+  const A = makeDevice(area);
+  const B = makeDevice(area);
+  await A.sync();
+  await B.sync();
+  addAccess(A, 'X');
+  await A.sync();
+  await B.sync();
+  assert.ok(B.data.categories[0].accesses.some(access => access.id === 'X'));
+  const deleted = structuredClone(A.data);
+  deleted.categories[0].accesses = deleted.categories[0].accesses.filter(access => access.id !== 'X');
+  A.commit(deleted);
+  await A.sync();
+  await B.sync();
+  assert.equal(B.data.categories[0].accesses.some(access => access.id === 'X'), false);
+});
+
 test('createSyncStore guarda por fragmentos y recupera la proyección', async () => {
   const area = memoryArea(), store = createSyncStore(area), data = fixture();
   data.categories[0].accesses[0].title = 'x'.repeat(SYNC_CHUNK_BYTES * 2);
@@ -201,4 +230,43 @@ test('detecta fragmentos dañados mediante el checksum del manifiesto', async ()
   const saved = await store.save(fixture());
   await area.set({ [SYNC_CHUNK_PREFIX + saved.revision + '.0']: 'corrupto' });
   await assert.rejects(store.load(), /dañados/);
+});
+
+function quotaEnforcedArea(quotaBytes) {
+  let state = {};
+  return {
+    QUOTA_BYTES: quotaBytes,
+    writes: 0,
+    async get(keys) {
+      if (keys === null) return structuredClone(state);
+      return Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(key => key in state).map(key => [key, structuredClone(state[key])]));
+    },
+    async set(values) {
+      const next = { ...state, ...structuredClone(values) };
+      const total = Object.entries(next).reduce((sum, [key, value]) => sum + key.length + JSON.stringify(value).length, 0);
+      if (total > this.QUOTA_BYTES) throw new Error('QUOTA_BYTES exceeded');
+      state = next;
+      this.writes++;
+    },
+    async remove(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) delete state[key]; },
+    async setAccessLevel() {},
+  };
+}
+
+test('borra los fragmentos viejos cuando juntos exceden la cuota total', async () => {
+  const area = quotaEnforcedArea(100000);
+  const store = createSyncStore(area);
+  const data = fixture();
+  data.categories[0].accesses[0].title = 'x'.repeat(SYNC_CHUNK_BYTES);
+  await store.save(data);
+  const first = await area.get(null);
+  const singleSize = Object.entries(first).reduce((sum, [key, value]) => sum + key.length + JSON.stringify(value).length, 0);
+  area.QUOTA_BYTES = Math.floor(singleSize * 1.5);
+  const updated = structuredClone(data);
+  updated.categories[0].accesses[0].title = 'y'.repeat(SYNC_CHUNK_BYTES);
+  await store.save(updated);
+  const loaded = await store.load();
+  assert.equal(loaded.data.categories[0].accesses[0].title, 'y'.repeat(SYNC_CHUNK_BYTES));
+  const after = Object.entries(await area.get(null)).reduce((sum, [key, value]) => sum + key.length + JSON.stringify(value).length, 0);
+  assert.ok(after <= area.QUOTA_BYTES);
 });
