@@ -7,6 +7,7 @@ import { collectTags, suggestTags, insertTag } from './tags.js';
 import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
+import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
 import { createSyncStore, mergeSyncData } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
@@ -22,6 +23,8 @@ let cardStatuses = [], tagCache = new Map();
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
+let captureBusy = false, captureCancelled = false;
+const captureThrottle = createCaptureThrottle();
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -846,27 +849,6 @@ function showCardMenu(event, access, categoryId) {
   });
 }
 
-function waitForBatchTab(tabId, timeout = 20000) {
-  return new Promise((resolve, reject) => {
-    let timer;
-    let settled = false;
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      chrome.tabs.onUpdated.removeListener(onUpdated);
-      callback(value);
-    };
-    const onUpdated = (updatedId, changeInfo, tab) => {
-      if (updatedId === tabId && changeInfo.status === 'complete') finish(resolve, tab);
-    };
-    chrome.tabs.onUpdated.addListener(onUpdated);
-    timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
-    chrome.tabs.get(tabId).then(tab => {
-      if (tab.status === 'complete') finish(resolve, tab);
-    }).catch(error => finish(reject, error));
-  });
-}
 async function captureBatchThumbnail(tab) {
   const [active] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
   if (active?.id !== tab.id) throw new Error('La pestaña de captura dejó de estar activa.');
@@ -879,6 +861,7 @@ async function captureBatchThumbnail(tab) {
   return thumbnail;
 }
 async function captureAllImages() {
+  if (captureBusy) { showMessage('Ya hay una captura masiva en curso.'); return; }
   const allAccesses = data.categories.flatMap(category => category.accesses);
   const targets = allAccesses.filter(access => !access.thumbnail && /^https?:/i.test(access.url));
   const localMissing = allAccesses.filter(access => !access.thumbnail && access.url.startsWith('file:')).length;
@@ -886,43 +869,55 @@ async function captureAllImages() {
     showMessage(localMissing ? 'No hay páginas web pendientes. Los accesos file:// requieren una captura manual.' : 'Todos los accesos web ya tienen miniatura.');
     return;
   }
-  if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
+  if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. El permiso temporal se retira al terminar. ¿Continuar?')) return;
   if (!await chrome.permissions.request({ origins: ['http://*/*', 'https://*/*'] })) {
     throw new Error('No se concedió el permiso para capturar páginas web.');
   }
+  captureBusy = true;
+  captureCancelled = false;
+  $('cancelCapture').hidden = false;
+  const batch = createBatchCommitter({ load: () => data, save: candidate => commit(candidate) });
   const [origin] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   let temporary;
   let captured = 0;
   let failed = 0;
+  let cancelled = false;
   try {
     temporary = await chrome.tabs.create({ url: 'about:blank', active: true, ...(origin?.windowId ? { windowId: origin.windowId } : {}) });
     for (const [index, access] of targets.entries()) {
+      if (captureCancelled) { cancelled = true; break; }
       try {
         showMessage('Capturando ' + (index + 1) + ' de ' + targets.length + ': ' + access.title);
-        await chrome.tabs.update(temporary.id, { url: accessUrl(access.url), active: true });
-        const loaded = await waitForBatchTab(temporary.id);
+        const target = accessUrl(access.url);
+        const loaded = await waitForCaptureTab(chrome.tabs, temporary.id, target, {
+          navigate: () => chrome.tabs.update(temporary.id, { url: target, active: true })
+        });
         if (!/^https?:/i.test(loaded.url || '')) throw new Error('La página no terminó en una URL web.');
+        await delay(CAPTURE_PAINT_DELAY_MS);
+        await captureThrottle();
         const thumbnail = await captureBatchThumbnail(loaded);
-        const candidate = structuredClone(data);
-        const target = candidate.categories.flatMap(category => category.accesses).find(item => item.id === access.id);
-        if (!target) throw new Error('El acceso ya no existe.');
-        target.thumbnail = thumbnail;
-        await commit(candidate);
+        await batch.add(access.id, thumbnail);
         captured++;
       } catch {
         failed++;
       }
     }
+    cancelled = cancelled || captureCancelled;
   } finally {
+    await batch.flush().catch(() => {});
     if (temporary?.id !== undefined) await chrome.tabs.remove(temporary.id).catch(() => {});
     if (origin?.id !== undefined) {
       await chrome.tabs.update(origin.id, { active: true }).catch(() => {});
       if (Number.isInteger(origin.windowId) && chrome.windows?.update) await chrome.windows.update(origin.windowId, { focused: true }).catch(() => {});
     }
+    await chrome.permissions.remove({ origins: ['http://*/*', 'https://*/*'] }).catch(() => {});
+    $('cancelCapture').hidden = true;
+    captureBusy = false;
   }
   const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') : '';
   const local = localMissing ? ' ' + localMissing + (localMissing === 1 ? ' acceso local requiere captura manual.' : ' accesos locales requieren captura manual.') : '';
-  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local);
+  const stopped = cancelled ? ' Captura cancelada; se detuvo tras la página actual.' : '';
+  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local + stopped);
 }
 
 function onClick(id, action) { $(id).onclick = () => run(async () => {
@@ -968,6 +963,7 @@ onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
 onClick('captureAllImages', captureAllImages);
+$('cancelCapture').onclick = () => { if (captureBusy) { captureCancelled = true; showMessage('Se cancelará al terminar la página actual.'); } };
 $('inventorySearch').oninput = () => {
   // Apply visibility immediately so actions cannot target hidden results.
   filterInventory();
