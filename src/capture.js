@@ -18,8 +18,9 @@ export function destinationMatches(url, target) {
 // Wait until the tab actually navigated to the target. A `complete` left over
 // from about:blank or the previous capture is not enough: only a matching URL
 // or a real navigation (loading event after update) followed by an http(s)
-// page counts. That also tolerates redirects.
-export function waitForCaptureTab(api, tabId, targetUrl, { timeout = 20000 } = {}) {
+// page counts. That also tolerates redirects. `navigate` runs after the
+// listener is attached so the new navigation's loading event is never missed.
+export function waitForCaptureTab(api, tabId, targetUrl, { timeout = 20000, navigate = null } = {}) {
   return new Promise((resolve, reject) => {
     let timer;
     let settled = false;
@@ -44,8 +45,10 @@ export function waitForCaptureTab(api, tabId, targetUrl, { timeout = 20000 } = {
     api.onUpdated.addListener(onUpdated);
     timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
     api.get(tabId).then(tab => {
+      if (tab && (tab.status === 'loading' || destinationMatches(tab.pendingUrl || '', targetUrl))) navigating = true;
       if (accept(tab)) finish(resolve, tab);
     }).catch(error => finish(reject, error));
+    if (navigate) navigate().catch(error => finish(reject, error));
   });
 }
 

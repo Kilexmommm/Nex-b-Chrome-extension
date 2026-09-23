@@ -889,8 +889,9 @@ async function captureAllImages() {
       try {
         showMessage('Capturando ' + (index + 1) + ' de ' + targets.length + ': ' + access.title);
         const target = accessUrl(access.url);
-        await chrome.tabs.update(temporary.id, { url: target, active: true });
-        const loaded = await waitForCaptureTab(chrome.tabs, temporary.id, target);
+        const loaded = await waitForCaptureTab(chrome.tabs, temporary.id, target, {
+          navigate: () => chrome.tabs.update(temporary.id, { url: target, active: true })
+        });
         if (!/^https?:/i.test(loaded.url || '')) throw new Error('La página no terminó en una URL web.');
         await delay(CAPTURE_PAINT_DELAY_MS);
         await captureThrottle();

@@ -64,6 +64,36 @@ test('la espera ignora eventos de otras pestañas', async () => {
   await assert.rejects(pending, /tardó demasiado/);
 });
 
+test('resuelve si el loading llega durante navigate y luego un complete redirigido', async () => {
+  const api = captureApi({ id: 9, url: 'about:blank', status: 'complete' });
+  const pending = waitForCaptureTab(api, 9, 'http://example.com/inicio', {
+    navigate: async () => {
+      api.emit(9, { status: 'loading' }, { id: 9, url: 'http://example.com/inicio', status: 'loading' });
+      return { id: 9, url: 'http://example.com/inicio', status: 'loading' };
+    }
+  });
+  api.emit(9, { status: 'complete' }, { id: 9, url: 'https://example.com/acceso', status: 'complete' });
+  assert.equal((await pending).url, 'https://example.com/acceso');
+});
+
+test('no resuelve con el resultado loading que devuelve navigate', async () => {
+  const api = captureApi({ id: 10, url: 'about:blank', status: 'complete' });
+  const pending = waitForCaptureTab(api, 10, 'http://example.com/', {
+    timeout: 20,
+    navigate: async () => ({ id: 10, url: 'http://example.com/', status: 'loading' })
+  });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  await assert.rejects(pending, /tardó demasiado/);
+});
+
+test('marca navigating si api.get trae pendingUrl del destino', async () => {
+  const api = captureApi({ id: 11, url: 'about:blank', status: 'loading', pendingUrl: 'http://example.com/inicio' });
+  const pending = waitForCaptureTab(api, 11, 'http://example.com/inicio');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  api.emit(11, { status: 'complete' }, { id: 11, url: 'https://example.com/acceso', status: 'complete' });
+  assert.equal((await pending).url, 'https://example.com/acceso');
+});
+
 test('el limitador respeta MAX de capturas por segundo', async () => {
   let current = 0;
   const waits = [];
