@@ -63,6 +63,15 @@ test('captura por lote usa permiso opcional y conserva miniaturas existentes', (
   assert.match(app, /chrome\.tabs\.captureVisibleTab/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
 });
+test('la captura masiva declara el permiso opcional y ofrece cancelar', () => {
+  const manifest = JSON.parse(read('manifest.json')), html = read('newtab.html'), app = read('src/app.js'), capture = read('src/capture.js');
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  assert.match(html, /id="cancelCapture"/);
+  assert.match(app, /chrome\.permissions\.remove\(\{ origins: \['http:\/\/\*\/\*', 'https:\/\/\*\/\*'\] \}\)/);
+  assert.match(app, /captureBusy/);
+  assert.match(capture, /MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/);
+  assert.match(capture, /CAPTURE_BATCH_SIZE = 5/);
+});
 test('la sincronización global recorre todas las secciones vinculadas y muestra errores', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(app, /const linkedCategories = data\.categories\.filter\(item => item\.bookmarkFolderId\)/);
