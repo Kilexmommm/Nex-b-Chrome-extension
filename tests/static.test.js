@@ -85,6 +85,13 @@ test('captura por lote usa acceso de host y conserva miniaturas existentes', () 
   assert.match(app, /chrome\.tabs\.captureVisibleTab/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
 });
+test('la captura masiva ofrece cancelar y respeta el límite de Chrome', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), capture = read('src/capture.js');
+  assert.match(html, /id="cancelCapture"/);
+  assert.match(app, /captureBusy/);
+  assert.match(capture, /MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/);
+  assert.match(capture, /CAPTURE_BATCH_SIZE = 5/);
+});
 test('la sincronización global recorre todas las secciones vinculadas y muestra errores', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(app, /const linkedCategories = data\.categories\.filter\(item => item\.bookmarkFolderId\)/);

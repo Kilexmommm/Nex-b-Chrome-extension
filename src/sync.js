@@ -4,6 +4,10 @@ export const SYNC_MANIFEST_KEY = 'nexb.sync.manifest';
 export const SYNC_CHUNK_PREFIX = 'nexb.sync.chunk.';
 export const SYNC_CHUNK_BYTES = 6000;
 
+// La copia remota se puede leer pero no es válida (p. ej. fragmentos de dos
+// equipos mezclados). La copia local sigue siendo la fuente fiable.
+export class SyncCorruptError extends Error {}
+
 function base64Encode(value) {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -55,7 +59,7 @@ function unionById(remoteItems, localItems) {
 }
 
 export function mergeSyncData(local, remote) {
-  if (!remote || remote.schemaVersion !== 1) throw new Error('La configuración sincronizada no es compatible.');
+  if (!remote || remote.schemaVersion !== 1) throw new SyncCorruptError('La configuración sincronizada no es compatible.');
   const images = localImages(local);
   const localAccessById = new Map(local.categories.flatMap(item => item.accesses).map(access => [access.id, access]));
   const candidate = structuredClone(remote);
@@ -66,12 +70,16 @@ export function mergeSyncData(local, remote) {
   candidate.settings.thumbnailHeight = local.settings.thumbnailHeight;
   candidate.workspaces = unionById(candidate.workspaces, local.workspaces);
   const remoteCategoryIds = new Set(candidate.categories.map(category => category.id));
+  // Un acceso que remoto ya tiene en otra categoría (p. ej. movido en este
+  // equipo) no se vuelve a añadir: duplicaría su id.
+  const remoteAccessIds = new Set(candidate.categories.flatMap(category => category.accesses.map(access => access.id)));
+  const onlyLocal = accesses => accesses.filter(access => !remoteAccessIds.has(access.id));
   // Categorías que ya existían en remoto: se conservan sus datos (remoto
   // gana en los campos compartidos), pero sus accesos se completan con los
   // que se hayan creado localmente y remoto todavía no conozca.
   for (const category of candidate.categories) {
     const localCategory = local.categories.find(item => item.id === category.id);
-    if (localCategory) category.accesses = unionById(category.accesses, localCategory.accesses);
+    if (localCategory) category.accesses = [...category.accesses, ...onlyLocal(localCategory.accesses)];
     for (const access of category.accesses) {
       access.thumbnail = images.get(access.id) || '';
       const localAccess = localAccessById.get(access.id);
@@ -80,8 +88,10 @@ export function mergeSyncData(local, remote) {
   }
   // Categorías creadas localmente que remoto todavía no conoce (su
   // workspaceId ya quedó preservado arriba por unionById en workspaces).
-  candidate.categories = unionById(candidate.categories, local.categories.filter(category => !remoteCategoryIds.has(category.id)));
-  return normalizeData(candidate);
+  candidate.categories = unionById(candidate.categories, local.categories.filter(category => !remoteCategoryIds.has(category.id))
+    .map(category => ({ ...category, accesses: onlyLocal(category.accesses) })));
+  try { return normalizeData(candidate); }
+  catch (cause) { throw new SyncCorruptError('La configuración sincronizada no es válida: ' + cause.message, { cause }); }
 }
 
 export function createSyncStore(area) {
@@ -109,7 +119,7 @@ export function createSyncStore(area) {
       const stored = await area.get(keys);
       if (keys.some(key => typeof stored[key] !== 'string')) throw new Error('Faltan datos sincronizados; se conserva la copia local.');
       try { return { revision: manifest.revision, data: JSON.parse(base64Decode(keys.map(key => stored[key]).join(''))) }; }
-      catch { throw new Error('Los datos sincronizados están dañados; se conserva la copia local.'); }
+      catch { throw new SyncCorruptError('Los datos sincronizados están dañados; se conserva la copia local.'); }
     }
   };
 }

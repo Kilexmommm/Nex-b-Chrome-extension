@@ -8,8 +8,9 @@ import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSectio
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
-import { createSyncStore, mergeSyncData } from './sync.js';
-import { syncDriveImages } from './drive.js';
+import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
+import { createSyncStore, mergeSyncData, SyncCorruptError } from './sync.js';
+import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
 const uid = prefix => prefix + '-' + crypto.randomUUID();
@@ -23,6 +24,8 @@ let cardStatuses = [], tagCache = new Map();
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
+let captureBusy = false, captureCancelled = false;
+const captureThrottle = createCaptureThrottle();
 let localThumbnailPreference = null;
 let narrowColumns = 1;
 const narrowMedia = window.matchMedia('(max-width: 600px)');
@@ -961,27 +964,6 @@ async function pasteClipboardImage() {
   }
 }
 
-function waitForBatchTab(tabId, expectedUrl, timeout = 20000) {
-  return new Promise((resolve, reject) => {
-    let timer;
-    let settled = false;
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      chrome.tabs.onUpdated.removeListener(onUpdated);
-      callback(value);
-    };
-    const onUpdated = (updatedId, changeInfo, tab) => {
-      if (updatedId === tabId && changeInfo.status === 'complete' && tab.url && tab.url !== 'about:blank') finish(resolve, tab);
-    };
-    chrome.tabs.onUpdated.addListener(onUpdated);
-    timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
-    chrome.tabs.get(tabId).then(tab => {
-      if (tab.status === 'complete' && tab.url === expectedUrl) finish(resolve, tab);
-    }).catch(error => finish(reject, error));
-  });
-}
 async function captureBatchThumbnail(tab) {
   const [active] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
   if (active?.id !== tab.id) throw new Error('La pestaña de captura dejó de estar activa.');
@@ -994,6 +976,7 @@ async function captureBatchThumbnail(tab) {
   return thumbnail;
 }
 async function captureAllImages() {
+  if (captureBusy) { showMessage('Ya hay una captura masiva en curso.'); return; }
   const allAccesses = data.categories.flatMap(category => category.accesses);
   const targets = allAccesses.filter(access => !access.thumbnail && /^https?:/i.test(access.url));
   const localMissing = allAccesses.filter(access => !access.thumbnail && access.url.startsWith('file:')).length;
@@ -1002,42 +985,50 @@ async function captureAllImages() {
     return;
   }
   if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
+  captureBusy = true;
+  captureCancelled = false;
+  $('cancelCapture').hidden = false;
+  const batch = createBatchCommitter({ load: () => data, save: candidate => commit(candidate) });
   const [origin] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   let temporary;
   let captured = 0;
   let failed = 0;
-  const failures = [];
+  let cancelled = false;
   try {
     temporary = await chrome.tabs.create({ url: 'about:blank', active: true, ...(origin?.windowId ? { windowId: origin.windowId } : {}) });
     for (const [index, access] of targets.entries()) {
+      if (captureCancelled) { cancelled = true; break; }
       try {
         showMessage('Capturando ' + (index + 1) + ' de ' + targets.length + ': ' + access.title);
-        const targetUrl = accessUrl(access.url);
-        await chrome.tabs.update(temporary.id, { url: targetUrl, active: true });
-        const loaded = await waitForBatchTab(temporary.id, targetUrl);
+        const target = accessUrl(access.url);
+        const loaded = await waitForCaptureTab(chrome.tabs, temporary.id, target, {
+          navigate: () => chrome.tabs.update(temporary.id, { url: target, active: true })
+        });
         if (!/^https?:/i.test(loaded.url || '')) throw new Error('La página no terminó en una URL web.');
+        await delay(CAPTURE_PAINT_DELAY_MS);
+        await captureThrottle();
         const thumbnail = await captureBatchThumbnail(loaded);
-        const candidate = structuredClone(data);
-        const target = candidate.categories.flatMap(category => category.accesses).find(item => item.id === access.id);
-        if (!target) throw new Error('El acceso ya no existe.');
-        target.thumbnail = thumbnail;
-        await commit(candidate);
+        await batch.add(access.id, thumbnail);
         captured++;
-      } catch (error) {
+      } catch {
         failed++;
-        failures.push(access.title + ': ' + (error.message || 'fallo desconocido'));
       }
     }
+    cancelled = cancelled || captureCancelled;
   } finally {
+    await batch.flush().catch(() => {});
     if (temporary?.id !== undefined) await chrome.tabs.remove(temporary.id).catch(() => {});
     if (origin?.id !== undefined) {
       await chrome.tabs.update(origin.id, { active: true }).catch(() => {});
       if (Number.isInteger(origin.windowId) && chrome.windows?.update) await chrome.windows.update(origin.windowId, { focused: true }).catch(() => {});
     }
+    $('cancelCapture').hidden = true;
+    captureBusy = false;
   }
-  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') + ' ' + failures.join(' | ') : '';
+  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') : '';
   const local = localMissing ? ' ' + localMissing + (localMissing === 1 ? ' acceso local requiere captura manual.' : ' accesos locales requieren captura manual.') : '';
-  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local);
+  const stopped = cancelled ? ' Captura cancelada; se detuvo tras la página actual.' : '';
+  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local + stopped);
 }
 
 function onClick(id, action) { $(id).onclick = () => run(async () => {
@@ -1117,6 +1108,7 @@ onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
 onClick('captureAllImages', captureAllImages);
+$('cancelCapture').onclick = () => { if (captureBusy) { captureCancelled = true; showMessage('Se cancelará al terminar la página actual.'); } };
 $('inventorySearch').oninput = () => {
   // Apply visibility immediately so actions cannot target hidden results.
   filterInventory();
@@ -1228,6 +1220,7 @@ onClick('openUpdate', async () => {
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
 onClick('openSidePanel', openSidePanel);
 onClick('settingsGeneralTab', () => selectSettingsTab('general'));
+onClick('settingsSyncTab', () => selectSettingsTab('sync'));
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
 onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });
 onClick('settingsDataTab', () => selectSettingsTab('data'));
@@ -1247,11 +1240,28 @@ onClick('syncDriveNow', async () => {
   $('syncEnabled').checked = true;
   await chrome.storage.local.set({ nexbSyncEnabled: true });
   setSyncStatus('Conectando con Google Drive…');
-  const result = await syncDriveImages(data);
-  if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
-  await syncStore.save(data);
-  const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
-  setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+  try {
+    const result = await syncDriveImages(data);
+    if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+    await syncStore.save(data);
+    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+    setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+  } catch (error) {
+    setSyncStatus(error.message, true);
+    throw error;
+  }
+});
+onClick('cleanupDriveOrphans', async () => {
+  if (!confirm('Esta acción borra de Google Drive las imágenes de accesos que no existen en ESTE equipo. Sincroniza todos los equipos antes de continuar, o se perderán sus imágenes. ¿Deseas continuar?')) return;
+  setSyncStatus('Buscando imágenes huérfanas en Drive…');
+  try {
+    const result = await cleanupDriveOrphans(data);
+    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+    setSyncStatus('Drive limpio: ' + result.deleted + ' imágenes huérfanas borradas.' + detail, result.errors.length > 0);
+  } catch (error) {
+    setSyncStatus(error.message, true);
+    throw error;
+  }
 });
 onClick('openDriveDocs', () => chrome.tabs.create({ url: 'https://console.cloud.google.com/apis/library/drive.googleapis.com' }));
 $('syncEnabled').onchange = () => run(async () => {
@@ -1376,13 +1386,22 @@ async function syncNow() {
       await chrome.storage.local.set({ nexbSyncEnabled: true });
     }
     setSyncStatus('Leyendo datos sincronizados…');
-    const remote = await syncStore.load();
-    if (remote) {
-      const merged = mergeSyncData(data, remote.data);
-      if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+    let repaired = false;
+    try {
+      const remote = await syncStore.load();
+      if (remote) {
+        const merged = mergeSyncData(data, remote.data);
+        if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+      }
+    } catch (error) {
+      // Sin reparar, la copia remota dañada fallaría en cada apertura.
+      if (!(error instanceof SyncCorruptError)) throw error;
+      repaired = true;
     }
     const saved = await syncStore.save(data);
-    setSyncStatus('Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.');
+    setSyncStatus(repaired
+      ? 'La copia sincronizada estaba dañada y se reemplazó con la de este equipo.'
+      : 'Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.', repaired);
   } catch (error) {
     setSyncStatus(error.message || 'No se pudo sincronizar; se conserva la copia local.', true);
     throw error;
@@ -1582,6 +1601,18 @@ chrome.tabs.onUpdated.addListener((_id, change) => { if (change.url || change.st
 chrome.tabs.onCreated.addListener(scheduleTabRefresh);
 chrome.tabs.onRemoved.addListener(scheduleTabRefresh);
 chrome.tabs.onReplaced.addListener(scheduleTabRefresh);
+
+// Solo debe quedar una pestaña de nex.b: al abrir otra, las anteriores se
+// cierran salvo que tengan un formulario abierto o trabajo en curso.
+const homeChannel = new BroadcastChannel('nexb-home');
+homeChannel.onmessage = async event => {
+  if (event.data !== 'opened') return;
+  if (saving || syncBusy || captureBusy || recaptureBusy || imageBusy || bookmarkBusy || document.querySelector('dialog[open]')) return;
+  const tab = await chrome.tabs.getCurrent().catch(() => null);
+  if (Number.isInteger(tab?.id)) chrome.tabs.remove(tab.id).catch(() => {});
+};
+// El Side Panel no es una pestaña (getCurrent no devuelve nada): no cierra otras.
+chrome.tabs.getCurrent().then(tab => { if (tab) homeChannel.postMessage('opened'); }).catch(() => {});
 
 async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });

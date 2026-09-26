@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeData } from '../src/model.js';
-import { createSyncStore, mergeSyncData, projectSyncData, SYNC_CHUNK_BYTES, SYNC_CHUNK_PREFIX } from '../src/sync.js';
+import { createSyncStore, mergeSyncData, projectSyncData, SyncCorruptError, SYNC_CHUNK_BYTES, SYNC_CHUNK_PREFIX } from '../src/sync.js';
 import { memoryArea } from './helpers.js';
 
 function fixture() {
@@ -73,4 +73,27 @@ test('createSyncStore rechaza fragmentos ausentes sin borrar la copia local', as
   await store.save(fixture());
   await area.remove(SYNC_CHUNK_PREFIX + '0');
   await assert.rejects(store.load(), /Faltan datos sincronizados/);
+});
+
+test('mergeSyncData marca como dañada una copia remota con accesos duplicados', () => {
+  const local = fixture();
+  const remote = projectSyncData(local);
+  remote.categories.push({ ...remote.categories[0], id: 'otra', accesses: [remote.categories[0].accesses[0]] });
+  assert.throws(() => mergeSyncData(local, remote), error => error instanceof SyncCorruptError && /Identificador duplicado: saved/.test(error.message));
+});
+
+test('createSyncStore marca como dañados los fragmentos ilegibles', async () => {
+  const area = memoryArea(), store = createSyncStore(area);
+  await store.save(fixture());
+  await area.set({ [SYNC_CHUNK_PREFIX + '0']: 'e30x' });
+  await assert.rejects(store.load(), SyncCorruptError);
+});
+
+test('mergeSyncData no duplica un acceso movido de categoría en este equipo', () => {
+  const local = fixture();
+  local.categories.push({ id: 'destino', name: 'Destino', workspaceId: local.workspaces[0].id, parentId: '', accesses: [] });
+  const remote = projectSyncData(local);
+  local.categories[1].accesses.push(local.categories[0].accesses.pop());
+  const merged = mergeSyncData(local, remote);
+  assert.equal(merged.categories.flatMap(c => c.accesses).filter(a => a.id === 'saved').length, 1);
 });
