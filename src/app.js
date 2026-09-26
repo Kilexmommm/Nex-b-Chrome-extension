@@ -1,11 +1,12 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride } from './model.js';
 import { createRepository } from './storage.js';
-import { openOrFocusTab } from './tabs.js';
+import { openOrFocusTab, openOrFocusMany } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
 import { resizeImage } from './images.js';
 import { collectTags, suggestTags, insertTag } from './tags.js';
 import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
+import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
 import { createSyncStore, mergeSyncData, SyncCorruptError } from './sync.js';
@@ -25,6 +26,9 @@ let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
 let captureBusy = false, captureCancelled = false;
 const captureThrottle = createCaptureThrottle();
+let localThumbnailPreference = null;
+let narrowColumns = 1;
+const narrowMedia = window.matchMedia('(max-width: 600px)');
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -61,6 +65,7 @@ function arrangeDialogFields() {
     cardBorderColor: 'Solo se usa si activas un borde.',
     cardSpacing: 'Espacio entre tarjetas del Workspace.',
     iconStyle: 'Aspecto de los controles con icono.',
+    showWorkspaceTabs: 'Muestra la fila de pestañas para cambiar de Workspace.',
     settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
     captureEnabled: 'Crea una miniatura al agregar un acceso.',
     bookmarkLink: 'Mantiene la sección vinculada a esa carpeta de Chrome.'
@@ -110,10 +115,61 @@ function currentWorkspace() {
 function currentCategories() {
   return data.categories.filter(c => c.workspaceId === currentWorkspace().id);
 }
+function validThumbnailPreference(value) {
+  if (!value || !['small', 'medium', 'large', 'custom'].includes(value.size)) return null;
+  const height = Number(value.height);
+  if (!Number.isInteger(height) || height < 80 || height > 480) return null;
+  return { size: value.size, height };
+}
+async function restoreLocalThumbnailPreference() {
+  const stored = await chrome.storage.local.get('nexbThumbnailPreference');
+  localThumbnailPreference = validThumbnailPreference(stored.nexbThumbnailPreference);
+}
+function applyLocalThumbnailPreference() {
+  if (!localThumbnailPreference) return;
+  data.settings.thumbnailSize = localThumbnailPreference.size;
+  data.settings.thumbnailHeight = localThumbnailPreference.height;
+}
+async function persistLocalThumbnailPreference(settings) {
+  localThumbnailPreference = { size: settings.thumbnailSize, height: settings.thumbnailHeight };
+  await chrome.storage.local.set({ nexbThumbnailPreference: localThumbnailPreference });
+}
+function applyNarrowColumns() {
+  document.documentElement.dataset.narrowColumns = String(narrowColumns);
+  document.documentElement.style.setProperty('--narrow-columns', String(narrowColumns));
+  document.querySelectorAll('[data-narrow-columns]').forEach(item => {
+    item.setAttribute('aria-pressed', String(Number(item.dataset.narrowColumns) === narrowColumns));
+  });
+}
+async function restoreNarrowColumns() {
+  const stored = await chrome.storage.local.get('nexb.narrowColumns');
+  narrowColumns = normalizeNarrowColumns(stored['nexb.narrowColumns']);
+  applyNarrowColumns();
+}
+async function setNarrowColumns(value) {
+  narrowColumns = normalizeNarrowColumns(value);
+  await chrome.storage.local.set({ 'nexb.narrowColumns': narrowColumns });
+  applyNarrowColumns();
+}
+function closeMainMenu(restoreFocus = false) {
+  const menu = $('mainMenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  $('mainMenuToggle').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('mainMenuToggle').focus();
+}
+function setNarrow(matches) {
+  document.documentElement.dataset.narrow = String(matches);
+  const toggle = $('mainMenuToggle');
+  if (toggle) toggle.hidden = !matches;
+  if (!matches) closeMainMenu();
+  if (ready) render();
+}
 function adopt(snapshot) {
   const selected = sessionStorage.getItem('activeWorkspace');
   data = snapshot.data;
   if (data.workspaces.some(w => w.id === selected)) data.activeWorkspaceId = selected;
+  applyLocalThumbnailPreference();
   revision = snapshot.revision;
   applySettings();
   render();
@@ -135,6 +191,7 @@ async function commit(candidate) {
     data = snapshot.data;
     revision = snapshot.revision;
     sessionStorage.setItem('activeWorkspace', data.activeWorkspaceId);
+    await persistLocalThumbnailPreference(data.settings);
     applySettings();
     render();
     scheduleSync();
@@ -168,17 +225,17 @@ function parseRules(value) {
   return validateRules(rules);
 }
 function selectSettingsTab(tab) {
-  const design = tab === 'design';
-  const sync = tab === 'sync';
-  $('settingsSyncPanel').hidden = !sync;
-  $('settingsDesignPanel').hidden = !design;
-  $('settingsGeneralPanel').hidden = design || sync;
-  $('settingsGeneralTab').setAttribute('aria-selected', String(!design && !sync));
-  $('settingsSyncTab').setAttribute('aria-selected', String(sync));
-  $('settingsDesignTab').setAttribute('aria-selected', String(design));
-  $('settingsGeneralTab').tabIndex = design || sync ? -1 : 0;
-  $('settingsSyncTab').tabIndex = sync ? 0 : -1;
-  $('settingsDesignTab').tabIndex = design ? 0 : -1;
+  const panelByTab = { general: 'settingsGeneralPanel', design: 'settingsDesignPanel', sync: 'settingsSyncPanel', data: 'settingsDataPanel' };
+  const tabByPanel = Object.fromEntries(Object.entries(panelByTab).map(([key, panel]) => [panel, 'settings' + key[0].toUpperCase() + key.slice(1) + 'Tab']));
+  const selected = panelByTab[tab] ? tab : 'general';
+  for (const [key, panelId] of Object.entries(panelByTab)) {
+    const active = key === selected;
+    const tabElement = $(tabByPanel[panelId]);
+    $(panelId).hidden = !active;
+    tabElement.setAttribute('aria-selected', String(active));
+    tabElement.classList.toggle('active', active);
+    tabElement.tabIndex = active ? 0 : -1;
+  }
 }
 function applySettings() {
   const s = data.settings;
@@ -190,9 +247,11 @@ function applySettings() {
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   document.documentElement.style.setProperty('--accent-ink', luminance > 0.179 ? '#000000' : '#ffffff');
   // La relación 5:3 se calcula en CSS desde el ancho de cada tarjeta.
-  document.documentElement.style.setProperty('--card-min-width', ({ small: 168, medium: 240, large: 312 }[s.thumbnailSize]) + 'px');
+  document.documentElement.style.setProperty('--card-min-width', Math.round(s.thumbnailHeight * 5 / 3) + 'px');
   document.documentElement.style.setProperty('--ui-font', ({ system: 'Inter,ui-sans-serif,system-ui,-apple-system,sans-serif', rounded: 'ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif', serif: 'ui-serif,Georgia,serif', mono: 'ui-monospace,SFMono-Regular,Menlo,monospace' }[s.fontFamily]));
-  document.documentElement.style.setProperty('--card-border-color', s.cardBorderColor);
+  const borderOverride = borderColorOverride(s.cardBorderColor);
+  if (borderOverride) document.documentElement.style.setProperty('--card-border-color', borderOverride);
+  else document.documentElement.style.removeProperty('--card-border-color');
   document.documentElement.style.setProperty('--card-border-width', ({ none: '0px', soft: '1px', strong: '2px' }[s.cardBorder]));
   document.documentElement.style.setProperty('--card-gap', ({ compact: '9px', normal: '16px', wide: '25px' }[s.cardSpacing]));
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
@@ -233,7 +292,7 @@ function renderStylePresets(themeId) {
 function isOpen(access) {
   try {
     if (access.url.startsWith('file:')) return openIndex.exact.has(accessUrl(access.url));
-    const key = access.matchType === 'domain' ? new URL(access.url).origin : access.matchType === 'exact' ? webUrl(access.url) : documentKey(access.url);
+    const key = access.matchType === 'domain' ? matchOrigin(access.url) : access.matchType === 'exact' ? webUrl(access.url) : documentMatchKey(access.url);
     return openIndex[access.matchType].has(key);
   } catch { return false; }
 }
@@ -258,8 +317,8 @@ async function refreshTabs() {
       const url = accessUrl(tab.pendingUrl || tab.url);
       openIndex.exact.add(url);
       if (url.startsWith('file:')) continue;
-      openIndex.domain.add(new URL(url).origin);
-      openIndex.document.add(documentKey(url));
+      openIndex.domain.add(matchOrigin(url));
+      openIndex.document.add(documentMatchKey(url));
     } catch { /* Internal browser pages cannot match saved accesses. */ }
   }
   updateStatuses();
@@ -272,6 +331,23 @@ function scheduleTabRefresh() {
 async function openAccess(access) {
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
+}
+async function openCategoryAccesses(category) {
+  const { opened, focused, failed } = await openOrFocusMany(category.accesses, chrome, navigator.locks);
+  scheduleTabRefresh();
+  let message = 'Se abrieron ' + opened + ' y se enfocaron ' + focused + '.';
+  if (failed) message += ' ' + failed + ' no se pudieron abrir.';
+  showMessage(message, failed > 0 && !opened && !focused);
+}
+let sidePanelWindowId = null;
+if (chrome.windows?.getCurrent) chrome.windows.getCurrent().then(window => { sidePanelWindowId = window?.id ?? null; }).catch(() => {});
+async function openSidePanel() {
+  if (!chrome.sidePanel || typeof chrome.sidePanel.open !== 'function') throw new Error('El panel lateral no está disponible en esta versión de Chrome.');
+  if (!Number.isInteger(sidePanelWindowId)) sidePanelWindowId = (await chrome.windows.getCurrent()).id;
+  if (!Number.isInteger(sidePanelWindowId)) throw new Error('No se pudo identificar la ventana actual.');
+  const options = typeof chrome.sidePanel.setOptions === 'function' ? chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true }).catch(() => {}) : Promise.resolve();
+  await chrome.sidePanel.open({ windowId: sidePanelWindowId });
+  await options;
 }
 function render() {
   cardStatuses = [];
@@ -313,7 +389,21 @@ function render() {
     };
     $('workspaceTabs').append(b);
   }
+  const narrow = document.documentElement.dataset.narrow === 'true';
+  const workspaceTabsHidden = narrow || data.settings.showWorkspaceTabs === false;
+  $('workspaceTabs').hidden = workspaceTabsHidden;
+  $('workspacePicker').hidden = !workspaceTabsHidden;
+  $('workspacePicker').replaceChildren(...data.workspaces.map(workspace => new Option(workspace.name, workspace.id, false, workspace.id === currentWorkspace().id && viewMode === 'workspace')));
+  $('workspacePicker').onchange = () => {
+    data.activeWorkspaceId = $('workspacePicker').value;
+    sessionStorage.setItem('activeWorkspace', data.activeWorkspaceId);
+    viewMode = 'workspace';
+    render();
+  };
   document.querySelectorAll('[data-thumbnail-size]').forEach(control => control.setAttribute('aria-pressed', String(control.dataset.thumbnailSize === data.settings.thumbnailSize)));
+  $('thumbnailCustomHeight').value = data.settings.thumbnailHeight;
+  $('thumbnailHeightRange').value = data.settings.thumbnailHeight;
+  $('thumbnailHeightValue').textContent = data.settings.thumbnailHeight + ' px';
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
   $('workspace').replaceChildren();
@@ -372,6 +462,7 @@ function renderCategory(category, subcategory) {
   const heading = node('div', 'category-heading');
   const actions = node('div', 'category-actions');
   actions.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'button quiet category-icon'),
+    button('⧉', 'Abrir todas las ventanas de esta sección', () => openCategoryAccesses(category), 'button quiet category-icon'),
     button('✎', 'Editar categoría', () => renameCategory(category), 'button quiet category-icon'),
     button('⇥', 'Mover sección a otro Workspace', () => openMoveSectionDialog(category), 'button quiet category-icon'));
   if (category.bookmarkFolderId) actions.append(button('↻', 'Sincronizar sección con Favoritos de Chrome', () => syncCategoryBookmarks(category), 'button quiet category-icon'));
@@ -395,18 +486,13 @@ function makeCard(access, categoryId) {
   const thumb = node('div', 'thumb');
   thumb.title = access.url;
   thumb.draggable = viewMode === 'workspace';
-  const recapture = node('a', 'card-recapture', 'Capturar imagen');
-  recapture.href = '#';
-  recapture.title = 'Volver a capturar ' + access.title;
-  recapture.onclick = event => { event.preventDefault(); run(() => openRecaptureDialog(access)); };
-  recapture.hidden = Boolean(access.thumbnail);
   if (access.thumbnail) {
     thumb.classList.add('has-thumbnail');
     const img = node('img', 'thumbnail-image'); img.src = access.thumbnail; img.alt = ''; img.title = access.url;
     img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
-    img.onerror = () => { img.remove(); thumb.classList.remove('has-thumbnail'); thumb.prepend(node('span', 'image-error', 'Imagen no disponible')); recapture.hidden = false; };
+    img.onerror = () => { img.remove(); thumb.classList.remove('has-thumbnail'); thumb.prepend(node('span', 'image-error', 'Imagen no disponible')); };
     thumb.append(img);
-  } else thumb.append(node('span', 'image-error', 'Sin miniatura'));
+  } else thumb.append(node('span', 'image-error visually-hidden', 'Sin miniatura'));
   const overlay = node('div', 'card-overlay');
   overlay.title = access.url;
   if (viewMode === 'tags') {
@@ -439,7 +525,7 @@ function makeCard(access, categoryId) {
   open.append(thumb);
   cardStatuses.push({ access, status, duplicateBadge });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  card.append(open, footer, edit, recapture);
+  card.append(open, footer, edit);
   thumb.ondragstart = event => {
     if (viewMode !== 'workspace') return;
     draggedAccess = { categoryId, accessId: access.id };
@@ -833,6 +919,16 @@ function showCardMenu(event, access, categoryId) {
   menu.style.left = Math.max(0, Math.min(event.clientX, innerWidth - 190)) + 'px';
   menu.style.top = Math.max(0, Math.min(event.clientY, innerHeight - 190)) + 'px';
   menu.querySelector('[data-card-action="capture"]').onclick = () => run(() => { hideCardMenu(); openRecaptureDialog(access); });
+  menu.querySelector('[data-card-action="paste"]').onclick = () => run(async () => {
+    hideCardMenu();
+    openAccessDialog(categoryId, access);
+    await pasteClipboardImage();
+  });
+  menu.querySelector('[data-card-action="upload"]').onclick = () => run(() => {
+    hideCardMenu();
+    openAccessDialog(categoryId, access);
+    $('thumbnailFileInput').click();
+  });
   menu.querySelector('[data-card-action="edit"]').onclick = () => run(() => { hideCardMenu(); openAccessDialog(categoryId, access); });
   menu.querySelector('[data-card-action="move"]').onclick = () => run(() => {
     hideCardMenu(); openAccessDialog(categoryId, access); $('accessWorkspace').focus();
@@ -847,6 +943,25 @@ function showCardMenu(event, access, categoryId) {
     category.accesses = category.accesses.filter(a => a.id !== access.id);
     await commit(candidate);
   });
+}
+async function pasteClipboardImage() {
+  if (!navigator.clipboard?.read) throw new Error('Chrome no permite leer imágenes del portapapeles. Usa Ctrl/⌘V dentro del editor.');
+  const generation = ++pasteGeneration;
+  imageBusy = true;
+  try {
+    const items = await navigator.clipboard.read();
+    const item = items.find(entry => entry.types.some(type => type.startsWith('image/')));
+    if (!item) throw new Error('El portapapeles no contiene una imagen.');
+    const type = item.types.find(value => value.startsWith('image/'));
+    const image = await resizeImage(await item.getType(type));
+    if (generation !== pasteGeneration || !$('accessDialog').open) return;
+    pastedImage = image;
+    $('accessThumbnailUrl').value = '';
+    showPreview();
+    showMessage('Miniatura lista para guardar.');
+  } finally {
+    if (generation === pasteGeneration) imageBusy = false;
+  }
 }
 
 async function captureBatchThumbnail(tab) {
@@ -869,10 +984,7 @@ async function captureAllImages() {
     showMessage(localMissing ? 'No hay páginas web pendientes. Los accesos file:// requieren una captura manual.' : 'Todos los accesos web ya tienen miniatura.');
     return;
   }
-  if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. El permiso temporal se retira al terminar. ¿Continuar?')) return;
-  if (!await chrome.permissions.request({ origins: ['http://*/*', 'https://*/*'] })) {
-    throw new Error('No se concedió el permiso para capturar páginas web.');
-  }
+  if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
   captureBusy = true;
   captureCancelled = false;
   $('cancelCapture').hidden = false;
@@ -910,7 +1022,6 @@ async function captureAllImages() {
       await chrome.tabs.update(origin.id, { active: true }).catch(() => {});
       if (Number.isInteger(origin.windowId) && chrome.windows?.update) await chrome.windows.update(origin.windowId, { focused: true }).catch(() => {});
     }
-    await chrome.permissions.remove({ origins: ['http://*/*', 'https://*/*'] }).catch(() => {});
     $('cancelCapture').hidden = true;
     captureBusy = false;
   }
@@ -950,8 +1061,42 @@ document.querySelectorAll('dialog').forEach(dialog => {
 document.querySelectorAll('[data-cancel]').forEach(b => {
   b.onclick = () => { if (!saving) b.closest('dialog').close(); };
 });
-document.addEventListener('click', event => { hideCardMenu(); if (!event.target.closest('.top-actions')) $('thumbnailSizeMenu').hidden = true; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCardMenu(); });
+document.addEventListener('click', event => {
+  hideCardMenu();
+  if (!event.target.closest('.top-actions')) {
+    $('thumbnailSizeMenu').hidden = true;
+    closeMainMenu();
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideCardMenu(); closeMainMenu(true); } });
+onClick('mainMenuToggle', () => {
+  const menu = $('mainMenu');
+  const open = menu.hidden;
+  menu.hidden = !open;
+  $('mainMenuToggle').setAttribute('aria-expanded', String(open));
+  if (open) menu.querySelector('button')?.focus();
+});
+const MAIN_MENU_TARGETS = { edit: 'editWorkspace', new: 'newWorkspace', thumbnail: 'thumbnailSizeToggle', inventory: 'openInventory', settings: 'openSettings', tags: 'tagRules' };
+document.querySelectorAll('[data-main-action]').forEach(item => {
+  item.onclick = () => run(async () => {
+    const action = item.dataset.mainAction;
+    closeMainMenu();
+    if (action === 'sync') {
+      $('openSettings').click();
+      $('settingsSyncTab').click();
+      return;
+    }
+    const target = MAIN_MENU_TARGETS[action];
+    if (target) $(target).click();
+  });
+});
+document.querySelectorAll('[data-narrow-columns]').forEach(item => {
+  item.onclick = () => run(async () => {
+    closeMainMenu();
+    await setNarrowColumns(Number(item.dataset.narrowColumns));
+  });
+});
+narrowMedia.addEventListener('change', event => setNarrow(event.matches));
 onClick('openInventory', openInventoryDialog);
 onClick('inventoryAllTab', () => selectInventoryTab('all'));
 onClick('inventoryDupTab', async () => { selectInventoryTab('dup'); await refreshDuplicates(); });
@@ -976,7 +1121,23 @@ onClick('editWorkspace', () => {
   $('editWorkspaceDialog').dataset.workspaceId = workspace.id;
   $('editWorkspaceName').value = workspace.name;
   $('editWorkspaceKind').value = workspace.type;
+  const onlyWorkspace = data.workspaces.length <= 1;
+  $('deleteWorkspace').disabled = onlyWorkspace;
+  $('deleteWorkspace').title = onlyWorkspace ? 'No puedes eliminar el último Workspace' : 'Eliminar este Workspace y sus datos';
   openDialog('editWorkspaceDialog');
+});
+onClick('deleteWorkspace', () => {
+  const workspaceId = $('editWorkspaceDialog').dataset.workspaceId;
+  $('deleteWorkspaceDialog').dataset.workspaceId = workspaceId;
+  $('deleteWorkspaceSummary').textContent = workspaceDeletionSummary(data, workspaceId);
+  $('editWorkspaceDialog').close();
+  openDialog('deleteWorkspaceDialog');
+});
+onSubmit('deleteWorkspaceForm', async () => {
+  const candidate = deleteWorkspace(data, $('deleteWorkspaceDialog').dataset.workspaceId, true);
+  await commit(candidate);
+  $('deleteWorkspaceDialog').close();
+  showMessage('Workspace eliminado. Puedes restaurarlo desde Configuración → Datos.');
 });
 async function moveWorkspaceToPosition(sourceId, targetId, after) {
   if (sourceId === targetId) return;
@@ -1001,9 +1162,26 @@ document.querySelectorAll('[data-thumbnail-size]').forEach(control => {
   control.onclick = () => run(async () => {
     const candidate = structuredClone(data);
     candidate.settings.thumbnailSize = control.dataset.thumbnailSize;
+    candidate.settings.thumbnailHeight = thumbnailHeightForSize(control.dataset.thumbnailSize, candidate.settings.thumbnailHeight);
     await commit(candidate); $('thumbnailSizeMenu').hidden = true;
   });
 });
+async function saveCustomThumbnailHeight() {
+  const height = Number($('thumbnailCustomHeight').value);
+  if (!Number.isInteger(height) || height < 80 || height > 480) throw new Error('Escribe un alto entre 80 y 480 px.');
+  const candidate = structuredClone(data);
+  candidate.settings.thumbnailSize = 'custom';
+  candidate.settings.thumbnailHeight = height;
+  await commit(candidate);
+  $('thumbnailSizeMenu').hidden = true;
+}
+onClick('saveThumbnailCustom', saveCustomThumbnailHeight);
+$('thumbnailHeightRange').oninput = () => {
+  $('thumbnailCustomHeight').value = $('thumbnailHeightRange').value;
+  $('thumbnailHeightValue').textContent = $('thumbnailHeightRange').value + ' px';
+};
+$('thumbnailHeightRange').onchange = () => run(saveCustomThumbnailHeight);
+$('thumbnailCustomHeight').onchange = () => run(saveCustomThumbnailHeight);
 onClick('newCategory', () => {
   $('categoryForm').reset();
   $('categoryParent').replaceChildren(new Option('Categoría principal', ''),
@@ -1040,15 +1218,32 @@ onClick('openUpdate', async () => {
   showMessage('Descarga iniciada. Conserva tu respaldo, reemplaza los archivos de la extensión y pulsa «Recargar» en chrome://extensions.');
 });
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
+onClick('openSidePanel', openSidePanel);
 onClick('settingsGeneralTab', () => selectSettingsTab('general'));
 onClick('settingsSyncTab', () => selectSettingsTab('sync'));
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
+onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });
+onClick('settingsDataTab', () => selectSettingsTab('data'));
+document.querySelector('#settingsDialog .settings-tabs').addEventListener('keydown', event => {
+  if (!['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+  const tabs = [...event.currentTarget.querySelectorAll('[role=tab]')];
+  const current = tabs.indexOf(document.activeElement);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  event.preventDefault();
+  tabs[next].focus();
+  tabs[next].click();
+});
+onClick('refreshSyncAccount', updateSyncAccount);
 onClick('syncNow', syncNow);
 onClick('syncDriveNow', async () => {
+  syncEnabled = true;
+  $('syncEnabled').checked = true;
+  await chrome.storage.local.set({ nexbSyncEnabled: true });
   setSyncStatus('Conectando con Google Drive…');
   try {
     const result = await syncDriveImages(data);
     if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+    await syncStore.save(data);
     const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
     setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
   } catch (error) {
@@ -1081,7 +1276,11 @@ onClick('openSettings', () => {
   $('settingsDialog').dataset.themeId = s.themeId;
   $('settingsDialog').dataset.pattern = s.backgroundPattern;
   for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) $(key).value = s[key];
+  $('thumbnailCustomHeight').value = s.thumbnailHeight;
+  $('thumbnailHeightRange').value = s.thumbnailHeight;
+  $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
   $('captureEnabled').checked = s.captureEnabled;
+  $('showWorkspaceTabs').checked = s.showWorkspaceTabs;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('syncEnabled').checked = syncEnabled;
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
@@ -1132,13 +1331,15 @@ $('accessTags').onkeydown = event => {
 };
 onSubmit('settingsForm', async () => {
   const candidate = structuredClone(data);
+  const thumbnailSize = $('thumbnailSize').value;
   candidate.settings = {
     themeId: $('settingsDialog').dataset.themeId, backgroundPattern: $('settingsDialog').dataset.pattern,
     accentColor: $('accentColor').value, backgroundColor: $('backgroundColor').value,
-    backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize: $('thumbnailSize').value,
+     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
-    captureEnabled: $('captureEnabled').checked
+    captureEnabled: $('captureEnabled').checked,
+    showWorkspaceTabs: $('showWorkspaceTabs').checked
   };
   candidate.autoTagRules = parseRules($('settingsTagRules').value);
   await commit(candidate); $('settingsDialog').close();
@@ -1164,6 +1365,15 @@ function setSyncStatus(message, error = false) {
   status.textContent = message;
   status.hidden = !message;
   status.classList.toggle('error', error);
+}
+async function updateSyncAccount() {
+  const status = $('syncAccount');
+  try {
+    const profile = await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' });
+    status.textContent = profile.email ? 'Cuenta de Chrome: ' + profile.email : 'Cuenta de Chrome: no disponible; activa la sincronización del perfil.';
+  } catch {
+    status.textContent = 'Cuenta de Chrome: no se pudo consultar.';
+  }
 }
 async function syncNow() {
   if (syncBusy) return;
@@ -1362,7 +1572,25 @@ document.addEventListener('paste', event => {
     } finally { if (generation === pasteGeneration) imageBusy = false; }
   });
 });
+$('thumbnailFileInput').onchange = () => run(async () => {
+  const file = $('thumbnailFileInput').files?.[0];
+  $('thumbnailFileInput').value = '';
+  if (!file) return;
+  const generation = ++pasteGeneration;
+  imageBusy = true;
+  try {
+    const image = await resizeImage(file);
+    if (generation !== pasteGeneration || !$('accessDialog').open) return;
+    pastedImage = image;
+    $('accessThumbnailUrl').value = '';
+    showPreview();
+    showMessage('Miniatura lista para guardar.');
+  } finally {
+    if (generation === pasteGeneration) imageBusy = false;
+  }
+});
 onClick('pasteBox', () => $('pasteBox').focus());
+onClick('clipboardPaste', pasteClipboardImage);
 onClick('removeThumbnail', () => { pasteGeneration++; imageBusy = false; pastedImage = ''; $('accessThumbnailUrl').value = ''; showPreview(); });
 $('accessThumbnailUrl').onchange = () => run(() => { pastedImage = imageUrl($('accessThumbnailUrl').value.trim()); showPreview(); });
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -1383,15 +1611,21 @@ homeChannel.onmessage = async event => {
   const tab = await chrome.tabs.getCurrent().catch(() => null);
   if (Number.isInteger(tab?.id)) chrome.tabs.remove(tab.id).catch(() => {});
 };
-homeChannel.postMessage('opened');
+// El Side Panel no es una pestaña (getCurrent no devuelve nada): no cierra otras.
+chrome.tabs.getCurrent().then(tab => { if (tab) homeChannel.postMessage('opened'); }).catch(() => {});
 
 async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await restoreLocalThumbnailPreference();
+  await restoreNarrowColumns();
   await restoreSyncPreference();
   const snapshot = await repository.load();
   adopt(snapshot); ready = true;
-  $('extensionVersion').textContent = chrome.runtime.getManifest().version;
+  const installedVersion = chrome.runtime.getManifest().version;
+  $('extensionVersion').textContent = installedVersion;
+  $('footerVersion').textContent = 'v' + installedVersion;
+  await updateSyncAccount();
   if (syncEnabled) await syncNow().catch(() => {});
   if (snapshot.recovered) showMessage('Se recuperó la copia anterior en memoria. Descarga un ZIP antes de continuar; los datos originales no se sobrescribieron.');
   await refreshTabs();
@@ -1422,4 +1656,5 @@ async function initialize() {
     showMessage(pending.notice || 'Revisa el acceso y elige su categoría antes de guardar.');
   } else if (pendingKey) { pendingKey = ''; showMessage('El acceso pendiente ya no está disponible. Agrégalo de nuevo desde la página.'); }
 }
+setNarrow(narrowMedia.matches);
 run(initialize);

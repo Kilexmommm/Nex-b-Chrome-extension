@@ -6,6 +6,7 @@ const PAGE = 'workspace-add-page';
 const LINK = 'workspace-add-link';
 const ACTION = 'workspace-add-site';
 const UPDATE_CAPTURE = 'workspace-update-capture';
+const SIDE_PANEL = 'workspace-open-side-panel';
 const TTL = 30 * 60 * 1000;
 
 function createMenu(properties) {
@@ -25,6 +26,7 @@ async function install() {
   await createMenu({ id: PAGE, title: 'Agregar página al acceso', contexts: ['page'], documentUrlPatterns: ['http://*/*', 'https://*/*'] });
   await createMenu({ id: LINK, title: 'Agregar enlace al acceso', contexts: ['link'], targetUrlPatterns: ['http://*/*', 'https://*/*'] });
   await createMenu({ id: ACTION, title: 'Agregar sitio a NEX.B', contexts: ['action'] });
+  await createMenu({ id: SIDE_PANEL, title: 'Abrir Side panel', contexts: ['action'] });
   await createMenu({ id: UPDATE_CAPTURE, title: 'Actualizar captura del acceso', contexts: ['page', 'action'] });
 }
 
@@ -94,6 +96,15 @@ async function openHome() {
   } else await chrome.tabs.create({ url });
 }
 
+async function openSidePanel(windowId) {
+  if (!chrome.sidePanel || typeof chrome.sidePanel.open !== 'function') throw new Error('El panel lateral no está disponible en esta versión de Chrome.');
+  if (!Number.isInteger(windowId)) throw new Error('No se pudo identificar la ventana actual.');
+  // No esperes nada antes de open(): el gesto de usuario caduca con los await.
+  const options = typeof chrome.sidePanel.setOptions === 'function' ? chrome.sidePanel.setOptions({ path: 'newtab.html', enabled: true }).catch(() => {}) : Promise.resolve();
+  await chrome.sidePanel.open({ windowId });
+  await options;
+}
+
 function reportFailure(error) {
   chrome.action.setBadgeText({ text: '!' }).catch(() => {});
   chrome.action.setBadgeBackgroundColor({ color: '#a32929' }).catch(() => {});
@@ -103,6 +114,10 @@ function reportFailure(error) {
 // Top-level listeners are registered synchronously; no timers keep the worker alive.
 chrome.runtime.onInstalled.addListener(() => { install().catch(reportFailure); });
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === SIDE_PANEL) {
+    openSidePanel(tab?.windowId).catch(reportFailure);
+    return;
+  }
   if (![PAGE, LINK, ACTION, UPDATE_CAPTURE].includes(info.menuItemId) || !tab) return;
   const isLink = info.menuItemId === LINK;
   if (isLink) addDraft(info.linkUrl, 'Nuevo acceso', tab, true).catch(reportFailure);

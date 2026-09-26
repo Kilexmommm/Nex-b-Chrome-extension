@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DATA, accessUrl, normalizeData, matches, imageUrl, webUrl, validateRules, duplicateTabGroups, tabKey } from '../src/model.js';
+import { DEFAULT_DATA, accessUrl, normalizeData, normalizeNarrowColumns, matches, imageUrl, webUrl, validateRules, duplicateTabGroups, tabKey, THUMBNAIL_HEIGHTS, thumbnailHeightForSize, borderColorOverride } from '../src/model.js';
 
 const fixture = () => structuredClone(DEFAULT_DATA);
 test('no ofrece como duplicada una pestaña navegando a otro documento', () => {
@@ -91,11 +91,19 @@ test('descarta CSS arbitrario y claves no definidas sin contaminar prototipos', 
   assert.equal(Object.hasOwn(result, '__proto__'), false);
   assert.throws(() => validateRules(JSON.parse('{"__proto__":"evil"}')));
 });
-test('conserva mayúsculas, query y fragmento en aplicaciones desconocidas', () => {
+test('en sitios desconocidos la ruta y las mayúsculas identifican el documento', () => {
   assert.equal(matches(access('https://example.com/doc/AbC'), 'https://example.com/doc/abc'), false);
-  assert.equal(matches(access('https://example.com/?id=1'), 'https://example.com/?id=2'), false);
-  assert.equal(matches(access('https://example.com/#one'), 'https://example.com/#two'), false);
   assert.equal(matches(access('https://example.com/'), 'https://example.com/private'), false);
+});
+test('query y fragmento no crean duplicados cuando el acceso no los define', () => {
+  assert.equal(matches(access('https://example.com/page'), 'https://example.com/page?x=1'), true);
+  assert.equal(matches(access('https://example.com/page'), 'https://example.com/page#seccion'), true);
+  assert.equal(matches(access('https://example.com/page#uno'), 'https://example.com/page#otro'), true);
+  assert.equal(matches(access('https://example.com/?id=1'), 'https://example.com/?id=2'), true);
+});
+test('una redireccion con www. no duplica el acceso', () => {
+  assert.equal(matches(access('https://example.com/pagina'), 'https://www.example.com/pagina'), true);
+  assert.equal(matches(access('https://www.example.com/', 'domain'), 'https://example.com/ruta'), true);
 });
 test('reconoce IDs de Google Docs, Drive, Figma y Miro', () => {
   for (const [a, b] of [
@@ -126,4 +134,49 @@ test('rutas locales: coincidencia exacta incluso con detección por dominio o do
   const folder = access('file:///Users/test/carpeta/', 'domain');
   assert.equal(matches(folder, 'file:///Users/test/carpeta/'), true);
   assert.equal(matches(folder, 'file:///Users/test/carpeta/hijo.html'), false);
+});
+test('showWorkspaceTabs se conserva y por defecto es visible', () => {
+  assert.equal(DEFAULT_DATA.settings.showWorkspaceTabs, true);
+  assert.equal(normalizeData().settings.showWorkspaceTabs, true);
+  const hidden = fixture();
+  hidden.settings.showWorkspaceTabs = false;
+  assert.equal(normalizeData(hidden).settings.showWorkspaceTabs, false);
+  const invalid = fixture();
+  invalid.settings.showWorkspaceTabs = 'sí';
+  assert.equal(normalizeData(invalid).settings.showWorkspaceTabs, true);
+});
+test('las columnas del ancho reducido solo admiten 1 o 2 y por defecto son 1', () => {
+  assert.equal(normalizeNarrowColumns(2), 2);
+  for (const value of [1, 3, 0, '2', '1', null, undefined, true, {}, []]) assert.equal(normalizeNarrowColumns(value), 1);
+});
+test('el ajuste de alto de miniaturas deriva del tamaño elegido y respeta Personalizado', () => {
+  assert.deepEqual({ ...THUMBNAIL_HEIGHTS }, { small: 101, medium: 144, large: 187 });
+  assert.equal(thumbnailHeightForSize('small', 999), 101);
+  assert.equal(thumbnailHeightForSize('medium', 999), 144);
+  assert.equal(thumbnailHeightForSize('large', 999), 187);
+  assert.equal(thumbnailHeightForSize('custom', 137), 137);
+  assert.equal(thumbnailHeightForSize('desconocido', 137), 137);
+});
+test('el color de borde elegido por el usuario solo se aplica si difiere del predeterminado', () => {
+  assert.equal(borderColorOverride('#ff0000'), '#ff0000');
+  assert.equal(borderColorOverride('#4a4a4a'), '');
+  assert.equal(borderColorOverride('#4A4A4A'), '');
+  assert.equal(borderColorOverride(''), '');
+  assert.equal(borderColorOverride(undefined), '');
+  assert.equal(borderColorOverride(null), '');
+  assert.equal(borderColorOverride('#123456', '#123456'), '');
+  assert.equal(borderColorOverride('#123457', '#123456'), '#123457');
+});
+test('guardar y recargar conserva todos los ajustes de Diseño', () => {
+  const saved = fixture();
+  saved.settings = { ...saved.settings, fontFamily: 'serif', cardStyle: 'glass', cardBorder: 'strong', cardBorderColor: '#ff0000', cardSpacing: 'wide', iconStyle: 'round', thumbnailSize: 'large', thumbnailHeight: thumbnailHeightForSize('large', 101) };
+  const reloaded = normalizeData(JSON.parse(JSON.stringify(saved))).settings;
+  assert.equal(reloaded.fontFamily, 'serif');
+  assert.equal(reloaded.cardStyle, 'glass');
+  assert.equal(reloaded.cardBorder, 'strong');
+  assert.equal(reloaded.cardBorderColor, '#ff0000');
+  assert.equal(reloaded.cardSpacing, 'wide');
+  assert.equal(reloaded.iconStyle, 'round');
+  assert.equal(reloaded.thumbnailSize, 'large');
+  assert.equal(reloaded.thumbnailHeight, 187);
 });

@@ -7,17 +7,21 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 test('configuración separa los ajustes generales del diseño visual', () => {
   const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css'), baseCss = read('src/styles.css');
   const form = html.split('id="settingsForm"')[1].split('</form>')[0];
-  assert.match(form, /id="settingsGeneralTab"/);
-  assert.match(form, /id="settingsDesignTab"/);
-  assert.match(form, /id="settingsGeneralPanel"/);
-  assert.match(form, /id="settingsDesignPanel"/);
+  for (const id of ['settingsGeneralTab', 'settingsDesignTab', 'settingsSyncTab', 'settingsDataTab', 'settingsGeneralPanel', 'settingsDesignPanel', 'settingsSyncPanel', 'settingsDataPanel']) assert.match(form, new RegExp('id="' + id + '"'));
+  assert.equal((form.match(/role="tab"/g) || []).length, 4);
+  assert.equal((form.match(/role="tabpanel"/g) || []).length, 4);
   assert.ok(form.indexOf('id="settingsGeneralPanel"') < form.indexOf('id="settingsDesignPanel"'));
+  const dataPanel = form.split('id="settingsDataPanel"')[1].split('</section>')[0];
+  for (const id of ['downloadData', 'importData', 'restorePrevious', 'dataJson']) assert.match(dataPanel, new RegExp('id="' + id + '"'));
+  assert.match(form, /id="settingsClose"[^>]*aria-label="Cerrar configuración"/);
   for (const id of ['fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) assert.match(form, new RegExp('id="' + id + '"'));
   assert.match(app, /function selectSettingsTab\(tab\)/);
+  assert.match(app, /settingsDataPanel/);
   assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
   assert.match(app, /dataset\.iconStyle = s\.iconStyle/);
   assert.match(css, /--card-border-width/);
   assert.match(baseCss, /--card-gap/);
+  assert.match(css, /#settingsDialog \.settings-layout \{[^}]*grid-template-columns: 172px minmax\(0, 1fr\)/);
 });
 test('las miniaturas nuevas no tienen borde por defecto', () => {
   assert.equal(normalizeData().settings.cardBorder, 'none');
@@ -55,19 +59,35 @@ test('la apertura local usa pestañas y ofrece la configuración de archivos', (
   assert.match(read('newtab.html'), /id="openLocalSettings"/);
   assert.doesNotMatch(read('newtab.html'), /Instalar asistente macOS/);
 });
-test('captura por lote usa permiso opcional y conserva miniaturas existentes', () => {
+test('el indicador abierto y la reutilización comparten la misma identidad de documento', () => {
+  const app = read('src/app.js'), model = read('src/model.js'), tabs = read('src/tabs.js');
+  // app.js construye la clave del indicador con documentMatchKey/matchOrigin...
+  assert.match(app, /openIndex\.document\.add\(documentMatchKey\(url\)\)/);
+  assert.match(app, /openIndex\.domain\.add\(matchOrigin\(url\)\)/);
+  assert.match(app, /: documentMatchKey\(access\.url\)/);
+  // ...y model.js usa exactamente las mismas claves para decidir el foco.
+  assert.match(model, /return documentMatchKey\(access\.url\) === documentMatchKey\(tabUrl\)/);
+  assert.match(model, /return matchOrigin\(access\.url\) === matchOrigin\(tabUrl\)/);
+  assert.match(tabs, /matches\(access, tab\.pendingUrl \|\| tab\.url\)/);
+});
+test('cada sección ofrece abrir todas sus ventanas sin duplicar', () => {
+  const app = read('src/app.js'), tabs = read('src/tabs.js');
+  assert.match(app, /openOrFocusMany\(category\.accesses, chrome, navigator\.locks\)/);
+  assert.match(app, /button\('⧉', 'Abrir todas las ventanas de esta sección'/);
+  assert.match(app, /openCategoryAccesses/);
+  assert.match(tabs, /export async function openOrFocusMany/);
+});
+test('captura por lote usa acceso de host y conserva miniaturas existentes', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="captureAllImages"/);
-  assert.match(app, /chrome\.permissions\.request\(\{ origins: \['http:\/\/\*\/\*', 'https:\/\/\*\/\*'\] \}\)/);
+  assert.doesNotMatch(app, /permissions\.request\(\{ origins: \['http:\/\/\*\/\*'/);
   assert.match(app, /!access\.thumbnail && \/\^https\?:\//);
   assert.match(app, /chrome\.tabs\.captureVisibleTab/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
 });
-test('la captura masiva declara el permiso opcional y ofrece cancelar', () => {
-  const manifest = JSON.parse(read('manifest.json')), html = read('newtab.html'), app = read('src/app.js'), capture = read('src/capture.js');
-  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+test('la captura masiva ofrece cancelar y respeta el límite de Chrome', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), capture = read('src/capture.js');
   assert.match(html, /id="cancelCapture"/);
-  assert.match(app, /chrome\.permissions\.remove\(\{ origins: \['http:\/\/\*\/\*', 'https:\/\/\*\/\*'\] \}\)/);
   assert.match(app, /captureBusy/);
   assert.match(capture, /MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/);
   assert.match(capture, /CAPTURE_BATCH_SIZE = 5/);
@@ -97,12 +117,18 @@ test('la configuración incluye una pestaña de sincronización sin imágenes en
   assert.match(sync, /const \{ backgroundImageUrl, \.\.\.settings \}/);
   assert.match(sync, /const \{ thumbnail, bookmarkMissing, \.\.\.metadata \}/);
 });
+test('el tamaño de miniaturas se conserva en una preferencia local independiente', () => {
+  const app = read('src/app.js');
+  assert.match(app, /nexbThumbnailPreference/);
+  assert.match(app, /restoreLocalThumbnailPreference/);
+  assert.match(app, /persistLocalThumbnailPreference\(data\.settings\)/);
+});
 test('Drive usa OAuth privado y la pestaña ofrece subida y descarga de imágenes', () => {
   const manifest = JSON.parse(read('manifest.json')), app = read('src/app.js'), drive = read('src/drive.js'), html = read('newtab.html');
   assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/drive.appdata']);
   assert.ok(manifest.oauth2.client_id.endsWith('.apps.googleusercontent.com'));
   assert.ok(manifest.permissions.includes('identity'));
-  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/']);
+  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
   assert.match(app, /syncDriveImages\(data\)/);
   assert.match(drive, /appDataFolder/);
   assert.match(html, /id="syncDriveNow"/);
@@ -118,15 +144,41 @@ test('el inventario prioriza grupos repetidos con miniatura, contador y cierre p
   assert.match(css, /\.inventory-group-row \{/);
   assert.match(css, /\.inventory-thumbnail-image \{/);
 });
+test('el menú contextual de accesos está en español, agrupado con iconos y permite subir imágenes', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), css = read('src/styles.css');
+  assert.match(html, /data-card-action="upload"[^>]*><span class="menu-icon"/);
+  assert.match(html, /Subir imagen desde el computador/);
+  assert.match(html, /class="menu-separator"/);
+  assert.match(html, /id="thumbnailFileInput"/);
+  assert.match(app, /data-card-action="upload/);
+  assert.match(css, /\.card-menu \.menu-separator/);
+  assert.match(css, /background:#2b2b2b/);
+});
 test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3', () => {
   const app = read('src/app.js'), css = read('src/styles.css');
-  assert.match(app, /small: 168, medium: 240, large: 312/);
+  assert.match(app, /thumbnailHeight/);
+  assert.match(app, /thumbnailHeight = height/);
   assert.equal(normalizeData().settings.thumbnailSize, 'small');
   assert.match(css, /--card-min-width:168px/);
-  assert.match(css, /minmax\(var\(--card-min-width\),1fr\)/);
+  assert.match(css, /minmax\(min\(var\(--card-min-width\),100%\),1fr\)/);
   assert.match(css, /\.thumb \{[\s\S]*?aspect-ratio:5 \/ 3/);
   assert.match(css, /\.add-card \{[\s\S]*?aspect-ratio:5 \/ 3/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
+  assert.match(read('newtab.html'), /id="thumbnailCustomHeight"/);
+});
+test('el encabezado ocupa el ancho disponible y ordena sus acciones con un icono de inventario propio', () => {
+  const html = read('newtab.html'), css = read('src/styles.css');
+  const start = html.indexOf('<div class="top-actions">');
+  const end = html.indexOf('</div>\n       </header>', start);
+  const actions = html.slice(start, end);
+  const actionIds = ['thumbnailSizeToggle', 'openInventory', 'newWorkspace', 'editWorkspace', 'openSettings'];
+  const positions = actionIds.map(id => actions.indexOf(`id="${id}"`));
+  assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])));
+  assert.ok(actions.indexOf('id="thumbnailSizeMenu"') > actions.indexOf('id="thumbnailSizeToggle"'));
+  assert.doesNotMatch(actions, /id="openInventory"[^>]*>☰/);
+  assert.match(actions, /id="openInventory"[^>]*>[\s\S]*class="inventory-icon"/);
+  assert.match(css, /\.shell \{[^}]*width:100%/);
+  assert.match(css, /\.inventory-icon \{[^}]*width:20px/);
 });
 test('miniaturas se pueden ordenar al arrastrar dentro de su sección', () => {
   const app = read('src/app.js'), css = read('src/overrides.css');
@@ -151,10 +203,11 @@ test('los accesos locales muestran un identificador visual diferente', () => {
   assert.match(app, /'tag link-type local-link', '⌂ Archivo local'/);
   assert.match(css, /\.tag\.link-type\.local-link \{[^}]*background: #4b3a25/);
 });
-test('capturar imagen es un enlace discreto y alineado a la derecha', () => {
-  const app = read('src/app.js'), css = read('src/overrides.css');
-  assert.match(app, /node\('a', 'card-recapture', 'Capturar imagen'\)/);
-  assert.match(css, /\[data-theme\] \.card-recapture \{[^}]*margin: 8px 2px 0 auto[^}]*font-weight: 400/);
+test('la captura vive solo en el menú contextual y ya no se crea en la tarjeta', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.doesNotMatch(app, /card-recapture/);
+  assert.match(app, /data-card-action="capture"\]'\)\.onclick = \(\) => run\(\(\) => \{ hideCardMenu\(\); openRecaptureDialog\(access\)/);
+  assert.match(html, /data-card-action="capture"/);
 });
 test('los Workspaces se ordenan al arrastrar sus etiquetas, sin flechas de orden', () => {
   const app = read('src/app.js'), html = read('newtab.html'), css = read('src/overrides.css');
@@ -201,7 +254,19 @@ test('contadores numéricos, iconos sin borde y firma al final', () => {
   assert.match(app, /accessCount\(items.length\)/);
   assert.match(app, /accessCount\(category.accesses.length\)/);
   assert.match(read('src/styles.css'), /\.category-icon \{[^}]*border:0;/);
-  assert.match(html, /<footer class="signature">By.kilex<\/footer>\s*<\/main>/);
+  assert.match(html, /<footer class="signature">[\s\S]*By\.kilex[\s\S]*<\/footer>\s*<\/main>/);
+});
+test('el pie muestra la versión real del manifest y un Feedback accesible a issues', () => {
+  const html = read('newtab.html'), app = read('src/app.js');
+  const manifest = JSON.parse(read('manifest.json')), pkg = JSON.parse(read('package.json'));
+  assert.equal(manifest.version, pkg.version);
+  assert.match(html, /id="footerVersion"/);
+  assert.match(app, /\$\('footerVersion'\)\.textContent = 'v' \+ installedVersion/);
+  assert.match(app, /const installedVersion = chrome\.runtime\.getManifest\(\)\.version/);
+  const footer = html.match(/<footer class="signature">([\s\S]*?)<\/footer>/)[1];
+  assert.match(footer, /By\.kilex/);
+  assert.match(footer, /<a[^>]*href="https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/issues"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>Feedback<\/a>/);
+  assert.match(read('src/overrides.css'), /\.footer-feedback:focus-visible \{ outline: 2px solid #769bff/);
 });
 test('paletas de miniaturas y bordes coordinadas; editar discreto y accesible', () => {
   const css = read('src/overrides.css'), app = read('src/app.js');
@@ -219,11 +284,13 @@ test('paletas de miniaturas y bordes coordinadas; editar discreto y accesible', 
   assert.match(app, /thumb.classList.add\('has-thumbnail'\)/);
   assert.match(app, /img.onerror[^\n]*thumb.classList.remove\('has-thumbnail'\)/);
 });
-test('Estilos es la última sección antes de Guardar configuración', () => {
+test('Estilos y datos permanecen en sus paneles antes de Guardar configuración', () => {
   const form = read('newtab.html').split('id="settingsForm"')[1].split('</form>')[0];
-  assert.ok(form.indexOf('id="stylePresets"') > form.indexOf('id="restorePrevious"'));
-  const after = form.slice(form.indexOf('id="stylePresets"'));
-  assert.match(after, /Guardar configuración/);
+  const designStart = form.indexOf('id="settingsDesignPanel"'), dataStart = form.indexOf('id="settingsDataPanel"');
+  assert.ok(designStart < dataStart);
+  assert.match(form.slice(designStart, dataStart), /id="stylePresets"/);
+  assert.match(form.slice(dataStart), /id="restorePrevious"/);
+  assert.match(form, /Guardar configuración/);
 });
 test('Alegre es claro y Bosque se valida y conserva como estilo', () => {
   assert.equal(THEME_PRESETS.alegre.light, true);
@@ -242,13 +309,18 @@ test('Aurora y Dunas usan fondos locales incluidos y válidos', () => {
     assert.equal(normalizeData(data).settings.backgroundPattern, preset.backgroundPattern);
   }
 });
-test('nombre a 13px, dos líneas, pie transparente y botón importar destacado', () => {
+test('nombre a 11px con color tenue, dos líneas, pie transparente y botón importar destacado', () => {
   const css = read('src/overrides.css');
   const title = css.match(/\.card-footer \.card-title \{([^}]+)\}/)[1];
-  assert.match(title, /font-size: 13px/);
+  assert.match(title, /font-size: 11px/);
+  assert.match(title, /color: #b6b3b3/);
+  assert.match(title, /font-weight: 400/);
   assert.match(title, /-webkit-line-clamp: 2/);
   assert.match(title, /overflow: hidden/);
   assert.match(title, /text-overflow: ellipsis/);
+  assert.match(title, /overflow-wrap: anywhere/);
+  assert.match(title, /line-height: 1\.4/);
+  assert.match(title, /max-height: 2\.8em/);
   assert.match(css, /\.card, \.light-theme \.card \{ border: 0; background: transparent/);
   assert.match(css, /\.card-footer \{[^}]*background: transparent/);
   assert.match(css, /#openBookmarks \{ background: #ffb15c; color: #2a180c/);
@@ -257,14 +329,31 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity']);
-  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead', 'sidePanel']);
+  assert.equal(manifest.optional_host_permissions, undefined);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
-  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/']);
+  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
+  assert.deepEqual(manifest.side_panel, { default_path: 'newtab.html' });
   for (const key of ['content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);
   assert.doesNotMatch(manifest.content_security_policy.extension_pages, /unsafe-eval/);
   for (const path of Object.values(manifest.icons)) assert.ok(existsSync(new URL('../' + path, import.meta.url)));
+});
+test('el panel lateral reutiliza newtab, ofrece menú de acción y conserva el clic normal', () => {
+  const manifest = JSON.parse(read('manifest.json'));
+  const worker = read('src/background.js');
+  const app = read('src/app.js');
+  const html = read('newtab.html');
+  const css = read('src/overrides.css');
+  assert.ok(manifest.permissions.includes('sidePanel'));
+  assert.match(worker, /chrome\.sidePanel\.setOptions\(\{ path: 'newtab\.html', enabled: true \}\)/);
+  assert.match(worker, /chrome\.sidePanel\.open\(\{ windowId \}\)/);
+  assert.match(worker, /title: 'Abrir Side panel', contexts: \['action'\]/);
+  assert.match(worker, /chrome\.action\.onClicked\.addListener\(tab => \{[\s\S]*?openHome\(\)\.catch/);
+  assert.match(html, /id="openSidePanel"[^>]*>Abrir Side panel/);
+  assert.match(app, /chrome\.sidePanel\.open\(\{ windowId: sidePanelWindowId \}\)/);
+  assert.match(css, /@media \(max-width: 480px\)/);
+  assert.match(css, /overflow-x: hidden/);
 });
 test('interfaz: todos los IDs usados existen y son únicos; módulo local sin innerHTML', () => {
   const html = read('newtab.html'), app = read('src/app.js');
@@ -276,7 +365,7 @@ test('interfaz: todos los IDs usados existen y son únicos; módulo local sin in
   assert.doesNotMatch(html, /id="rulesDialog"/);
   assert.match(app, /footer\.append\(status, title\)/);
   assert.match(app, /open\.append\(thumb\)/);
-  assert.match(app, /card\.append\(open, footer, edit, recapture\)/);
+  assert.match(app, /card\.append\(open, footer, edit\)/);
   assert.doesNotMatch(app, /overlay\.append\(node\('div', 'card-title'/);
 });
 test('regresión de CSS: una base, hidden respetado y tag activo claro con contraste', () => {
@@ -285,4 +374,98 @@ test('regresión de CSS: una base, hidden respetado y tag activo claro con contr
   assert.match(overrides, /\[hidden\] \{ display: none !important/);
   assert.match(overrides, /\.light-theme \.workspace-tab\.active:hover \{ background: #2f3437; border-color: #2f3437; color: #fff/);
   assert.match(overrides, /\.card \{ min-height: 0/);
+});
+test('las tarjetas sin miniatura ocultan el texto pero conservan una señal accesible', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /node\('span', 'image-error visually-hidden', 'Sin miniatura'\)/);
+  assert.doesNotMatch(app, /node\('span', 'image-error', 'Sin miniatura'\)/);
+  assert.match(css, /\.visually-hidden \{[^}]*clip: rect\(0 0 0 0\)/);
+});
+test('la zona de miniaturas ocupa el 90% en escritorio y vuelve al 100% en móvil', () => {
+  const css = read('src/overrides.css');
+  assert.match(css, /#workspace \{ width: 90%; margin-inline: auto; \}/);
+  assert.match(css, /@media \(max-width: 600px\) \{ #workspace \{ width: 100%; \} \}/);
+  assert.match(read('src/styles.css'), /\.shell \{[^}]*width:100%/);
+});
+test('showWorkspaceTabs existe, persiste y se aplica sin romper Tags', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), model = read('src/model.js');
+  assert.match(html, /<input id="showWorkspaceTabs" type="checkbox"/);
+  assert.match(model, /showWorkspaceTabs: true/);
+  assert.match(model, /showWorkspaceTabs: typeof s\.showWorkspaceTabs === 'boolean' \? s\.showWorkspaceTabs : true/);
+  assert.match(app, /\$\('showWorkspaceTabs'\)\.checked = s\.showWorkspaceTabs/);
+  assert.match(app, /showWorkspaceTabs: \$\('showWorkspaceTabs'\)\.checked/);
+  assert.match(app, /\$\('workspaceTabs'\)\.hidden = workspaceTabsHidden/);
+  assert.match(html, /id="workspacePicker"/);
+  assert.match(app, /\$\('workspacePicker'\)\.hidden = !workspaceTabsHidden/);
+  assert.match(html, /id="tagRules"/);
+});
+test('el tamaño de miniaturas del panel Diseño deriva su alto y se aplica al guardar', () => {
+  const app = read('src/app.js'), model = read('src/model.js');
+  assert.match(model, /export function thumbnailHeightForSize\(size, fallback\)/);
+  assert.match(app, /const thumbnailSize = \$\('thumbnailSize'\)\.value/);
+  assert.match(app, /thumbnailSize, thumbnailHeight: thumbnailHeightForSize\(thumbnailSize, data\.settings\.thumbnailHeight\)/);
+  assert.match(app, /thumbnailHeightForSize\(control\.dataset\.thumbnailSize/);
+});
+test('el color de borde elegido gana en los temas y el color de tema queda como reserva', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /borderColorOverride\(s\.cardBorderColor\)/);
+  assert.match(app, /removeProperty\('--card-border-color'\)/);
+  assert.match(css, /:root \{[^}]*--card-border-color: #4a4a4a/);
+  for (const theme of ['papel', 'minimalista', 'bosque']) {
+    const palette = [...css.matchAll(new RegExp('\\[data-theme="' + theme + '"\\] \\{([^}]+)\\}', 'g'))].map(match => match[1]).join(' ');
+    assert.match(palette, /--card-border-color:/, 'Falta el color de borde reserva en ' + theme);
+  }
+  assert.match(css, /\[data-theme="papel"\] \.card \.thumb \{[^}]*border-color: var\(--card-border-color\)/);
+  assert.match(css, /:is\(\[data-theme="minimalista"\], \[data-theme="bosque"\]\) \.card \.thumb \{[^}]*border-color: var\(--card-border-color\)/);
+  assert.doesNotMatch(css, /\[data-theme="papel"\] \.card \.thumb \{[^}]*border-color: #b9a28680/);
+  assert.doesNotMatch(css, /:is\(\[data-theme="minimalista"\], \[data-theme="bosque"\]\) \.card \.thumb \{[^}]*border-color: var\(--tile-border\)/);
+});
+test('cardBorder permite tarjetas sin borde y conserva las variantes de estilo', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /\{ none: '0px', soft: '1px', strong: '2px' \}\[s\.cardBorder\]/);
+  assert.match(css, /\.card \.thumb \{ border: var\(--card-border-width/);
+  assert.match(css, /\[data-card-style="soft"\] \.card \.thumb/);
+  assert.match(css, /\[data-card-style="glass"\]/);
+  assert.match(app, /dataset\.cardStyle = s\.cardStyle/);
+});
+test('el ancho reducido simplifica la cabecera con marca oculta y menú de tres puntos', () => {
+  const html = read('newtab.html'), css = read('src/overrides.css');
+  assert.match(html, /id="mainMenuToggle"[^>]*aria-haspopup="menu"/);
+  assert.match(html, /id="mainMenuToggle"[^>]*aria-expanded="false"/);
+  assert.match(html, /id="mainMenuToggle"[^>]*aria-label="M[aá]s acciones"/);
+  const start = html.indexOf('<div class="top-actions">');
+  const actions = html.slice(start, html.indexOf('</div>\n       </header>', start));
+  for (const id of ['thumbnailSizeToggle', 'openInventory', 'newWorkspace', 'editWorkspace', 'openSettings']) {
+    assert.ok(actions.indexOf(`id="${id}"`) < actions.indexOf('id="mainMenuToggle"'));
+  }
+  const menu = html.split('id="mainMenu"')[1].split('</menu>')[0];
+  for (const action of ['edit', 'new', 'thumbnail', 'inventory', 'sync', 'settings', 'tags']) {
+    assert.match(menu, new RegExp('data-main-action="' + action + '"'));
+  }
+  assert.match(menu, /data-narrow-columns="1"/);
+  assert.match(menu, /data-narrow-columns="2"/);
+  assert.match(css, /\[data-narrow="true"\] \.topbar > h1 \{ display: none/);
+  assert.match(css, /\[data-narrow="true"\] #mainMenuToggle \{ display: inline-flex/);
+  assert.match(css, /\[data-narrow="true"\] \.top-actions > :is\(#thumbnailSizeToggle, #openInventory, #newWorkspace, #editWorkspace, #openSettings\) \{ display: none/);
+});
+test('app.js detecta el ancho reducido y alterna picker, pestañas y botón de tres puntos', () => {
+  const app = read('src/app.js');
+  assert.match(app, /matchMedia\('\(max-width: 600px\)'\)/);
+  assert.match(app, /documentElement\.dataset\.narrow = String\(matches\)/);
+  assert.match(app, /addEventListener\('change'/);
+  assert.match(app, /const narrow = document\.documentElement\.dataset\.narrow === 'true'/);
+  assert.match(app, /const workspaceTabsHidden = narrow \|\| data\.settings\.showWorkspaceTabs === false/);
+  assert.match(app, /\$\('workspaceTabs'\)\.hidden = workspaceTabsHidden/);
+  assert.match(app, /\$\('workspacePicker'\)\.hidden = !workspaceTabsHidden/);
+  assert.match(app, /toggle\.hidden = !matches/);
+  assert.match(app, /setAttribute\('aria-expanded', 'false'\)/);
+});
+test('la preferencia narrowColumns se guarda por dispositivo en chrome.storage.local', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /chrome\.storage\.local\.set\(\{ 'nexb\.narrowColumns': narrowColumns \}\)/);
+  assert.match(app, /chrome\.storage\.local\.get\('nexb\.narrowColumns'\)/);
+  assert.match(app, /restoreNarrowColumns/);
+  assert.match(app, /applyNarrowColumns/);
+  assert.match(app, /data-narrow-columns/);
+  assert.match(css, /html\[data-narrow="true"\] \.cards \{ grid-template-columns: repeat\(var\(--narrow-columns, 1\), minmax\(0, 1fr\)\)/);
 });

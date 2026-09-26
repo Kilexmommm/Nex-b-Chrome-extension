@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openOrFocusTab } from '../src/tabs.js';
+import { openOrFocusTab, openOrFocusMany } from '../src/tabs.js';
 import { locks } from './helpers.js';
 
 function mock(tabs = []) {
@@ -24,6 +24,29 @@ test('consulta actual y enfoca la ventana de la pestaña existente', async () =>
   await openOrFocusTab(access, api, locks());
   assert.deepEqual(api.state.updates, [4]); assert.deepEqual(api.state.windows, [9]);
   assert.equal(api.state.creates, 0);
+});
+test('reutiliza la pestaña aunque su URL tenga query o fragmento agregado', async () => {
+  const docAccess = { ...access, matchType: 'document' };
+  for (const url of ['https://example.com/?utm=1', 'https://example.com/#ruta', 'https://example.com/#ruta?x=1']) {
+    const api = mock([{ id: 7, windowId: 3, url }]);
+    await openOrFocusTab(docAccess, api, locks());
+    assert.deepEqual(api.state.updates, [7]);
+    assert.deepEqual(api.state.windows, [3]);
+    assert.equal(api.state.creates, 0);
+  }
+});
+test('reutiliza la pestaña en otra ventana y la enfoca', async () => {
+  const api = mock([{ id: 11, windowId: 42, url: access.url }]);
+  await openOrFocusTab(access, api, locks());
+  assert.deepEqual(api.state.updates, [11]);
+  assert.deepEqual(api.state.windows, [42]);
+  assert.equal(api.state.creates, 0);
+});
+test('estado obsoleto: si la pestaña ya no está, abre exactamente una', async () => {
+  const api = mock();
+  await openOrFocusTab(access, api, locks());
+  assert.equal(api.state.creates, 1);
+  assert.deepEqual(api.state.updates, []);
 });
 test('fallo al enfocar no crea un duplicado', async () => {
   const api = mock([{ id: 4, windowId: 9, url: access.url }]);
@@ -81,4 +104,41 @@ test('conserva errores reales de Chrome sin intentar otro programa', async () =>
   api.extension = { isAllowedFileSchemeAccess: async () => true };
   api.tabs.create = async () => { throw new Error('File URL navigation is not allowed'); };
   await assert.rejects(openOrFocusTab({ url: 'file:///tmp/a.html', matchType: 'exact' }, api, locks()), /File URL navigation is not allowed/);
+});
+
+test('abre en lote: una URL ya abierta se enfoca y no se crea', async () => {
+  const api = mock([{ id: 4, windowId: 9, url: access.url }]);
+  const result = await openOrFocusMany([access], api, locks());
+  assert.deepEqual(result, { opened: 0, focused: 1, failed: 0 });
+  assert.equal(api.state.creates, 0);
+  assert.deepEqual(api.state.updates, [4]);
+  assert.deepEqual(api.state.windows, [9]);
+});
+
+test('abre en lote: una URL nueva se crea', async () => {
+  const api = mock();
+  const result = await openOrFocusMany([{ url: 'https://nueva.example.com/', matchType: 'exact' }], api, locks());
+  assert.deepEqual(result, { opened: 1, focused: 0, failed: 0 });
+  assert.equal(api.state.creates, 1);
+});
+
+test('abre en lote: enlaces repetidos en la sección se procesan una sola vez', async () => {
+  const api = mock();
+  const list = [access, { ...access }, { url: 'https://otra.example.com/', matchType: 'exact' }];
+  const result = await openOrFocusMany(list, api, locks());
+  assert.deepEqual(result, { opened: 2, focused: 0, failed: 0 });
+  assert.equal(api.state.creates, 2);
+});
+
+test('abre en lote: un file:// sin permiso se omite sin abortar los demás', async () => {
+  const api = mock();
+  api.extension = { isAllowedFileSchemeAccess: async () => false };
+  const list = [
+    { url: 'file:///Users/test/a.html', matchType: 'document' },
+    { url: 'https://example.com/', matchType: 'exact' }
+  ];
+  const result = await openOrFocusMany(list, api, locks());
+  assert.deepEqual(result, { opened: 1, focused: 0, failed: 1 });
+  assert.equal(api.state.creates, 1);
+  assert.equal(api.state.tabs[0].pendingUrl, 'https://example.com/');
 });

@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "General", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal" },
+    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", showWorkspaceTabs: true },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -18,6 +18,15 @@ export const THEME_PRESETS = {
     claro: { name: "Claro", accentColor: "#436dba", backgroundColor: "#eaf1ff", backgroundPattern: "linear-gradient(135deg,#f8fbff,#dfeaff)", light: true }
 };
 export const LIMITS = Object.freeze({ image: 8 * 1024 * 1024, archive: 64 * 1024 * 1024, data: 80 * 1024 * 1024, accesses: 2000 });
+export const THUMBNAIL_HEIGHTS = Object.freeze({ small: 101, medium: 144, large: 187 });
+export function thumbnailHeightForSize(size, fallback) {
+    return THUMBNAIL_HEIGHTS[size] ?? fallback;
+}
+// El color de borde predeterminado no cuenta como elección: los temas pueden
+// conservar su propio color mientras el usuario no elija uno distinto.
+export function borderColorOverride(cardBorderColor, defaultColor = DEFAULT_DATA.settings.cardBorderColor) {
+    return typeof cardBorderColor === "string" && cardBorderColor.toLowerCase() !== defaultColor.toLowerCase() ? cardBorderColor : "";
+}
 const fail = (message) => { throw new Error(message); };
 function record(value, label) {
     if (!value || typeof value !== "object" || Array.isArray(value))
@@ -80,6 +89,9 @@ export function imageUrl(value = "") {
     if (!url.startsWith("https:"))
         fail("Las imágenes remotas deben usar HTTPS.");
     return url;
+}
+export function normalizeNarrowColumns(value) {
+    return value === 2 ? 2 : 1;
 }
 export function domainOf(value) {
     try {
@@ -170,12 +182,16 @@ export function normalizeData(stored = DEFAULT_DATA) {
             fail("Color inválido.");
     // Never accept arbitrary CSS from an imported backup.
     const backgroundPattern = Object.values(THEME_PRESETS).some(p => p.backgroundPattern === s.backgroundPattern) ? s.backgroundPattern : "";
+    const thumbnailSize = enumValue(s.thumbnailSize, ["small", "medium", "large", "custom"], "Miniaturas");
+    const fallbackHeight = THUMBNAIL_HEIGHTS[thumbnailSize] ?? 144;
+    const thumbnailHeight = Number.isInteger(s.thumbnailHeight) && s.thumbnailHeight >= 80 && s.thumbnailHeight <= 480 ? s.thumbnailHeight : fallbackHeight;
     return { schemaVersion: 1, workspaces, categories,
         activeWorkspaceId: workspaceIds.has(stored.activeWorkspaceId) ? stored.activeWorkspaceId : workspaces[0].id,
         settings: { themeId, accentColor: s.accentColor, backgroundColor: s.backgroundColor,
             backgroundImageUrl: imageUrl(s.backgroundImageUrl), backgroundPattern,
             captureEnabled: typeof s.captureEnabled === 'boolean' ? s.captureEnabled : true,
-            thumbnailSize: enumValue(s.thumbnailSize, ["small", "medium", "large"], "Miniaturas"),
+            showWorkspaceTabs: typeof s.showWorkspaceTabs === 'boolean' ? s.showWorkspaceTabs : true,
+            thumbnailSize, thumbnailHeight,
             fontFamily: enumValue(s.fontFamily, ["system", "rounded", "serif", "mono"], "Fuente"),
             cardStyle: enumValue(s.cardStyle, ["flat", "soft", "glass"], "Estilo de tarjeta"),
             cardBorder: enumValue(s.cardBorder, ["none", "soft", "strong"], "Borde de tarjeta"),
@@ -184,9 +200,8 @@ export function normalizeData(stored = DEFAULT_DATA) {
             iconStyle: enumValue(s.iconStyle, ["minimal", "filled", "round"], "Estilo de icono") },
         autoTagRules: validateRules(stored.autoTagRules ?? DEFAULT_DATA.autoTagRules) };
 }
-export function documentKey(value) {
-    const url = new URL(webUrl(value));
-    // Document IDs are case sensitive. Unknown apps keep query and fragment.
+function appDocumentId(url) {
+    // Document IDs are case sensitive.
     if (url.hostname === "docs.google.com") {
         const match = url.pathname.match(/^\/(document|spreadsheets|presentation)\/(?:u\/\d+\/)?d\/([^/]+)/);
         if (match)
@@ -208,7 +223,28 @@ export function documentKey(value) {
         if (match)
             return url.origin + "/app/board/" + match[1];
     }
-    return url.href;
+    return null;
+}
+// Identidad de documento usada por el inventario: para sitios desconocidos
+// conserva la mayor precision posible (URL completa con query y fragmento).
+export function documentKey(value) {
+    const url = new URL(webUrl(value));
+    return appDocumentId(url) ?? url.href;
+}
+// Origen comparable: mismo protocolo, host y puerto, tratando www. como alias.
+// Evita duplicados cuando el sitio redirige entre example.com y www.example.com.
+export function matchOrigin(value) {
+    const url = new URL(webUrl(value));
+    return url.protocol + "//" + url.hostname.replace(/^www\./, "") + (url.port ? ":" + url.port : "");
+}
+// Identidad de documento usada para abrir/enfocar accesos. El fragmento nunca
+// cambia el recurso y la query suele ser efimera (seguimiento, sesion), por lo
+// que para sitios desconocidos el documento queda definido por origen + ruta.
+// Es la misma clave que construye el indicador "abierto" en app.js, de modo que
+// un punto verde garantiza que el clic enfoca en vez de duplicar.
+export function documentMatchKey(value) {
+    const url = new URL(webUrl(value));
+    return appDocumentId(url) ?? (matchOrigin(value) + url.pathname);
 }
 export function matches(access, tabUrl) {
     try {
@@ -217,10 +253,10 @@ export function matches(access, tabUrl) {
         if (url.startsWith("file:"))
             return url === accessUrl(tabUrl);
         if (access.matchType === "domain")
-            return new URL(webUrl(access.url)).origin === new URL(webUrl(tabUrl)).origin;
+            return matchOrigin(access.url) === matchOrigin(tabUrl);
         if (access.matchType === "exact")
             return webUrl(access.url) === webUrl(tabUrl);
-        return documentKey(access.url) === documentKey(tabUrl);
+        return documentMatchKey(access.url) === documentMatchKey(tabUrl);
     }
     catch {
         return false;

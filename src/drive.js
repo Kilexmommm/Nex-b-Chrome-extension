@@ -66,7 +66,7 @@ export async function blobDataUrl(blob) {
 async function listFiles(token) {
   const query = encodeURIComponent("'appDataFolder' in parents and trashed = false");
   // Google Drive limita cada página; nextPageToken permite recorrer toda la carpeta.
-  const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,size,modifiedTime)');
+  const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,size,modifiedTime,appProperties)');
   const files = [];
   let pageToken = '';
   do {
@@ -79,9 +79,9 @@ async function listFiles(token) {
   return files;
 }
 
-async function uploadFile(token, existingId, name, blob, mimeType) {
+async function uploadFile(token, existingId, name, blob, mimeType, hash) {
   const boundary = 'nexb-' + crypto.randomUUID();
-  const metadata = JSON.stringify(existingId ? { name, mimeType } : { name, parents: ['appDataFolder'], mimeType });
+  const metadata = JSON.stringify(existingId ? { name, mimeType, appProperties: { nexbHash: hash } } : { name, parents: ['appDataFolder'], mimeType, appProperties: { nexbHash: hash } });
   const body = new Blob([
     '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n', metadata,
     '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n', blob,
@@ -94,8 +94,7 @@ async function uploadFile(token, existingId, name, blob, mimeType) {
 
 async function downloadFile(token, id) {
   const response = await request(DRIVE_API + '/files/' + encodeURIComponent(id) + '?alt=media', token);
-  const blob = await response.blob();
-  return { dataUrl: await blobDataUrl(blob), hash: await imageHash(blob) };
+  return blobDataUrl(await response.blob());
 }
 
 async function deleteFile(token, id) {
@@ -116,21 +115,37 @@ export async function syncDriveImages(data) {
         const local = dataUrlBlob(access.thumbnail);
         const existing = byName.get(name) || (access.driveImageId ? files.find(file => file.id === access.driveImageId) : null);
         if (local) {
-          const hash = await imageHash(local.blob);
-          // Si el contenido no cambió, no se vuelve a subir la misma imagen.
-          if (access.driveImageId && access.driveImageHash === hash) {
-            unchanged++;
-          } else {
-            const id = await uploadFile(token, existing?.id || access.driveImageId, name, local.blob, local.mimeType);
-            access.driveImageId = id;
-            access.driveImageHash = hash;
-            byName.set(name, { id, name, mimeType: local.mimeType });
-            uploaded++;
+          const localHash = await imageHash(local.blob);
+          const sameAsLocal = access.driveImageHash && access.driveImageHash === localHash;
+          const remoteHash = existing?.appProperties?.nexbHash || '';
+          if (existing && !access.driveImageHash) {
+            access.thumbnail = await downloadFile(token, existing.id);
+            const downloadedImage = dataUrlBlob(access.thumbnail);
+            if (downloadedImage) access.driveImageHash = remoteHash || await imageHash(downloadedImage.blob);
+            access.driveImageId = existing.id;
+            downloaded++;
+            continue;
           }
+          if (existing && access.driveImageHash && !sameAsLocal && remoteHash && remoteHash !== access.driveImageHash)
+            throw new Error('Conflicto: esta miniatura cambió también en otro computador. No se sobrescribió.');
+          // Si el contenido no cambió, no se vuelve a subir la misma imagen.
+          if (sameAsLocal && existing) {
+            if (remoteHash && remoteHash !== localHash) {
+              access.thumbnail = await downloadFile(token, existing.id);
+              access.driveImageHash = remoteHash;
+              downloaded++;
+            } else unchanged++;
+            continue;
+          }
+          const id = await uploadFile(token, existing?.id || access.driveImageId, name, local.blob, local.mimeType, localHash);
+          access.driveImageId = id;
+          access.driveImageHash = localHash;
+          byName.set(name, { id, name, mimeType: local.mimeType, appProperties: { nexbHash: localHash } });
+          uploaded++;
         } else if (!access.thumbnail && access.driveImageId) {
-          const image = await downloadFile(token, access.driveImageId);
-          access.thumbnail = image.dataUrl;
-          access.driveImageHash = image.hash;
+          access.thumbnail = await downloadFile(token, access.driveImageId);
+          const downloadedImage = dataUrlBlob(access.thumbnail);
+          if (downloadedImage) access.driveImageHash = await imageHash(downloadedImage.blob);
           downloaded++;
         } else if (!access.thumbnail) skipped++;
       } catch (error) {

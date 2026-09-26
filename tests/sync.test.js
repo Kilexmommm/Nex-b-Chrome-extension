@@ -28,6 +28,36 @@ test('mergeSyncData conserva miniaturas locales al aplicar metadatos remotos', (
   assert.equal(merged.categories[0].accesses[0].thumbnail, 'https://example.com/image.png');
 });
 
+test('mergeSyncData no revierte el tamaño de miniaturas local', () => {
+  const local = fixture();
+  local.settings.thumbnailSize = 'custom';
+  local.settings.thumbnailHeight = 320;
+  const remote = projectSyncData(local);
+  remote.settings.thumbnailSize = 'medium';
+  remote.settings.thumbnailHeight = 144;
+  const merged = mergeSyncData(local, remote);
+  assert.equal(merged.settings.thumbnailSize, 'custom');
+  assert.equal(merged.settings.thumbnailHeight, 320);
+});
+
+test('mergeSyncData conserva un workspace/categoría/acceso creado localmente que remoto todavía no conoce', () => {
+  const local = fixture();
+  const remote = projectSyncData(local);
+  // El remoto representa el estado de ANTES de crear el workspace nuevo
+  // (el caso real: se crea localmente y, antes de que el próximo push a
+  // sync lo suba, corre una sincronización que trae este remoto viejo).
+  local.workspaces.push({ id: 'nuevo-ws', name: 'Nuevo Workspace', type: 'standard' });
+  local.categories.push({ id: 'nueva-cat', name: 'Nueva Categoría', workspaceId: 'nuevo-ws', parentId: '', accesses: [
+    { id: 'nuevo-acceso', title: 'Acceso nuevo', url: 'https://example.com/nuevo', tags: [], thumbnail: '', matchType: 'document' },
+  ] });
+  local.categories[0].accesses.push({ id: 'otro-acceso-existente-cat', title: 'Otro acceso', url: 'https://example.com/otro', tags: [], thumbnail: '', matchType: 'document' });
+  const merged = mergeSyncData(local, remote);
+  assert.ok(merged.workspaces.some(w => w.id === 'nuevo-ws'), 'el workspace nuevo no debe desaparecer');
+  assert.ok(merged.categories.some(c => c.id === 'nueva-cat'), 'la categoría nueva no debe desaparecer');
+  assert.ok(merged.categories.find(c => c.id === 'nueva-cat').accesses.some(a => a.id === 'nuevo-acceso'), 'el acceso de la categoría nueva no debe desaparecer');
+  assert.ok(merged.categories[0].accesses.some(a => a.id === 'otro-acceso-existente-cat'), 'un acceso nuevo en una categoría ya existente en remoto no debe desaparecer');
+});
+
 test('createSyncStore guarda por fragmentos y recupera la proyección', async () => {
   const area = memoryArea(), store = createSyncStore(area), data = fixture();
   data.categories[0].accesses[0].title = 'x'.repeat(SYNC_CHUNK_BYTES * 2);
@@ -57,4 +87,13 @@ test('createSyncStore marca como dañados los fragmentos ilegibles', async () =>
   await store.save(fixture());
   await area.set({ [SYNC_CHUNK_PREFIX + '0']: 'e30x' });
   await assert.rejects(store.load(), SyncCorruptError);
+});
+
+test('mergeSyncData no duplica un acceso movido de categoría en este equipo', () => {
+  const local = fixture();
+  local.categories.push({ id: 'destino', name: 'Destino', workspaceId: local.workspaces[0].id, parentId: '', accesses: [] });
+  const remote = projectSyncData(local);
+  local.categories[1].accesses.push(local.categories[0].accesses.pop());
+  const merged = mergeSyncData(local, remote);
+  assert.equal(merged.categories.flatMap(c => c.accesses).filter(a => a.id === 'saved').length, 1);
 });

@@ -1,4 +1,4 @@
-# nex.b · 1.7.5
+# nex.b · 1.9.1
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -64,9 +64,32 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ## Últimas actualizaciones
 
+### Novedades 1.9.1
+
+- **Versión unificada:** reúne la línea 1.8.1 (Side Panel adaptable y abrir toda una sección) con la 1.9.0 (enfoque sin pestaña duplicada, Diseño persistente, borrado seguro de Workspace e integración continua) en una sola entrega.
+- **Side Panel con ancho reducido:** oculta la marca, cambia las pestañas por un selector de Workspace, agrupa las acciones en un menú ⋮ y permite 1 o 2 miniaturas por fila, guardado por dispositivo.
+- **Abrir toda una sección:** el botón ⧉ de cada sección/subsección abre todos sus accesos y enfoca los que ya están abiertos.
+
+### Novedades 1.9.0
+
+- **Enfoque sin pestaña duplicada:** al abrir un acceso se busca primero si su documento o dominio ya está abierto y se enfoca esa pestaña y su ventana. El indicador de «abierto» y la reutilización comparten la misma identidad, de modo que una URL con `?consulta`, `#fragmento` o `www.` de más ya no abre una copia.
+- **Diseño que persiste y se aplica:** el alto de miniaturas se deriva del tamaño elegido y se guarda; el color de borde elegido se aplica y, si coincide con el predeterminado, cada tema conserva su propio borde como reserva.
+- **Eliminación segura de Workspace:** Editar Workspace permite eliminar un Workspace con un resumen previo de categorías, subcategorías y accesos. Exige confirmación, no permite borrar el último Workspace, navega a otro existente y conserva la copia anterior como respaldo local restaurable desde Configuración → Datos.
+- **Integración continua:** GitHub Actions ejecuta `npm test` con Node.js 20 en cada `pull_request` y en cada push a `main`. Se añade `CONTRIBUTING.md` con requisitos, ejecución de pruebas y alcance de los cambios.
+
+Detalle completo: [Novedades 1.9.0](docs/NOVEDADES-1.9.0.md).
+
+### Novedades 1.8.0
+
+- **Encabezado reorganizado:** marca, Workspaces y Tags a la izquierda; acciones a la derecha en orden Alto de miniaturas, Inventario, + Workspace, Editar Workspace y Configurar. El Inventario usa un icono de ventanas en lugar de `☰`.
+- **Configuración con navegación lateral:** General, Diseño, Sincronizar y Datos/Respaldo en una columna, con botón X de cierre y navegación por teclado.
+- **Side Panel de Chrome:** abre nex.b en el panel lateral derecho desde el menú de la extensión, reutilizando la misma interfaz y sin duplicar datos.
+- **Home más compacto:** la zona de miniaturas usa el 90% en escritorio; el título de cada acceso es más ligero (11 px, `#b6b3b3`); se quitó el texto «Sin miniatura» y «Capturar imagen» del home (la captura queda en el menú de clic derecho).
+- **Nuevo ajuste** para mostrar u ocultar las pestañas de Workspace.
+
 ### Inventario de pestañas (PR #9)
 
-- El botón ☰ permite buscar pestañas abiertas, reunir las visibles o seleccionadas, guardar accesos sin duplicar documentos en el Workspace y revisar copias repetidas.
+- El botón de Inventario permite buscar pestañas abiertas, reunir las visibles o seleccionadas, guardar accesos sin duplicar documentos en el Workspace y revisar copias repetidas.
 - Se consulta bajo demanda, sin sondeo ni trabajo adicional permanente en el service worker. El listado se inserta en bloque y Chrome puede omitir el renderizado de filas fuera de pantalla.
 - Antes de cerrar o reunir seleccionadas se comprueba que sigan en la misma URL. El cierre de duplicados excluye pestañas navegando, fijadas o reproduciendo audio, y no incluye copias nuevas que no aparecían en el listado.
 - Las acciones esperan a terminar antes de aceptar otro clic en el mismo botón. El cierre de pestañas puede afectar trabajo no guardado; revisa la selección antes de confirmar.
@@ -231,7 +254,7 @@ La importación es manual, no una sincronización continua. Solo crea una secci�
 - Desde una página HTTP/HTTPS, el menú contextual o el icono de la extensión abre un acceso pendiente. Revisa la captura y selecciona la categoría antes de guardar.
 - Al agregar un enlace con clic derecho no se captura la página de origen: no representa necesariamente el enlace guardado.
 - Sin categorías se ofrece crear “General” junto con el acceso, solamente al guardar.
-- Al final del Workspace, **Capturar imágenes faltantes** solicita un permiso opcional y recorre las páginas web sin miniatura en una pestaña temporal. Las pestañas cambian de forma visible; se omiten los accesos `file://` y no se reemplazan miniaturas existentes.
+- Al final del Workspace, **Capturar imágenes faltantes** recorre las páginas web sin miniatura en una pestaña temporal. Las pestañas cambian de forma visible; se omiten los accesos `file://` y no se reemplazan miniaturas existentes.
 
 ### Sincronización entre computadores
 
@@ -272,10 +295,10 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | `unlimitedStorage` | Almacenar miniaturas sin la cuota estándar de la extensión. |
 | `identity` | Solicitar el token OAuth de Google para Drive; Chrome gestiona el token y no se guarda en la extensión. |
 | `bookmarks` — opcional | Leer favoritos al solicitar una importación; el código no modifica los favoritos. |
-| `http://*/*`, `https://*/*` — opcionales | Capturar imágenes faltantes en lote, solo después de pulsar el botón y aceptar el permiso. |
+| `http://*/*`, `https://*/*` | Capturar imágenes faltantes en lote en la pestaña temporal iniciada por el usuario. |
 | `https://www.googleapis.com/` | Comunicar con Google Drive para subir y descargar miniaturas privadas. |
 
-El acceso opcional a sitios no se solicita durante la instalación. La captura masiva puede incluir información privada; revisa el resultado antes de compartir un respaldo. La extensión no inyecta scripts en las páginas.
+La captura masiva puede incluir información privada; revisa el resultado antes de compartir un respaldo. La extensión no inyecta scripts en las páginas.
 
 ## Estructura del proyecto
 

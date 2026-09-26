@@ -15,7 +15,7 @@ body {
   background:#212121
 }
 .shell {
-  width:80%;
+  width:100%;
   max-width:none;
   margin:0 auto;
   padding:28px 32px 70px
@@ -34,6 +34,12 @@ body {
 .icon-button {
   min-width:37px;
   padding-inline:0
+}
+.inventory-icon {
+  width:20px;
+  height:20px;
+  display:block;
+  margin:auto
 }
 .workspace-row {
   display:flex;
@@ -152,7 +158,7 @@ h2 {
 }
 .cards {
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(var(--card-min-width),1fr));
+  grid-template-columns:repeat(auto-fill,minmax(min(var(--card-min-width),100%),1fr));
   gap:var(--card-gap,16px)
 }
 .card {
@@ -270,31 +276,49 @@ h2 {
   min-width:160px;
   margin:0;
   padding:5px;
-  background:#1d2639;
-  border:1px solid #455476;
+  background:#2b2b2b;
+  border:1px solid #555;
   border-radius:7px;
-  box-shadow:0 12px 30px #0007
+  box-shadow:0 12px 30px #0007;
+  list-style:none
 }
 .card-menu button {
-  display:block;
+  display:flex;
+  align-items:center;
+  gap:11px;
   width:100%;
   border:0;
   border-radius:4px;
   padding:8px 10px;
   background:transparent;
-  color:#eaf0ff;
+  color:#f0f0f0;
   text-align:left;
   font:13px inherit;
   cursor:pointer
 }
 .card-menu button:hover {
-  background:#33466e
+  background:#454545
+}
+.card-menu .menu-icon {
+  display:inline-grid;
+  place-items:center;
+  width:24px;
+  flex:0 0 24px;
+  color:#d8d8d8;
+  font-size:18px;
+  line-height:1
+}
+.card-menu .menu-separator {
+  height:1px;
+  margin:7px 3px;
+  background:#fff;
+  opacity:.9
 }
 .card-menu button.danger {
   color:#ffb5ba
 }
 .card-menu button.danger:hover {
-  background:#65363e
+  background:#4d3838
 }
 dialog {
   border:0;
@@ -314,6 +338,19 @@ dialog {
   max-width:1200px;
   max-height:85vh;
   overflow:auto
+}
+.settings-layout {
+  display:grid;
+  grid-template-columns:180px minmax(0,1fr);
+  gap:24px;
+  min-height:0
+}
+.settings-content {
+  min-width:0;
+  min-height:0;
+  max-height:calc(85vh - 150px);
+  overflow-y:auto;
+  padding-right:4px
 }
 .setting-grid {
   display:grid;
