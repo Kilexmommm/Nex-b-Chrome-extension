@@ -8,7 +8,7 @@ import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSectio
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
-import { createSyncStore, mergeSyncData } from './sync.js';
+import { createSyncStore, mergeSyncData, SyncCorruptError } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
@@ -1176,13 +1176,22 @@ async function syncNow() {
       await chrome.storage.local.set({ nexbSyncEnabled: true });
     }
     setSyncStatus('Leyendo datos sincronizados…');
-    const remote = await syncStore.load();
-    if (remote) {
-      const merged = mergeSyncData(data, remote.data);
-      if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+    let repaired = false;
+    try {
+      const remote = await syncStore.load();
+      if (remote) {
+        const merged = mergeSyncData(data, remote.data);
+        if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+      }
+    } catch (error) {
+      // Sin reparar, la copia remota dañada fallaría en cada apertura.
+      if (!(error instanceof SyncCorruptError)) throw error;
+      repaired = true;
     }
     const saved = await syncStore.save(data);
-    setSyncStatus('Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.');
+    setSyncStatus(repaired
+      ? 'La copia sincronizada estaba dañada y se reemplazó con la de este equipo.'
+      : 'Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.', repaired);
   } catch (error) {
     setSyncStatus(error.message || 'No se pudo sincronizar; se conserva la copia local.', true);
     throw error;
@@ -1364,6 +1373,17 @@ chrome.tabs.onUpdated.addListener((_id, change) => { if (change.url || change.st
 chrome.tabs.onCreated.addListener(scheduleTabRefresh);
 chrome.tabs.onRemoved.addListener(scheduleTabRefresh);
 chrome.tabs.onReplaced.addListener(scheduleTabRefresh);
+
+// Solo debe quedar una pestaña de nex.b: al abrir otra, las anteriores se
+// cierran salvo que tengan un formulario abierto o trabajo en curso.
+const homeChannel = new BroadcastChannel('nexb-home');
+homeChannel.onmessage = async event => {
+  if (event.data !== 'opened') return;
+  if (saving || syncBusy || captureBusy || recaptureBusy || imageBusy || bookmarkBusy || document.querySelector('dialog[open]')) return;
+  const tab = await chrome.tabs.getCurrent().catch(() => null);
+  if (Number.isInteger(tab?.id)) chrome.tabs.remove(tab.id).catch(() => {});
+};
+homeChannel.postMessage('opened');
 
 async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });

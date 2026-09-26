@@ -4,6 +4,10 @@ export const SYNC_MANIFEST_KEY = 'nexb.sync.manifest';
 export const SYNC_CHUNK_PREFIX = 'nexb.sync.chunk.';
 export const SYNC_CHUNK_BYTES = 6000;
 
+// La copia remota se puede leer pero no es válida (p. ej. fragmentos de dos
+// equipos mezclados). La copia local sigue siendo la fuente fiable.
+export class SyncCorruptError extends Error {}
+
 function base64Encode(value) {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -44,7 +48,7 @@ export function projectSyncData(data) {
 }
 
 export function mergeSyncData(local, remote) {
-  if (!remote || remote.schemaVersion !== 1) throw new Error('La configuración sincronizada no es compatible.');
+  if (!remote || remote.schemaVersion !== 1) throw new SyncCorruptError('La configuración sincronizada no es compatible.');
   const images = localImages(local);
   const candidate = structuredClone(remote);
   candidate.activeWorkspaceId = local.activeWorkspaceId;
@@ -56,7 +60,8 @@ export function mergeSyncData(local, remote) {
       if (localAccess?.bookmarkMissing !== undefined) access.bookmarkMissing = localAccess.bookmarkMissing;
     }
   }
-  return normalizeData(candidate);
+  try { return normalizeData(candidate); }
+  catch (cause) { throw new SyncCorruptError('La configuración sincronizada no es válida: ' + cause.message, { cause }); }
 }
 
 export function createSyncStore(area) {
@@ -84,7 +89,7 @@ export function createSyncStore(area) {
       const stored = await area.get(keys);
       if (keys.some(key => typeof stored[key] !== 'string')) throw new Error('Faltan datos sincronizados; se conserva la copia local.');
       try { return { revision: manifest.revision, data: JSON.parse(base64Decode(keys.map(key => stored[key]).join(''))) }; }
-      catch { throw new Error('Los datos sincronizados están dañados; se conserva la copia local.'); }
+      catch { throw new SyncCorruptError('Los datos sincronizados están dañados; se conserva la copia local.'); }
     }
   };
 }
