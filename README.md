@@ -1,4 +1,4 @@
-# nex.b · 1.9.1
+# nex.b · 2.0
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,16 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0
+
+- **Sin «Identificador duplicado»:** mover un acceso de categoría ya no lo duplica al sincronizar con Chrome. Si la copia sincronizada llega dañada, se reemplaza con la de este equipo en vez de fallar en cada apertura.
+- **Una sola pestaña de nex.b:** al abrir una nueva, las anteriores se cierran salvo que tengan un formulario abierto o trabajo en curso. El Side Panel no cierra pestañas.
+- **Captura masiva robusta:** espera a que cada página cargue y se pinte, se puede cancelar y guarda por lotes.
+- **Imágenes en Drive por hash:** no vuelve a subir imágenes sin cambios, recorre carpetas grandes y permite limpiar imágenes huérfanas a mano.
+- **Menos memoria:** la sincronización y la validación ya no serializan todas las miniaturas en cada guardado.
+
+Detalle completo: [Novedades 2.0](docs/NOVEDADES-2.0.md).
 
 ### Novedades 1.9.1
 

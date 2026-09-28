@@ -262,6 +262,7 @@ test('el pie muestra la versión real del manifest y un Feedback accesible a iss
   assert.equal(manifest.version, pkg.version);
   assert.match(html, /id="footerVersion"/);
   assert.match(app, /\$\('footerVersion'\)\.textContent = 'v' \+ installedVersion/);
+  assert.equal('2.0.0'.replace(/^(\d+\.\d+)\.0$/, '$1'), '2.0');
   assert.match(app, /const installedVersion = chrome\.runtime\.getManifest\(\)\.version/);
   const footer = html.match(/<footer class="signature">([\s\S]*?)<\/footer>/)[1];
   assert.match(footer, /By\.kilex/);

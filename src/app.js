@@ -9,7 +9,7 @@ import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
-import { createSyncStore, mergeSyncData, SyncCorruptError } from './sync.js';
+import { createSyncStore, mergeSyncData, projectSyncData, SyncCorruptError } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
@@ -1391,7 +1391,9 @@ async function syncNow() {
       const remote = await syncStore.load();
       if (remote) {
         const merged = mergeSyncData(data, remote.data);
-        if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+        // Se comparan solo los datos sincronizables: serializar las miniaturas
+        // tras cada cambio dispararía la memoria con bibliotecas grandes.
+        if (JSON.stringify(projectSyncData(merged)) !== JSON.stringify(projectSyncData(data))) await commit(merged);
       }
     } catch (error) {
       // Sin reparar, la copia remota dañada fallaría en cada apertura.
@@ -1624,7 +1626,8 @@ async function initialize() {
   adopt(snapshot); ready = true;
   const installedVersion = chrome.runtime.getManifest().version;
   $('extensionVersion').textContent = installedVersion;
-  $('footerVersion').textContent = 'v' + installedVersion;
+  // 2.0.0 se muestra como 2.0; un parche distinto de cero se conserva (2.0.1).
+  $('footerVersion').textContent = 'v' + installedVersion.replace(/^(\d+\.\d+)\.0$/, '$1');
   await updateSyncAccount();
   if (syncEnabled) await syncNow().catch(() => {});
   if (snapshot.recovered) showMessage('Se recuperó la copia anterior en memoria. Descarga un ZIP antes de continuar; los datos originales no se sobrescribieron.');

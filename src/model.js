@@ -114,11 +114,37 @@ export function validateRules(value) {
     }
     return rules;
 }
+// Mide el tamaño aproximado en JSON sin construir la cadena completa: con
+// miniaturas en base64, JSON.stringify duplicaba decenas de MB en cada guardado.
+function exceedsSize(value, limit) {
+    let size = 0;
+    const stack = [value];
+    while (stack.length) {
+        const item = stack.pop();
+        if (typeof item === "string")
+            size += item.length + 2;
+        else if (Array.isArray(item)) {
+            size += 2 + item.length;
+            stack.push(...item);
+        }
+        else if (item && typeof item === "object") {
+            for (const [key, child] of Object.entries(item)) {
+                size += key.length + 4;
+                stack.push(child);
+            }
+        }
+        else
+            size += 8;
+        if (size > limit)
+            return true;
+    }
+    return false;
+}
 export function normalizeData(stored = DEFAULT_DATA) {
     record(stored, "Configuración");
     if (!Array.isArray(stored.categories))
         fail('La configuración no contiene categorías válidas.');
-    if (JSON.stringify(stored).length > LIMITS.data)
+    if (exceedsSize(stored, LIMITS.data))
         fail("Configuración demasiado grande.");
     if (stored.schemaVersion !== undefined && stored.schemaVersion !== 1)
         fail("Versión de configuración no compatible.");
