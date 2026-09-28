@@ -70,6 +70,7 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 - **Una sola pestaña de nex.b:** al abrir una nueva, las anteriores se cierran salvo que tengan un formulario abierto o trabajo en curso. El Side Panel no cierra pestañas.
 - **Captura masiva robusta:** espera a que cada página cargue y se pinte, se puede cancelar y guarda por lotes.
 - **Imágenes en Drive por hash:** no vuelve a subir imágenes sin cambios, recorre carpetas grandes y permite limpiar imágenes huérfanas a mano.
+- **Buscar por nombre:** la lupa junto a Tags abre un campo que filtra las miniaturas por nombre en el Workspace (con sus secciones) y en la vista de Tags. No distingue acentos ni mayúsculas; Esc lo cierra.
 - **Menos memoria:** la sincronización y la validación ya no serializan todas las miniaturas en cada guardado.
 
 Detalle completo: [Novedades 2.0](docs/NOVEDADES-2.0.md).

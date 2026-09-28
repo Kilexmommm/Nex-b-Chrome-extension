@@ -6,6 +6,7 @@
 - **Una sola pestaña de nex.b:** al abrir una pestaña nueva de nex.b, las anteriores se cierran solas. No se cierran las que tienen un formulario abierto o un guardado, sincronización, captura o imagen en curso. Abrir el Side Panel no cierra pestañas.
 - **Captura masiva robusta:** espera la navegación y el pintado de cada página, respeta el límite de capturas por segundo de Chrome, se puede cancelar y guarda por lotes sin reemplazar miniaturas existentes.
 - **Imágenes en Google Drive por hash:** no vuelve a subir una imagen sin cambios, recorre todas las páginas de la carpeta privada, detecta cambios hechos en otro equipo, explica un Client ID de OAuth inválido y ofrece limpiar a mano las imágenes huérfanas.
+- **Buscar por nombre:** la lupa al final de la fila de Workspaces y Tags abre un campo que filtra las miniaturas por nombre mientras escribes. En el Workspace oculta las secciones sin coincidencias; en Tags, los grupos vacíos. No distingue acentos ni mayúsculas y Esc lo limpia y cierra.
 - **Menos memoria:** la sincronización compara solo los datos sincronizables y la validación mide el tamaño sin serializar todas las miniaturas en cada guardado.
 - **Versión en el pie:** el pie muestra `v2.0` junto al enlace de Feedback.
 

@@ -21,6 +21,7 @@ let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = f
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
 let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
+let searchQuery = '', searchTimer = null;
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
@@ -407,17 +408,40 @@ function render() {
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
   $('workspace').replaceChildren();
-  $('emptyState').textContent = viewMode === 'tags' ? 'Aún no hay accesos con tags en tus Workspaces.' : 'Agrega una categoría para empezar a organizar tus accesos.';
+  $('emptyState').textContent = searchQuery ? 'Ningún acceso coincide con «' + $('accessSearch').value.trim() + '».'
+    : viewMode === 'tags' ? 'Aún no hay accesos con tags en tus Workspaces.' : 'Agrega una categoría para empezar a organizar tus accesos.';
   if (viewMode === 'tags') renderTagView();
   else {
     const categories = currentCategories();
-    $('emptyState').hidden = categories.length > 0;
+    const visible = category => category.accesses.filter(matchesSearch);
+    let shown = 0;
     for (const category of categories.filter(c => !c.parentId)) {
-      renderCategory(category, false);
-      for (const child of categories.filter(c => c.parentId === category.id)) renderCategory(child, true);
+      const children = categories.filter(c => c.parentId === category.id).map(child => [child, visible(child)]);
+      const own = visible(category);
+      // Al buscar, se ocultan las secciones sin coincidencias propias ni en sus subsecciones.
+      if (searchQuery && !own.length && !children.some(([, items]) => items.length)) continue;
+      renderCategory(category, false, own); shown++;
+      for (const [child, items] of children) if (!searchQuery || items.length) renderCategory(child, true, items);
     }
+    $('emptyState').hidden = shown > 0;
   }
   updateStatuses();
+}
+// Sin acentos ni mayúsculas: «diseno» encuentra «Diseño».
+const searchText = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const matchesSearch = access => !searchQuery || searchText(access.title).includes(searchQuery);
+function setSearch(value) {
+  const query = searchText(value);
+  if (query === searchQuery) return;
+  searchQuery = query;
+  render();
+}
+function closeSearch() {
+  clearTimeout(searchTimer);
+  $('accessSearch').value = '';
+  $('accessSearch').hidden = true;
+  $('searchToggle').setAttribute('aria-expanded', 'false');
+  setSearch('');
 }
 function renderTagView() {
   const groups = new Map();
@@ -426,6 +450,10 @@ function renderTagView() {
       if (!groups.has(tag)) groups.set(tag, []);
       groups.get(tag).push({ access, category });
     }
+  }
+  if (searchQuery) for (const [tag, items] of groups) {
+    const matching = items.filter(({ access }) => matchesSearch(access));
+    if (matching.length) groups.set(tag, matching); else groups.delete(tag);
   }
   $('emptyState').hidden = groups.size > 0;
   const entries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -457,7 +485,7 @@ function renderTagView() {
   }
   appendGroups();
 }
-function renderCategory(category, subcategory) {
+function renderCategory(category, subcategory, accesses = category.accesses) {
   const section = node('section', 'category' + (subcategory ? ' subcategory' : ''));
   const heading = node('div', 'category-heading');
   const actions = node('div', 'category-actions');
@@ -473,10 +501,10 @@ function renderCategory(category, subcategory) {
     control.disabled = position + direction < 0 || position + direction >= siblings.length;
     actions.append(control);
   }
-  heading.append(node('h2', '', category.name), accessCount(category.accesses.length), actions);
+  heading.append(node('h2', '', category.name), accessCount(accesses.length), actions);
   const cards = node('div', 'cards');
-  category.accesses.forEach(access => cards.append(makeCard(access, category.id)));
-  cards.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'add-card'));
+  accesses.forEach(access => cards.append(makeCard(access, category.id)));
+  if (!searchQuery) cards.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'add-card'));
   section.append(heading, cards);
   $('workspace').append(section);
 }
@@ -1189,6 +1217,21 @@ onClick('newCategory', () => {
   openDialog('categoryDialog');
 });
 onClick('tagRules', () => { viewMode = viewMode === 'tags' ? 'workspace' : 'tags'; render(); });
+onClick('searchToggle', () => {
+  const input = $('accessSearch');
+  if (!input.hidden && !input.value.trim()) { closeSearch(); return; }
+  input.hidden = false;
+  $('searchToggle').setAttribute('aria-expanded', 'true');
+  input.focus();
+});
+$('accessSearch').oninput = () => {
+  // Espera a que se deje de escribir para no redibujar en cada tecla.
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => setSearch($('accessSearch').value), 150);
+};
+$('accessSearch').onkeydown = event => {
+  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeSearch(); $('searchToggle').focus(); }
+};
 onSubmit('moveSectionForm', async () => {
   const workspaceId = $('moveSectionWorkspace').value;
   await commit(moveSection(data, $('moveSectionDialog').dataset.sectionId, workspaceId));
