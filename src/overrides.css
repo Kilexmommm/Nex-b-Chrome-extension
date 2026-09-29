@@ -311,3 +311,11 @@ dialog::backdrop { background: #00000099; }
 
 /* Tipo de enlace: los archivos locales no se confunden con sitios web. */
 [data-theme] .tag.link-type.local-link { background: #4b3a25; color: #f0c889; }
+/* Buscador por nombre al final de la fila de Workspaces y Tags. */
+.search-toggle { display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px; }
+.search-toggle svg { width: 14px; height: 14px; }
+.search-toggle[aria-expanded=true] { outline: 2px solid #526788; outline-offset: 2px; }
+.access-search { flex: 0 1 200px; min-width: 120px; border: 1px solid #4a4a4a; border-radius: 999px; background: #2b2b2b; color: #dedede; padding: 6px 12px; font-size: 12px; }
+.access-search:focus-visible { outline: 2px solid #769bff; outline-offset: 1px; }
+.light-theme .access-search { border-color: #b7c4db; background: #fff; color: #3d4a61; }
+[data-narrow="true"] .access-search { flex: 1 1 auto; min-width: 0; }

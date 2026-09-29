@@ -8,8 +8,9 @@ import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSectio
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
-import { createSyncStore, mergeSyncData } from './sync.js';
-import { syncDriveImages } from './drive.js';
+import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
+import { createSyncStore, mergeSyncData, projectSyncData, SyncCorruptError } from './sync.js';
+import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
 const uid = prefix => prefix + '-' + crypto.randomUUID();
@@ -20,9 +21,12 @@ let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = f
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
 let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
+let searchQuery = '', searchTimer = null;
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let syncEnabled = false, syncBusy = false, syncTimer = null;
+let captureBusy = false, captureCancelled = false;
+const captureThrottle = createCaptureThrottle();
 let localThumbnailPreference = null;
 let narrowColumns = 1;
 const narrowMedia = window.matchMedia('(max-width: 600px)');
@@ -404,17 +408,40 @@ function render() {
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
   $('workspace').replaceChildren();
-  $('emptyState').textContent = viewMode === 'tags' ? 'Aún no hay accesos con tags en tus Workspaces.' : 'Agrega una categoría para empezar a organizar tus accesos.';
+  $('emptyState').textContent = searchQuery ? 'Ningún acceso coincide con «' + $('accessSearch').value.trim() + '».'
+    : viewMode === 'tags' ? 'Aún no hay accesos con tags en tus Workspaces.' : 'Agrega una categoría para empezar a organizar tus accesos.';
   if (viewMode === 'tags') renderTagView();
   else {
     const categories = currentCategories();
-    $('emptyState').hidden = categories.length > 0;
+    const visible = category => category.accesses.filter(matchesSearch);
+    let shown = 0;
     for (const category of categories.filter(c => !c.parentId)) {
-      renderCategory(category, false);
-      for (const child of categories.filter(c => c.parentId === category.id)) renderCategory(child, true);
+      const children = categories.filter(c => c.parentId === category.id).map(child => [child, visible(child)]);
+      const own = visible(category);
+      // Al buscar, se ocultan las secciones sin coincidencias propias ni en sus subsecciones.
+      if (searchQuery && !own.length && !children.some(([, items]) => items.length)) continue;
+      renderCategory(category, false, own); shown++;
+      for (const [child, items] of children) if (!searchQuery || items.length) renderCategory(child, true, items);
     }
+    $('emptyState').hidden = shown > 0;
   }
   updateStatuses();
+}
+// Sin acentos ni mayúsculas: «diseno» encuentra «Diseño».
+const searchText = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const matchesSearch = access => !searchQuery || searchText(access.title).includes(searchQuery);
+function setSearch(value) {
+  const query = searchText(value);
+  if (query === searchQuery) return;
+  searchQuery = query;
+  render();
+}
+function closeSearch() {
+  clearTimeout(searchTimer);
+  $('accessSearch').value = '';
+  $('accessSearch').hidden = true;
+  $('searchToggle').setAttribute('aria-expanded', 'false');
+  setSearch('');
 }
 function renderTagView() {
   const groups = new Map();
@@ -423,6 +450,10 @@ function renderTagView() {
       if (!groups.has(tag)) groups.set(tag, []);
       groups.get(tag).push({ access, category });
     }
+  }
+  if (searchQuery) for (const [tag, items] of groups) {
+    const matching = items.filter(({ access }) => matchesSearch(access));
+    if (matching.length) groups.set(tag, matching); else groups.delete(tag);
   }
   $('emptyState').hidden = groups.size > 0;
   const entries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -454,7 +485,7 @@ function renderTagView() {
   }
   appendGroups();
 }
-function renderCategory(category, subcategory) {
+function renderCategory(category, subcategory, accesses = category.accesses) {
   const section = node('section', 'category' + (subcategory ? ' subcategory' : ''));
   const heading = node('div', 'category-heading');
   const actions = node('div', 'category-actions');
@@ -470,10 +501,10 @@ function renderCategory(category, subcategory) {
     control.disabled = position + direction < 0 || position + direction >= siblings.length;
     actions.append(control);
   }
-  heading.append(node('h2', '', category.name), accessCount(category.accesses.length), actions);
+  heading.append(node('h2', '', category.name), accessCount(accesses.length), actions);
   const cards = node('div', 'cards');
-  category.accesses.forEach(access => cards.append(makeCard(access, category.id)));
-  cards.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'add-card'));
+  accesses.forEach(access => cards.append(makeCard(access, category.id)));
+  if (!searchQuery) cards.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'add-card'));
   section.append(heading, cards);
   $('workspace').append(section);
 }
@@ -961,27 +992,6 @@ async function pasteClipboardImage() {
   }
 }
 
-function waitForBatchTab(tabId, expectedUrl, timeout = 20000) {
-  return new Promise((resolve, reject) => {
-    let timer;
-    let settled = false;
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      chrome.tabs.onUpdated.removeListener(onUpdated);
-      callback(value);
-    };
-    const onUpdated = (updatedId, changeInfo, tab) => {
-      if (updatedId === tabId && changeInfo.status === 'complete' && tab.url && tab.url !== 'about:blank') finish(resolve, tab);
-    };
-    chrome.tabs.onUpdated.addListener(onUpdated);
-    timer = setTimeout(() => finish(reject, new Error('La página tardó demasiado en cargar.')), timeout);
-    chrome.tabs.get(tabId).then(tab => {
-      if (tab.status === 'complete' && tab.url === expectedUrl) finish(resolve, tab);
-    }).catch(error => finish(reject, error));
-  });
-}
 async function captureBatchThumbnail(tab) {
   const [active] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
   if (active?.id !== tab.id) throw new Error('La pestaña de captura dejó de estar activa.');
@@ -994,6 +1004,7 @@ async function captureBatchThumbnail(tab) {
   return thumbnail;
 }
 async function captureAllImages() {
+  if (captureBusy) { showMessage('Ya hay una captura masiva en curso.'); return; }
   const allAccesses = data.categories.flatMap(category => category.accesses);
   const targets = allAccesses.filter(access => !access.thumbnail && /^https?:/i.test(access.url));
   const localMissing = allAccesses.filter(access => !access.thumbnail && access.url.startsWith('file:')).length;
@@ -1002,42 +1013,50 @@ async function captureAllImages() {
     return;
   }
   if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
+  captureBusy = true;
+  captureCancelled = false;
+  $('cancelCapture').hidden = false;
+  const batch = createBatchCommitter({ load: () => data, save: candidate => commit(candidate) });
   const [origin] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   let temporary;
   let captured = 0;
   let failed = 0;
-  const failures = [];
+  let cancelled = false;
   try {
     temporary = await chrome.tabs.create({ url: 'about:blank', active: true, ...(origin?.windowId ? { windowId: origin.windowId } : {}) });
     for (const [index, access] of targets.entries()) {
+      if (captureCancelled) { cancelled = true; break; }
       try {
         showMessage('Capturando ' + (index + 1) + ' de ' + targets.length + ': ' + access.title);
-        const targetUrl = accessUrl(access.url);
-        await chrome.tabs.update(temporary.id, { url: targetUrl, active: true });
-        const loaded = await waitForBatchTab(temporary.id, targetUrl);
+        const target = accessUrl(access.url);
+        const loaded = await waitForCaptureTab(chrome.tabs, temporary.id, target, {
+          navigate: () => chrome.tabs.update(temporary.id, { url: target, active: true })
+        });
         if (!/^https?:/i.test(loaded.url || '')) throw new Error('La página no terminó en una URL web.');
+        await delay(CAPTURE_PAINT_DELAY_MS);
+        await captureThrottle();
         const thumbnail = await captureBatchThumbnail(loaded);
-        const candidate = structuredClone(data);
-        const target = candidate.categories.flatMap(category => category.accesses).find(item => item.id === access.id);
-        if (!target) throw new Error('El acceso ya no existe.');
-        target.thumbnail = thumbnail;
-        await commit(candidate);
+        await batch.add(access.id, thumbnail);
         captured++;
-      } catch (error) {
+      } catch {
         failed++;
-        failures.push(access.title + ': ' + (error.message || 'fallo desconocido'));
       }
     }
+    cancelled = cancelled || captureCancelled;
   } finally {
+    await batch.flush().catch(() => {});
     if (temporary?.id !== undefined) await chrome.tabs.remove(temporary.id).catch(() => {});
     if (origin?.id !== undefined) {
       await chrome.tabs.update(origin.id, { active: true }).catch(() => {});
       if (Number.isInteger(origin.windowId) && chrome.windows?.update) await chrome.windows.update(origin.windowId, { focused: true }).catch(() => {});
     }
+    $('cancelCapture').hidden = true;
+    captureBusy = false;
   }
-  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') + ' ' + failures.join(' | ') : '';
+  const errors = failed ? ' ' + failed + (failed === 1 ? ' no se pudo capturar.' : ' no se pudieron capturar.') : '';
   const local = localMissing ? ' ' + localMissing + (localMissing === 1 ? ' acceso local requiere captura manual.' : ' accesos locales requieren captura manual.') : '';
-  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local);
+  const stopped = cancelled ? ' Captura cancelada; se detuvo tras la página actual.' : '';
+  showMessage('Se capturaron ' + captured + ' de ' + targets.length + ' miniaturas.' + errors + local + stopped);
 }
 
 function onClick(id, action) { $(id).onclick = () => run(async () => {
@@ -1117,6 +1136,7 @@ onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
 onClick('captureAllImages', captureAllImages);
+$('cancelCapture').onclick = () => { if (captureBusy) { captureCancelled = true; showMessage('Se cancelará al terminar la página actual.'); } };
 $('inventorySearch').oninput = () => {
   // Apply visibility immediately so actions cannot target hidden results.
   filterInventory();
@@ -1197,6 +1217,21 @@ onClick('newCategory', () => {
   openDialog('categoryDialog');
 });
 onClick('tagRules', () => { viewMode = viewMode === 'tags' ? 'workspace' : 'tags'; render(); });
+onClick('searchToggle', () => {
+  const input = $('accessSearch');
+  if (!input.hidden && !input.value.trim()) { closeSearch(); return; }
+  input.hidden = false;
+  $('searchToggle').setAttribute('aria-expanded', 'true');
+  input.focus();
+});
+$('accessSearch').oninput = () => {
+  // Espera a que se deje de escribir para no redibujar en cada tecla.
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => setSearch($('accessSearch').value), 150);
+};
+$('accessSearch').onkeydown = event => {
+  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeSearch(); $('searchToggle').focus(); }
+};
 onSubmit('moveSectionForm', async () => {
   const workspaceId = $('moveSectionWorkspace').value;
   await commit(moveSection(data, $('moveSectionDialog').dataset.sectionId, workspaceId));
@@ -1228,6 +1263,7 @@ onClick('openUpdate', async () => {
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
 onClick('openSidePanel', openSidePanel);
 onClick('settingsGeneralTab', () => selectSettingsTab('general'));
+onClick('settingsSyncTab', () => selectSettingsTab('sync'));
 onClick('settingsDesignTab', () => selectSettingsTab('design'));
 onClick('settingsSyncTab', async () => { selectSettingsTab('sync'); await updateSyncAccount(); });
 onClick('settingsDataTab', () => selectSettingsTab('data'));
@@ -1247,11 +1283,28 @@ onClick('syncDriveNow', async () => {
   $('syncEnabled').checked = true;
   await chrome.storage.local.set({ nexbSyncEnabled: true });
   setSyncStatus('Conectando con Google Drive…');
-  const result = await syncDriveImages(data);
-  if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
-  await syncStore.save(data);
-  const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
-  setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+  try {
+    const result = await syncDriveImages(data);
+    if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+    await syncStore.save(data);
+    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+    setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+  } catch (error) {
+    setSyncStatus(error.message, true);
+    throw error;
+  }
+});
+onClick('cleanupDriveOrphans', async () => {
+  if (!confirm('Esta acción borra de Google Drive las imágenes de accesos que no existen en ESTE equipo. Sincroniza todos los equipos antes de continuar, o se perderán sus imágenes. ¿Deseas continuar?')) return;
+  setSyncStatus('Buscando imágenes huérfanas en Drive…');
+  try {
+    const result = await cleanupDriveOrphans(data);
+    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+    setSyncStatus('Drive limpio: ' + result.deleted + ' imágenes huérfanas borradas.' + detail, result.errors.length > 0);
+  } catch (error) {
+    setSyncStatus(error.message, true);
+    throw error;
+  }
 });
 onClick('openDriveDocs', () => chrome.tabs.create({ url: 'https://console.cloud.google.com/apis/library/drive.googleapis.com' }));
 $('syncEnabled').onchange = () => run(async () => {
@@ -1376,13 +1429,24 @@ async function syncNow() {
       await chrome.storage.local.set({ nexbSyncEnabled: true });
     }
     setSyncStatus('Leyendo datos sincronizados…');
-    const remote = await syncStore.load();
-    if (remote) {
-      const merged = mergeSyncData(data, remote.data);
-      if (JSON.stringify(merged) !== JSON.stringify(data)) await commit(merged);
+    let repaired = false;
+    try {
+      const remote = await syncStore.load();
+      if (remote) {
+        const merged = mergeSyncData(data, remote.data);
+        // Se comparan solo los datos sincronizables: serializar las miniaturas
+        // tras cada cambio dispararía la memoria con bibliotecas grandes.
+        if (JSON.stringify(projectSyncData(merged)) !== JSON.stringify(projectSyncData(data))) await commit(merged);
+      }
+    } catch (error) {
+      // Sin reparar, la copia remota dañada fallaría en cada apertura.
+      if (!(error instanceof SyncCorruptError)) throw error;
+      repaired = true;
     }
     const saved = await syncStore.save(data);
-    setSyncStatus('Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.');
+    setSyncStatus(repaired
+      ? 'La copia sincronizada estaba dañada y se reemplazó con la de este equipo.'
+      : 'Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.', repaired);
   } catch (error) {
     setSyncStatus(error.message || 'No se pudo sincronizar; se conserva la copia local.', true);
     throw error;
@@ -1583,6 +1647,18 @@ chrome.tabs.onCreated.addListener(scheduleTabRefresh);
 chrome.tabs.onRemoved.addListener(scheduleTabRefresh);
 chrome.tabs.onReplaced.addListener(scheduleTabRefresh);
 
+// Solo debe quedar una pestaña de nex.b: al abrir otra, las anteriores se
+// cierran salvo que tengan un formulario abierto o trabajo en curso.
+const homeChannel = new BroadcastChannel('nexb-home');
+homeChannel.onmessage = async event => {
+  if (event.data !== 'opened') return;
+  if (saving || syncBusy || captureBusy || recaptureBusy || imageBusy || bookmarkBusy || document.querySelector('dialog[open]')) return;
+  const tab = await chrome.tabs.getCurrent().catch(() => null);
+  if (Number.isInteger(tab?.id)) chrome.tabs.remove(tab.id).catch(() => {});
+};
+// El Side Panel no es una pestaña (getCurrent no devuelve nada): no cierra otras.
+chrome.tabs.getCurrent().then(tab => { if (tab) homeChannel.postMessage('opened'); }).catch(() => {});
+
 async function initialize() {
   await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
@@ -1593,7 +1669,8 @@ async function initialize() {
   adopt(snapshot); ready = true;
   const installedVersion = chrome.runtime.getManifest().version;
   $('extensionVersion').textContent = installedVersion;
-  $('footerVersion').textContent = 'v' + installedVersion;
+  // 2.0.0 se muestra como 2.0; un parche distinto de cero se conserva (2.0.1).
+  $('footerVersion').textContent = 'v' + installedVersion.replace(/^(\d+\.\d+)\.0$/, '$1');
   await updateSyncAccount();
   if (syncEnabled) await syncNow().catch(() => {});
   if (snapshot.recovered) showMessage('Se recuperó la copia anterior en memoria. Descarga un ZIP antes de continuar; los datos originales no se sobrescribieron.');

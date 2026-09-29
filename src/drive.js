@@ -8,8 +8,21 @@ function tokenValue(result) {
   return typeof result === 'string' ? result : result?.token;
 }
 
+function authError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  const invalidClient = message.includes('bad client id') || message.includes('invalid client id') || message.includes('invalid_client') || (message.includes('oauth') && message.includes('invalid'));
+  if (invalidClient) return new Error('El Client ID de OAuth no corresponde al ID de esta extensión. Instala nex.b desde Chrome Web Store o fija una clave estable en el manifest; mientras tanto usa el ZIP para mover tus datos.');
+  return error instanceof Error ? error : new Error('No se pudo conectar con Google Drive.');
+}
+
 async function authToken(interactive = true) {
-  const token = tokenValue(await chrome.identity.getAuthToken({ interactive }));
+  let result;
+  try {
+    result = await chrome.identity.getAuthToken({ interactive });
+  } catch (error) {
+    throw authError(error);
+  }
+  const token = tokenValue(result);
   if (!token) throw new Error('Google no devolvió un token de Drive.');
   return token;
 }
@@ -37,9 +50,9 @@ export function dataUrlBlob(value) {
   return { blob: new Blob([bytes], { type: match[1].toLowerCase() }), mimeType: match[1].toLowerCase() };
 }
 
-async function blobHash(blob) {
+export async function imageHash(blob) {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
-  return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export async function blobDataUrl(blob) {
@@ -52,8 +65,18 @@ export async function blobDataUrl(blob) {
 
 async function listFiles(token) {
   const query = encodeURIComponent("'appDataFolder' in parents and trashed = false");
-  const response = await request(DRIVE_API + '/files?q=' + query + '&spaces=appDataFolder&fields=files(id,name,mimeType,size,modifiedTime,appProperties)', token);
-  return (await response.json()).files || [];
+  // Google Drive limita cada página; nextPageToken permite recorrer toda la carpeta.
+  const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,size,modifiedTime,appProperties)');
+  const files = [];
+  let pageToken = '';
+  do {
+    const url = DRIVE_API + '/files?q=' + query + '&spaces=appDataFolder&fields=' + fields + '&pageSize=1000' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const response = await request(url, token);
+    const body = await response.json();
+    files.push(...(body.files || []));
+    pageToken = body.nextPageToken || '';
+  } while (pageToken);
+  return files;
 }
 
 async function uploadFile(token, existingId, name, blob, mimeType, hash) {
@@ -74,12 +97,16 @@ async function downloadFile(token, id) {
   return blobDataUrl(await response.blob());
 }
 
+async function deleteFile(token, id) {
+  await request(DRIVE_API + '/files/' + encodeURIComponent(id), token, { method: 'DELETE' });
+}
+
 export async function syncDriveImages(data) {
   const token = await authToken(true);
   const files = await listFiles(token);
   const byName = new Map(files.map(file => [file.name, file]));
   const candidate = structuredClone(data);
-  let uploaded = 0, downloaded = 0, skipped = 0;
+  let uploaded = 0, unchanged = 0, downloaded = 0, skipped = 0;
   const errors = [];
   for (const category of candidate.categories) {
     for (const access of category.accesses) {
@@ -88,25 +115,26 @@ export async function syncDriveImages(data) {
         const local = dataUrlBlob(access.thumbnail);
         const existing = byName.get(name) || (access.driveImageId ? files.find(file => file.id === access.driveImageId) : null);
         if (local) {
-          const localHash = await blobHash(local.blob);
-          const unchanged = access.driveImageHash && access.driveImageHash === localHash;
+          const localHash = await imageHash(local.blob);
+          const sameAsLocal = access.driveImageHash && access.driveImageHash === localHash;
           const remoteHash = existing?.appProperties?.nexbHash || '';
           if (existing && !access.driveImageHash) {
             access.thumbnail = await downloadFile(token, existing.id);
             const downloadedImage = dataUrlBlob(access.thumbnail);
-            if (downloadedImage) access.driveImageHash = remoteHash || await blobHash(downloadedImage.blob);
+            if (downloadedImage) access.driveImageHash = remoteHash || await imageHash(downloadedImage.blob);
             access.driveImageId = existing.id;
             downloaded++;
             continue;
           }
-          if (existing && access.driveImageHash && !unchanged && remoteHash && remoteHash !== access.driveImageHash)
+          if (existing && access.driveImageHash && !sameAsLocal && remoteHash && remoteHash !== access.driveImageHash)
             throw new Error('Conflicto: esta miniatura cambió también en otro computador. No se sobrescribió.');
-          if (unchanged && existing) {
+          // Si el contenido no cambió, no se vuelve a subir la misma imagen.
+          if (sameAsLocal && existing) {
             if (remoteHash && remoteHash !== localHash) {
               access.thumbnail = await downloadFile(token, existing.id);
               access.driveImageHash = remoteHash;
               downloaded++;
-            }
+            } else unchanged++;
             continue;
           }
           const id = await uploadFile(token, existing?.id || access.driveImageId, name, local.blob, local.mimeType, localHash);
@@ -117,7 +145,7 @@ export async function syncDriveImages(data) {
         } else if (!access.thumbnail && access.driveImageId) {
           access.thumbnail = await downloadFile(token, access.driveImageId);
           const downloadedImage = dataUrlBlob(access.thumbnail);
-          if (downloadedImage) access.driveImageHash = await blobHash(downloadedImage.blob);
+          if (downloadedImage) access.driveImageHash = await imageHash(downloadedImage.blob);
           downloaded++;
         } else if (!access.thumbnail) skipped++;
       } catch (error) {
@@ -125,5 +153,26 @@ export async function syncDriveImages(data) {
       }
     }
   }
-  return { data: normalizeData(candidate), uploaded, downloaded, skipped, errors };
+  return { data: normalizeData(candidate), uploaded, unchanged, downloaded, skipped, errors };
+}
+
+// Borra de appDataFolder las imágenes cuyo acceso ya no existe en la biblioteca.
+// Es una acción destructiva: solo debe ejecutarse cuando todos los equipos ya
+// sincronizaron sus accesos, porque la lista local puede estar incompleta.
+export async function cleanupDriveOrphans(data) {
+  const token = await authToken(true);
+  const files = await listFiles(token);
+  const accessIds = new Set(data.categories.flatMap(category => category.accesses.map(access => access.id)));
+  let deleted = 0;
+  const errors = [];
+  for (const file of files) {
+    if (!file.name?.startsWith('nexb-image-') || accessIds.has(file.name.slice('nexb-image-'.length))) continue;
+    try {
+      await deleteFile(token, file.id);
+      deleted++;
+    } catch (error) {
+      errors.push(file.name + ': ' + (error.message || 'No se pudo borrar la imagen huérfana.'));
+    }
+  }
+  return { deleted, errors };
 }

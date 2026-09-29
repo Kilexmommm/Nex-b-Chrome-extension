@@ -85,6 +85,13 @@ test('captura por lote usa acceso de host y conserva miniaturas existentes', () 
   assert.match(app, /chrome\.tabs\.captureVisibleTab/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
 });
+test('la captura masiva ofrece cancelar y respeta el límite de Chrome', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), capture = read('src/capture.js');
+  assert.match(html, /id="cancelCapture"/);
+  assert.match(app, /captureBusy/);
+  assert.match(capture, /MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/);
+  assert.match(capture, /CAPTURE_BATCH_SIZE = 5/);
+});
 test('la sincronización global recorre todas las secciones vinculadas y muestra errores', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(app, /const linkedCategories = data\.categories\.filter\(item => item\.bookmarkFolderId\)/);
@@ -245,7 +252,7 @@ test('contadores numéricos, iconos sin borde y firma al final', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(app, /node\('span', 'count', String\(count\)\)/);
   assert.match(app, /accessCount\(items.length\)/);
-  assert.match(app, /accessCount\(category.accesses.length\)/);
+  assert.match(app, /accessCount\(accesses.length\)/);
   assert.match(read('src/styles.css'), /\.category-icon \{[^}]*border:0;/);
   assert.match(html, /<footer class="signature">[\s\S]*By\.kilex[\s\S]*<\/footer>\s*<\/main>/);
 });
@@ -255,6 +262,7 @@ test('el pie muestra la versión real del manifest y un Feedback accesible a iss
   assert.equal(manifest.version, pkg.version);
   assert.match(html, /id="footerVersion"/);
   assert.match(app, /\$\('footerVersion'\)\.textContent = 'v' \+ installedVersion/);
+  assert.equal('2.0.0'.replace(/^(\d+\.\d+)\.0$/, '$1'), '2.0');
   assert.match(app, /const installedVersion = chrome\.runtime\.getManifest\(\)\.version/);
   const footer = html.match(/<footer class="signature">([\s\S]*?)<\/footer>/)[1];
   assert.match(footer, /By\.kilex/);
@@ -461,4 +469,13 @@ test('la preferencia narrowColumns se guarda por dispositivo en chrome.storage.l
   assert.match(app, /applyNarrowColumns/);
   assert.match(app, /data-narrow-columns/);
   assert.match(css, /html\[data-narrow="true"\] \.cards \{ grid-template-columns: repeat\(var\(--narrow-columns, 1\), minmax\(0, 1fr\)\)/);
+});
+test('la lupa tras Tags filtra por nombre en Workspace y en Tags', () => {
+  const app = read('src/app.js'), html = read('newtab.html');
+  assert.match(html, /id="tagRules"[^>]*>Tags<\/button><button id="searchToggle"[^>]*aria-controls="accessSearch"/);
+  assert.match(html, /<input id="accessSearch" type="search"[^>]*hidden \/>/);
+  assert.match(app, /const matchesSearch = access => !searchQuery \|\| searchText\(access\.title\)\.includes\(searchQuery\)/);
+  assert.match(app, /renderCategory\(category, false, own\)/);
+  assert.match(app, /items\.filter\(\(\{ access \}\) => matchesSearch\(access\)\)/);
+  assert.match(app, /if \(!searchQuery\) cards\.append\(button\('\+'/);
 });

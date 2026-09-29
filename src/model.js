@@ -114,11 +114,37 @@ export function validateRules(value) {
     }
     return rules;
 }
+// Mide el tamaño aproximado en JSON sin construir la cadena completa: con
+// miniaturas en base64, JSON.stringify duplicaba decenas de MB en cada guardado.
+function exceedsSize(value, limit) {
+    let size = 0;
+    const stack = [value];
+    while (stack.length) {
+        const item = stack.pop();
+        if (typeof item === "string")
+            size += item.length + 2;
+        else if (Array.isArray(item)) {
+            size += 2 + item.length;
+            stack.push(...item);
+        }
+        else if (item && typeof item === "object") {
+            for (const [key, child] of Object.entries(item)) {
+                size += key.length + 4;
+                stack.push(child);
+            }
+        }
+        else
+            size += 8;
+        if (size > limit)
+            return true;
+    }
+    return false;
+}
 export function normalizeData(stored = DEFAULT_DATA) {
     record(stored, "Configuración");
     if (!Array.isArray(stored.categories))
         fail('La configuración no contiene categorías válidas.');
-    if (JSON.stringify(stored).length > LIMITS.data)
+    if (exceedsSize(stored, LIMITS.data))
         fail("Configuración demasiado grande.");
     if (stored.schemaVersion !== undefined && stored.schemaVersion !== 1)
         fail("Versión de configuración no compatible.");
@@ -153,7 +179,9 @@ export function normalizeData(stored = DEFAULT_DATA) {
                 const bookmarkId = text(a.bookmarkId ?? "", "Favorito de Chrome", 120, true);
                 const accessBookmarkFolderId = text(a.bookmarkFolderId ?? "", "Carpeta de favorito", 120, true);
                 const driveImageId = text(a.driveImageId ?? "", "Imagen de Google Drive", 200, true);
-                const driveImageHash = text(a.driveImageHash ?? "", "Hash de imagen de Google Drive", 128, true);
+                // Un hash corrupto no debe impedir cargar la biblioteca: se omite.
+                const rawHash = typeof a.driveImageHash === "string" ? a.driveImageHash.trim() : "";
+                const driveImageHash = /^[0-9a-f]{1,128}$/.test(rawHash) ? rawHash : "";
                 return { id: uniqueId(a.id, accessIds), title: text(a.title, "Nombre de acceso", 300),
                     url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
