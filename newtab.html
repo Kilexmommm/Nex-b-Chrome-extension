@@ -103,6 +103,11 @@
       <small>Las URLs que ya existen en cualquier sección del Workspace elegido se ignoran. Si una sección principal tiene este nombre, se agregan ahí solo los enlaces nuevos.</small>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="bookmarkImportSubmit" class="button" disabled>Importar nuevos</button></div>
     </form></dialog>
+    <dialog id="syncChoiceDialog"><form method="dialog" id="syncChoiceForm" class="dialog-form">
+      <h2>Primera sincronización</h2>
+      <p class="help">Ya hay datos guardados en la nube y en este equipo. Elige qué conservar para no perder nada.</p>
+      <div class="dialog-actions"><button id="syncChoiceLocal" type="button" class="button secondary">Usar los de este equipo</button><button id="syncChoiceCloud" type="button" class="button secondary">Usar los de la nube</button><button id="syncChoiceMerge" type="button" class="button">Combinar ambos</button></div>
+    </form></dialog>
     <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
       <button id="settingsClose" type="button" data-cancel class="dialog-close" aria-label="Cerrar configuración">×</button>
       <h2>Configurar nex.b</h2>

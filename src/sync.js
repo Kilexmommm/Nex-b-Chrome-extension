@@ -3,10 +3,15 @@ import { normalizeData } from './model.js';
 export const SYNC_MANIFEST_KEY = 'nexb.sync.manifest';
 export const SYNC_CHUNK_PREFIX = 'nexb.sync.chunk.';
 export const SYNC_CHUNK_BYTES = 6000;
-
-// La copia remota se puede leer pero no es válida (p. ej. fragmentos de dos
-// equipos mezclados). La copia local sigue siendo la fuente fiable.
+// La copia remota se puede leer pero no es válida (fragmentos mezclados, suma de
+// control distinta o datos que no pasan la validación). La local es la fiable.
 export class SyncCorruptError extends Error {}
+
+export const SYNC_QUOTA = Object.freeze({
+  QUOTA_BYTES: 102400,
+  QUOTA_BYTES_PER_ITEM: 8192,
+  MAX_ITEMS: 512
+});
 
 function base64Encode(value) {
   const bytes = new TextEncoder().encode(value);
@@ -20,6 +25,12 @@ function base64Decode(value) {
   const binary = atob(value);
   const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+function checksum(value) {
+  let sum = 0;
+  for (let index = 0; index < value.length; index += 1) sum = (sum + value.charCodeAt(index)) & 0xffff;
+  return sum;
 }
 
 function localImages(data) {
@@ -47,78 +58,177 @@ export function projectSyncData(data) {
   };
 }
 
-// Devuelve los elementos remotos (que ganan en los campos compartidos) más
-// cualquier elemento local cuyo id no exista todavía en remoto — sin esto,
-// un workspace/categoría/acceso creado localmente después del último push a
-// sync desaparece en cuanto corre la siguiente sincronización, porque
-// `remote` todavía no lo conoce y antes se descartaba todo lo que remote no
-// tuviera.
-function unionById(remoteItems, localItems) {
-  const remoteIds = new Set(remoteItems.map(item => item.id));
-  return [...remoteItems, ...localItems.filter(item => !remoteIds.has(item.id))];
+// Thumbnail size is a local layout preference; stale sync metadata must not undo it.
+function keepLocalLayout(settings, localSettings) {
+  settings.thumbnailSize = localSettings.thumbnailSize;
+  settings.thumbnailHeight = localSettings.thumbnailHeight;
 }
 
-export function mergeSyncData(local, remote) {
-  if (!remote || remote.schemaVersion !== 1) throw new SyncCorruptError('La configuración sincronizada no es compatible.');
-  const images = localImages(local);
-  const localAccessById = new Map(local.categories.flatMap(item => item.accesses).map(access => [access.id, access]));
-  const candidate = structuredClone(remote);
-  candidate.activeWorkspaceId = local.activeWorkspaceId;
-  candidate.settings = { ...local.settings, ...candidate.settings, backgroundImageUrl: local.settings.backgroundImageUrl };
-  // Thumbnail size is a local layout preference; stale sync metadata must not undo it.
-  candidate.settings.thumbnailSize = local.settings.thumbnailSize;
-  candidate.settings.thumbnailHeight = local.settings.thumbnailHeight;
-  candidate.workspaces = unionById(candidate.workspaces, local.workspaces);
-  const remoteCategoryIds = new Set(candidate.categories.map(category => category.id));
-  // Un acceso que remoto ya tiene en otra categoría (p. ej. movido en este
-  // equipo) no se vuelve a añadir: duplicaría su id.
-  const remoteAccessIds = new Set(candidate.categories.flatMap(category => category.accesses.map(access => access.id)));
-  const onlyLocal = accesses => accesses.filter(access => !remoteAccessIds.has(access.id));
-  // Categorías que ya existían en remoto: se conservan sus datos (remoto
-  // gana en los campos compartidos), pero sus accesos se completan con los
-  // que se hayan creado localmente y remoto todavía no conozca.
-  for (const category of candidate.categories) {
-    const localCategory = local.categories.find(item => item.id === category.id);
-    if (localCategory) category.accesses = [...category.accesses, ...onlyLocal(localCategory.accesses)];
-    for (const access of category.accesses) {
-      access.thumbnail = images.get(access.id) || '';
-      const localAccess = localAccessById.get(access.id);
-      if (localAccess?.bookmarkMissing !== undefined) access.bookmarkMissing = localAccess.bookmarkMissing;
-    }
+function mergeById(localList, remoteList, preferLocal) {
+  const remoteById = new Map((remoteList ?? []).map(item => [item.id, item]));
+  const seen = new Set();
+  const result = [];
+  for (const item of localList ?? []) {
+    seen.add(item.id);
+    if (remoteById.has(item.id) && !preferLocal) result.push(remoteById.get(item.id));
+    else result.push(item);
   }
-  // Categorías creadas localmente que remoto todavía no conoce (su
-  // workspaceId ya quedó preservado arriba por unionById en workspaces).
-  candidate.categories = unionById(candidate.categories, local.categories.filter(category => !remoteCategoryIds.has(category.id))
-    .map(category => ({ ...category, accesses: onlyLocal(category.accesses) })));
-  try { return normalizeData(candidate); }
+  for (const item of remoteList ?? []) {
+    if (!seen.has(item.id)) result.push(item);
+  }
+  return result;
+}
+
+function validRemote(value) {
+  try { return normalizeData(value); }
   catch (cause) { throw new SyncCorruptError('La configuración sincronizada no es válida: ' + cause.message, { cause }); }
 }
 
+// Combina dos bibliotecas por identificador: workspaces, categorías y accesos.
+// Un elemento presente en un solo lado se conserva (unión). Si el mismo id existe
+// en ambos, gana el remoto salvo que `preferLocal` sea true (hay cambios locales
+// pendientes de subir), en cuyo caso gana el local. Las miniaturas locales nunca
+// viajan por sync y se conservan siempre. El resultado se valida con normalizeData.
+// Limitación: la unión no detecta borrados concurrentes; si en "merge" un equipo
+// eliminó un acceso que el otro conserva, el acceso puede reaparecer al combinarse.
+export function mergeThreeWay(local, remote, { preferLocal = false } = {}) {
+  if (!remote || remote.schemaVersion !== 1) throw new SyncCorruptError('La configuración sincronizada no es compatible.');
+  const images = localImages(local);
+  // Un acceso movido de categoría existe en ambos lados con el mismo id pero en
+  // categorías distintas: solo se conserva en la categoría del lado que gana.
+  const idsOf = library => new Set(library.categories.flatMap(category => category.accesses.map(access => access.id)));
+  const winnerIds = preferLocal ? idsOf(local) : idsOf(remote);
+  const workspaces = mergeById(local.workspaces, remote.workspaces, preferLocal);
+  const categories = mergeById(local.categories, remote.categories, preferLocal).map(category => {
+    const remoteCategory = remote.categories.find(item => item.id === category.id);
+    const localCategory = local.categories.find(item => item.id === category.id);
+    const localHere = new Set((localCategory?.accesses ?? []).map(access => access.id));
+    const remoteHere = new Set((remoteCategory?.accesses ?? []).map(access => access.id));
+    const loserHere = preferLocal ? remoteHere : localHere, winnerHere = preferLocal ? localHere : remoteHere;
+    const accesses = mergeById(localCategory?.accesses ?? [], remoteCategory?.accesses ?? [], preferLocal)
+      .filter(access => winnerHere.has(access.id) || !loserHere.has(access.id) || !winnerIds.has(access.id)).map(access => {
+      const localAccess = localCategory?.accesses.find(item => item.id === access.id);
+      const merged = { ...access, thumbnail: images.get(access.id) || '' };
+      if (localAccess?.bookmarkMissing !== undefined) merged.bookmarkMissing = localAccess.bookmarkMissing;
+      return merged;
+    });
+    return { ...category, accesses };
+  });
+  const settings = preferLocal ? { ...local.settings } : { ...local.settings, ...remote.settings };
+  settings.backgroundImageUrl = local.settings.backgroundImageUrl;
+  keepLocalLayout(settings, local.settings);
+  return validRemote({
+    schemaVersion: 1,
+    workspaces,
+    categories,
+    activeWorkspaceId: local.activeWorkspaceId,
+    settings,
+    autoTagRules: preferLocal ? { ...local.autoTagRules } : { ...remote.autoTagRules }
+  });
+}
+
+// Reconstruye la biblioteca completa desde la proyección remota, conservando las
+// miniaturas locales que ya existan para los mismos accesos, el Workspace activo
+// y la imagen de fondo (que no viajan por sync). Se usa al elegir "usar los de la
+// nube" en la primera activación y al aplicar cambios remotos sin cambios locales.
+export function applyRemoteData(local, remote) {
+  if (!remote || remote.schemaVersion !== 1) throw new SyncCorruptError('La configuración sincronizada no es compatible.');
+  const images = localImages(local);
+  const full = validRemote(remote);
+  for (const category of full.categories)
+    for (const access of category.accesses)
+      access.thumbnail = images.get(access.id) || '';
+  full.settings.backgroundImageUrl = local.settings.backgroundImageUrl;
+  keepLocalLayout(full.settings, local.settings);
+  full.activeWorkspaceId = local.activeWorkspaceId;
+  return normalizeData(full);
+}
+
+// Decide la acción de syncNow sin tocar el DOM: 'upload' (subir local), 'apply'
+// (aplicar remoto), 'merge' (combinar ambos) o 'none' (nada pendiente).
+export function decideSyncAction(remoteRevision, lastRevision, dirty) {
+  if (remoteRevision && remoteRevision === lastRevision) return dirty ? 'upload' : 'none';
+  if (!remoteRevision) return 'upload';
+  // Sin revisión conocida (equipo nuevo o actualizado desde 1.9.1) no se sabe qué
+  // es más reciente: se combina en vez de reemplazar la biblioteca local.
+  if (!lastRevision) return 'merge';
+  return dirty ? 'merge' : 'apply';
+}
+
+function quotaLimits(area) {
+  return {
+    bytes: area.QUOTA_BYTES ?? SYNC_QUOTA.QUOTA_BYTES,
+    perItem: area.QUOTA_BYTES_PER_ITEM ?? SYNC_QUOTA.QUOTA_BYTES_PER_ITEM,
+    maxItems: area.MAX_ITEMS ?? SYNC_QUOTA.MAX_ITEMS
+  };
+}
+
+function itemSize(key, value) {
+  return key.length + JSON.stringify(value).length;
+}
+
+function valuesSize(values) {
+  return Object.entries(values).reduce((sum, [key, value]) => sum + itemSize(key, value), 0);
+}
+
+export function assertWithinQuota(values, area) {
+  const limits = quotaLimits(area);
+  const entries = Object.entries(values);
+  if (entries.length > limits.maxItems) throw new Error('Demasiados elementos para Chrome Sync. Usa el respaldo ZIP.');
+  let total = 0;
+  for (const [key, value] of entries) {
+    const size = itemSize(key, value);
+    if (size > limits.perItem) throw new Error('Un fragmento supera el límite de ' + Math.round(limits.perItem / 1024) + ' KB por elemento de Chrome Sync. Usa el respaldo ZIP.');
+    total += size;
+  }
+  if (total > limits.bytes) throw new Error('La biblioteca es demasiado grande para Chrome Sync (' + Math.ceil(total / 1024) + ' KB de ' + Math.round(limits.bytes / 1024) + ' KB). Usa el respaldo ZIP.');
+  return total;
+}
+
 export function createSyncStore(area) {
+  const chunkKey = (revision, index) => SYNC_CHUNK_PREFIX + revision + '.' + index;
+  async function removeOrphanChunks(keepRevision) {
+    const all = await area.get(null);
+    const orphans = Object.keys(all).filter(key => key.startsWith(SYNC_CHUNK_PREFIX) && !key.startsWith(SYNC_CHUNK_PREFIX + keepRevision + '.'));
+    if (orphans.length) await area.remove(orphans);
+  }
   return {
     async save(data) {
       const encoded = base64Encode(JSON.stringify(projectSyncData(data)));
+      const revision = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
       const chunks = [];
       for (let offset = 0; offset < encoded.length; offset += SYNC_CHUNK_BYTES)
         chunks.push(encoded.slice(offset, offset + SYNC_CHUNK_BYTES));
-      const previous = (await area.get(SYNC_MANIFEST_KEY))[SYNC_MANIFEST_KEY];
-      const revision = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
-      const values = { [SYNC_MANIFEST_KEY]: { schemaVersion: 1, count: chunks.length, revision } };
-      chunks.forEach((chunk, index) => { values[SYNC_CHUNK_PREFIX + index] = chunk; });
+      const values = { [SYNC_MANIFEST_KEY]: { schemaVersion: 1, count: chunks.length, revision, length: encoded.length, checksum: checksum(encoded) } };
+      chunks.forEach((chunk, index) => { values[chunkKey(revision, index)] = chunk; });
+      assertWithinQuota(values, area);
+      // La cuota se mide sobre el estado total: si los fragmentos nuevos caben solos
+      // pero no junto con los de la revisión anterior, se borran primero (y se acepta
+      // la ventana breve en que load() reportará "Faltan datos sincronizados").
+      const existing = await area.get(null);
+      const retained = Object.keys(existing)
+        .filter(key => !(key in values))
+        .reduce((sum, key) => sum + itemSize(key, existing[key]), 0);
+      if (valuesSize(values) + retained > quotaLimits(area).bytes) await removeOrphanChunks(revision);
       await area.set(values);
-      if (previous?.count > chunks.length)
-        await area.remove(Array.from({ length: previous.count - chunks.length }, (_, index) => SYNC_CHUNK_PREFIX + (chunks.length + index)));
+      await removeOrphanChunks(revision);
       return { revision, bytes: encoded.length };
     },
     async load() {
       const manifest = (await area.get(SYNC_MANIFEST_KEY))[SYNC_MANIFEST_KEY];
       if (!manifest) return null;
-      if (manifest.schemaVersion !== 1 || !Number.isInteger(manifest.count) || manifest.count < 1 || manifest.count > 512)
+      if (manifest.schemaVersion !== 1 || !manifest.revision || !Number.isInteger(manifest.count) || manifest.count < 1 || manifest.count > SYNC_QUOTA.MAX_ITEMS)
         throw new Error('El manifiesto sincronizado no es válido.');
-      const keys = Array.from({ length: manifest.count }, (_, index) => SYNC_CHUNK_PREFIX + index);
+      // Hasta 1.9.1 los fragmentos no llevaban la revisión en la clave ni el manifiesto
+      // guardaba length; se leen igual y el próximo save() los migra al formato nuevo.
+      const legacy = !Number.isInteger(manifest.length);
+      const keys = Array.from({ length: manifest.count }, (_, index) => legacy ? SYNC_CHUNK_PREFIX + index : chunkKey(manifest.revision, index));
       const stored = await area.get(keys);
       if (keys.some(key => typeof stored[key] !== 'string')) throw new Error('Faltan datos sincronizados; se conserva la copia local.');
-      try { return { revision: manifest.revision, data: JSON.parse(base64Decode(keys.map(key => stored[key]).join(''))) }; }
+      const encoded = keys.map(key => stored[key]).join('');
+      if ((Number.isInteger(manifest.length) && manifest.length !== encoded.length) || (Number.isInteger(manifest.checksum) && manifest.checksum !== checksum(encoded)))
+        throw new SyncCorruptError('Los datos sincronizados están dañados; se conserva la copia local.');
+      try { return { revision: manifest.revision, data: JSON.parse(base64Decode(encoded)) }; }
       catch { throw new SyncCorruptError('Los datos sincronizados están dañados; se conserva la copia local.'); }
     }
   };
