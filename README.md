@@ -1,4 +1,4 @@
-# nex.b · 2.0
+# nex.b · 2.0.1
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -64,6 +64,10 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ## Últimas actualizaciones
 
+### Novedades 2.0.1
+
+- **Borrar un tag (o cualquier edición) ya no se deshace al sincronizar:** vuelve la sincronización por revisión de 1.9.2, que sube tus cambios en vez de reemplazarlos por la copia de la nube. Los datos sincronizados con 1.9.1 se leen y se migran solos.
+
 ### Novedades 2.0
 
 - **Sin «Identificador duplicado»:** mover un acceso de categoría ya no lo duplica al sincronizar con Chrome. Si la copia sincronizada llega dañada, se reemplaza con la de este equipo en vez de fallar en cada apertura.
@@ -73,7 +77,17 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 - **Buscar por nombre:** la lupa junto a Tags abre un campo que filtra las miniaturas por nombre en el Workspace (con sus secciones) y en la vista de Tags. No distingue acentos ni mayúsculas; Esc lo cierra.
 - **Menos memoria:** la sincronización y la validación ya no serializan todas las miniaturas en cada guardado.
 
-Detalle completo: [Novedades 2.0](docs/NOVEDADES-2.0.md).
+Detalle completo: [Novedades 2.0](docs/NOVEDADES-2.0.md) y [2.0.1](docs/NOVEDADES-2.0.1.md).
+
+### Novedades 1.9.2
+
+- **Sincronización que no deshace tus cambios:** cada equipo recuerda la última versión sincronizada. Tus ediciones se suben en vez de ser reemplazadas por la copia de la nube, y los borrados se propagan a los demás equipos.
+- **Primera activación con datos en ambos lados:** nex.b pregunta si usar los datos de este equipo, los de la nube o combinarlos.
+- **Cuota de Chrome Sync:** si la biblioteca no cabe, aparece un aviso claro y no se escribe nada a medias.
+- **Drive:** recorre todas las páginas de archivos, explica un Client ID inválido y ofrece **Limpiar imágenes huérfanas en Drive** como acción manual. Sincronizar imágenes ya no activa la sincronización de datos.
+- **Captura masiva:** espera la navegación real (incluidas redirecciones), deja pintar la página, respeta el límite de capturas de Chrome, guarda por lotes y se puede cancelar.
+
+Detalle en [docs/NOVEDADES-1.9.2.md](docs/NOVEDADES-1.9.2.md).
 
 ### Novedades 1.9.1
 

@@ -11,7 +11,7 @@ function tokenValue(result) {
 function authError(error) {
   const message = String(error?.message || error || '').toLowerCase();
   const invalidClient = message.includes('bad client id') || message.includes('invalid client id') || message.includes('invalid_client') || (message.includes('oauth') && message.includes('invalid'));
-  if (invalidClient) return new Error('El Client ID de OAuth no corresponde al ID de esta extensión. Instala nex.b desde Chrome Web Store o fija una clave estable en el manifest; mientras tanto usa el ZIP para mover tus datos.');
+  if (invalidClient) return new Error('El Client ID de OAuth no corresponde al ID de esta extensión. Revisa la configuración de Google Cloud; mientras tanto usa el ZIP para mover tus datos.');
   return error instanceof Error ? error : new Error('No se pudo conectar con Google Drive.');
 }
 

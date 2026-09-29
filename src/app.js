@@ -9,7 +9,7 @@ import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
-import { createSyncStore, mergeSyncData, projectSyncData, SyncCorruptError } from './sync.js';
+import { createSyncStore, mergeThreeWay, applyRemoteData, decideSyncAction, projectSyncData, SyncCorruptError } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
@@ -24,12 +24,12 @@ let cardStatuses = [], tagCache = new Map();
 let searchQuery = '', searchTimer = null;
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
-let syncEnabled = false, syncBusy = false, syncTimer = null;
-let captureBusy = false, captureCancelled = false;
-const captureThrottle = createCaptureThrottle();
 let localThumbnailPreference = null;
 let narrowColumns = 1;
 const narrowMedia = window.matchMedia('(max-width: 600px)');
+let syncEnabled = false, syncBusy = false, syncTimer = null, syncDirty = false, syncLastRevision = '';
+let captureBusy = false, captureCancelled = false;
+const captureThrottle = createCaptureThrottle();
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -182,7 +182,8 @@ async function reload() {
   if (snapshot.revision >= revision) adopt(snapshot);
   reloadPending = false;
 }
-async function commit(candidate) {
+async function commit(candidate, options = {}) {
+  const { markDirty = true } = options;
   if (!ready) throw new Error('Los datos no están listos para guardar.');
   if (saving) throw new Error('Espera a que termine el guardado.');
   saving = true;
@@ -195,7 +196,11 @@ async function commit(candidate) {
     await persistLocalThumbnailPreference(data.settings);
     applySettings();
     render();
-    scheduleSync();
+    if (markDirty) {
+      syncDirty = true;
+      await chrome.storage.local.set({ nexbSyncDirty: true });
+      scheduleSync();
+    }
   } finally {
     saving = false;
     document.querySelectorAll('dialog button, dialog input, dialog select, dialog textarea').forEach(b => { b.disabled = false; });
@@ -1022,6 +1027,7 @@ async function captureAllImages() {
   let captured = 0;
   let failed = 0;
   let cancelled = false;
+  const failures = [];
   try {
     temporary = await chrome.tabs.create({ url: 'about:blank', active: true, ...(origin?.windowId ? { windowId: origin.windowId } : {}) });
     for (const [index, access] of targets.entries()) {
@@ -1279,14 +1285,10 @@ document.querySelector('#settingsDialog .settings-tabs').addEventListener('keydo
 onClick('refreshSyncAccount', updateSyncAccount);
 onClick('syncNow', syncNow);
 onClick('syncDriveNow', async () => {
-  syncEnabled = true;
-  $('syncEnabled').checked = true;
-  await chrome.storage.local.set({ nexbSyncEnabled: true });
   setSyncStatus('Conectando con Google Drive…');
   try {
     const result = await syncDriveImages(data);
     if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
-    await syncStore.save(data);
     const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
     setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
   } catch (error) {
@@ -1310,7 +1312,7 @@ onClick('openDriveDocs', () => chrome.tabs.create({ url: 'https://console.cloud.
 $('syncEnabled').onchange = () => run(async () => {
   syncEnabled = $('syncEnabled').checked;
   await chrome.storage.local.set({ nexbSyncEnabled: syncEnabled });
-  if (syncEnabled) await syncNow();
+  if (syncEnabled) await activateSync();
   else setSyncStatus('Sincronización desactivada en este dispositivo.');
 });
 onClick('openSettings', () => {
@@ -1418,40 +1420,127 @@ async function updateSyncAccount() {
     status.textContent = 'Cuenta de Chrome: no se pudo consultar.';
   }
 }
+async function setSyncLastRevision(value) {
+  syncLastRevision = value;
+  await chrome.storage.local.set({ nexbSyncLastRevision: value });
+}
+async function clearSyncDirty() {
+  syncDirty = false;
+  await chrome.storage.local.set({ nexbSyncDirty: false });
+}
+function isDefaultLibrary(value) {
+  return JSON.stringify(value) === JSON.stringify(normalizeData());
+}
+function askFirstSync() {
+  const dialog = $('syncChoiceDialog');
+  return new Promise(resolve => {
+    const choose = value => { dialog.close(); resolve(value); };
+    $('syncChoiceLocal').onclick = () => choose('local');
+    $('syncChoiceCloud').onclick = () => choose('cloud');
+    $('syncChoiceMerge').onclick = () => choose('merge');
+    dialog.addEventListener('cancel', () => choose(null), { once: true });
+    dialog.showModal();
+  });
+}
+async function activateSync() {
+  let remote = null;
+  try { remote = await syncStore.load(); }
+  catch (error) { if (!(error instanceof SyncCorruptError)) throw error; /* syncNow la reemplaza. */ }
+  if (remote && !isDefaultLibrary(data)) {
+    const choice = await askFirstSync();
+    if (!choice) {
+      syncEnabled = false;
+      $('syncEnabled').checked = false;
+      await chrome.storage.local.set({ nexbSyncEnabled: false });
+      setSyncStatus('Sincronización cancelada.');
+      return;
+    }
+    if (choice === 'local') {
+      const saved = await syncStore.save(data);
+      await setSyncLastRevision(saved.revision);
+      await clearSyncDirty();
+      setSyncStatus('Sincronizado con los datos de este equipo.');
+      return;
+    }
+    if (choice === 'cloud') {
+      await commit(applyRemoteData(data, remote.data), { markDirty: false });
+      await setSyncLastRevision(remote.revision);
+      await clearSyncDirty();
+      setSyncStatus('Sincronizado con los datos de la nube.');
+      return;
+    }
+    await commit(mergeThreeWay(data, remote.data, { preferLocal: false }), { markDirty: false });
+    const saved = await syncStore.save(data);
+    await setSyncLastRevision(saved.revision);
+    await clearSyncDirty();
+    setSyncStatus('Sincronizado combinando los datos de ambos equipos.');
+    return;
+  }
+  await syncNow();
+}
+// La copia remota no se puede usar (fragmentos mezclados, suma de control o
+// datos inválidos): sin reemplazarla, fallaría en cada apertura.
+async function replaceCorruptRemote() {
+  const saved = await syncStore.save(data);
+  await setSyncLastRevision(saved.revision);
+  await clearSyncDirty();
+  setSyncStatus('La copia sincronizada estaba dañada y se reemplazó con la de este equipo.', true);
+}
 async function syncNow() {
   if (syncBusy) return;
   syncBusy = true;
   clearTimeout(syncTimer);
   try {
     if (!syncEnabled) {
-      syncEnabled = true;
-      $('syncEnabled').checked = true;
-      await chrome.storage.local.set({ nexbSyncEnabled: true });
+      setSyncStatus('Activa la sincronización primero.');
+      return;
     }
     setSyncStatus('Leyendo datos sincronizados…');
-    let repaired = false;
-    try {
-      const remote = await syncStore.load();
-      if (remote) {
-        const merged = mergeSyncData(data, remote.data);
-        // Se comparan solo los datos sincronizables: serializar las miniaturas
-        // tras cada cambio dispararía la memoria con bibliotecas grandes.
-        if (JSON.stringify(projectSyncData(merged)) !== JSON.stringify(projectSyncData(data))) await commit(merged);
-      }
-    } catch (error) {
-      // Sin reparar, la copia remota dañada fallaría en cada apertura.
+    let remote;
+    try { remote = await syncStore.load(); }
+    catch (error) {
       if (!(error instanceof SyncCorruptError)) throw error;
-      repaired = true;
+      await replaceCorruptRemote();
+      return;
+    }
+    const action = decideSyncAction(remote?.revision ?? '', syncLastRevision, syncDirty);
+    if (action === 'none') {
+      setSyncStatus('Todo está sincronizado.');
+      return;
+    }
+    if (action === 'upload') {
+      const saved = await syncStore.save(data);
+      await setSyncLastRevision(saved.revision);
+      await clearSyncDirty();
+      setSyncStatus('Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.');
+      return;
+    }
+    let next;
+    try {
+      next = action === 'apply' ? applyRemoteData(data, remote.data) : mergeThreeWay(data, remote.data, { preferLocal: true });
+    } catch (error) {
+      if (!(error instanceof SyncCorruptError)) throw error;
+      await replaceCorruptRemote();
+      return;
+    }
+    // Se comparan solo los datos sincronizables: serializar todas las miniaturas
+    // en cada sincronización dispararía la memoria con bibliotecas grandes.
+    if (JSON.stringify(projectSyncData(next)) !== JSON.stringify(projectSyncData(data))) await commit(next, { markDirty: false });
+    if (action === 'apply') {
+      await setSyncLastRevision(remote.revision);
+      setSyncStatus('Se aplicaron los datos sincronizados.');
+      return;
     }
     const saved = await syncStore.save(data);
-    setSyncStatus(repaired
-      ? 'La copia sincronizada estaba dañada y se reemplazó con la de este equipo.'
-      : 'Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.', repaired);
+    await setSyncLastRevision(saved.revision);
+    await clearSyncDirty();
+    setSyncStatus('Sincronizado combinando cambios locales y remotos.');
   } catch (error) {
     setSyncStatus(error.message || 'No se pudo sincronizar; se conserva la copia local.', true);
     throw error;
   } finally {
     syncBusy = false;
+    if (syncEnabled && syncDirty) scheduleSync();
   }
 }
 function scheduleSync() {
@@ -1460,8 +1549,10 @@ function scheduleSync() {
   syncTimer = setTimeout(() => run(syncNow), 900);
 }
 async function restoreSyncPreference() {
-  const stored = await chrome.storage.local.get('nexbSyncEnabled');
+  const stored = await chrome.storage.local.get(['nexbSyncEnabled', 'nexbSyncDirty', 'nexbSyncLastRevision']);
   syncEnabled = stored.nexbSyncEnabled === true;
+  syncDirty = stored.nexbSyncDirty === true;
+  syncLastRevision = typeof stored.nexbSyncLastRevision === 'string' ? stored.nexbSyncLastRevision : '';
   $('syncEnabled').checked = syncEnabled;
 }
 
@@ -1640,7 +1731,10 @@ onClick('removeThumbnail', () => { pasteGeneration++; imageBusy = false; pastedI
 $('accessThumbnailUrl').onchange = () => run(() => { pastedImage = imageUrl($('accessThumbnailUrl').value.trim()); showPreview(); });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && ('workspaceRevision' in changes || 'workspaceData' in changes)) run(reload);
-  if (area === 'sync' && syncEnabled && Object.keys(changes).some(key => key.startsWith('nexb.sync.'))) setSyncStatus('Hay cambios sincronizados disponibles. Pulsa «Sincronizar ahora» para aplicarlos.');
+  if (area === 'sync' && syncEnabled && Object.keys(changes).some(key => key.startsWith('nexb.sync.'))) {
+    if (syncDirty) setSyncStatus('Hay cambios sincronizados y cambios locales pendientes. Pulsa «Sincronizar ahora» para combinarlos.');
+    else { setSyncStatus('Aplicando cambios sincronizados…'); scheduleSync(); }
+  }
 });
 chrome.tabs.onUpdated.addListener((_id, change) => { if (change.url || change.status === 'complete') scheduleTabRefresh(); });
 chrome.tabs.onCreated.addListener(scheduleTabRefresh);
