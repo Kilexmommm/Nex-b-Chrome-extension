@@ -319,3 +319,10 @@ dialog::backdrop { background: #00000099; }
 .access-search:focus-visible { outline: 2px solid #769bff; outline-offset: 1px; }
 .light-theme .access-search { border-color: #b7c4db; background: #fff; color: #3d4a61; }
 [data-narrow="true"] .access-search { flex: 1 1 auto; min-width: 0; }
+/* Aviso de versión nueva y comando de actualización. */
+.update-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 10px auto 0; width: 90%; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--accent-color) 55%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--accent-color) 14%, transparent); font-size: 13px; }
+.update-banner[hidden] { display: none; }
+.update-banner > span { flex: 1 1 260px; min-width: 0; }
+.update-command { display: block; margin: 6px 0; padding: 8px 10px; border-radius: 7px; background: rgba(0,0,0,.28); font-size: 12px; overflow-wrap: anywhere; user-select: all; }
+.light-theme .update-command { background: rgba(0,0,0,.06); }
+@media (max-width: 600px) { .update-banner { width: 100%; } }

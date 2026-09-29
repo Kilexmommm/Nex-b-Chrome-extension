@@ -9,6 +9,7 @@ import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
+import { checkForUpdate, UPDATE_COMMAND } from './update.js';
 import { createSyncStore, mergeThreeWay, applyRemoteData, decideSyncAction, projectSyncData, SyncCorruptError } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
@@ -1262,6 +1263,25 @@ onSubmit('recaptureForm', async () => {
   }
 });
 const GITHUB_ARCHIVE_URL = 'https://github.com/Kilexmommm/Nex-b-Chrome-extension/archive/refs/heads/main.zip';
+async function copyUpdateCommand() {
+  try { await navigator.clipboard.writeText(UPDATE_COMMAND); showMessage('Comando copiado. Pégalo en la Terminal y después pulsa «Recargar nex.b».'); }
+  catch { showMessage('Copia este comando en la Terminal: ' + UPDATE_COMMAND); }
+}
+// Para una extensión descomprimida, reload() vuelve a leer la carpeta del disco.
+const reloadExtension = () => chrome.runtime.reload();
+onClick('copyUpdateCommand', copyUpdateCommand);
+onClick('bannerCopyUpdate', copyUpdateCommand);
+onClick('reloadExtension', reloadExtension);
+onClick('bannerReload', reloadExtension);
+onClick('bannerDismiss', () => { $('updateBanner').hidden = true; sessionStorage.setItem('nexbUpdateDismissed', '1'); });
+async function showAvailableUpdate(current) {
+  const latest = await checkForUpdate(current, { storage: chrome.storage.local });
+  if (!latest) return;
+  $('updateAvailable').textContent = ' · disponible: ' + latest;
+  if (sessionStorage.getItem('nexbUpdateDismissed')) return;
+  $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Copia el comando, pégalo en la Terminal y pulsa «Recargar nex.b».';
+  $('updateBanner').hidden = false;
+}
 onClick('openUpdate', async () => {
   await chrome.tabs.create({ url: GITHUB_ARCHIVE_URL });
   showMessage('Descarga iniciada. Conserva tu respaldo, reemplaza los archivos de la extensión y pulsa «Recargar» en chrome://extensions.');
@@ -1763,6 +1783,8 @@ async function initialize() {
   adopt(snapshot); ready = true;
   const installedVersion = chrome.runtime.getManifest().version;
   $('extensionVersion').textContent = installedVersion;
+  $('updateCommand').textContent = UPDATE_COMMAND;
+  showAvailableUpdate(installedVersion).catch(() => {});
   // 2.0.0 se muestra como 2.0; un parche distinto de cero se conserva (2.0.1).
   $('footerVersion').textContent = 'v' + installedVersion.replace(/^(\d+\.\d+)\.0$/, '$1');
   await updateSyncAccount();
