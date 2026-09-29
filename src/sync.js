@@ -66,12 +66,20 @@ export function mergeSyncData(local, remote) {
   candidate.settings.thumbnailHeight = local.settings.thumbnailHeight;
   candidate.workspaces = unionById(candidate.workspaces, local.workspaces);
   const remoteCategoryIds = new Set(candidate.categories.map(category => category.id));
+  // Un acceso vive en una sola categoría. Al fusionar categoría por categoría,
+  // un acceso movido de sección puede existir en remoto en la sección antigua y
+  // en local en la nueva: sin un registro global su id se duplicaría,
+  // normalizeData rechazaría el guardado y el cambio de Diseño (por ejemplo el
+  // tamaño de miniaturas) quedaría bloqueado. Reclamamos cada id una sola vez.
+  const claimedAccessIds = new Set();
+  const claimLocalAccesses = items => items.filter(item => !claimedAccessIds.has(item.id));
   // Categorías que ya existían en remoto: se conservan sus datos (remoto
   // gana en los campos compartidos), pero sus accesos se completan con los
   // que se hayan creado localmente y remoto todavía no conozca.
   for (const category of candidate.categories) {
+    for (const access of category.accesses) claimedAccessIds.add(access.id);
     const localCategory = local.categories.find(item => item.id === category.id);
-    if (localCategory) category.accesses = unionById(category.accesses, localCategory.accesses);
+    if (localCategory) category.accesses = unionById(category.accesses, claimLocalAccesses(localCategory.accesses));
     for (const access of category.accesses) {
       access.thumbnail = images.get(access.id) || '';
       const localAccess = localAccessById.get(access.id);
@@ -80,7 +88,9 @@ export function mergeSyncData(local, remote) {
   }
   // Categorías creadas localmente que remoto todavía no conoce (su
   // workspaceId ya quedó preservado arriba por unionById en workspaces).
-  candidate.categories = unionById(candidate.categories, local.categories.filter(category => !remoteCategoryIds.has(category.id)));
+  candidate.categories = unionById(candidate.categories, local.categories
+    .filter(category => !remoteCategoryIds.has(category.id))
+    .map(category => ({ ...category, accesses: claimLocalAccesses(category.accesses) })));
   return normalizeData(candidate);
 }
 

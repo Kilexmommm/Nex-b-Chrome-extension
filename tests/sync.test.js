@@ -58,6 +58,41 @@ test('mergeSyncData conserva un workspace/categoría/acceso creado localmente qu
   assert.ok(merged.categories[0].accesses.some(a => a.id === 'otro-acceso-existente-cat'), 'un acceso nuevo en una categoría ya existente en remoto no debe desaparecer');
 });
 
+test('cambiar el tamaño de miniaturas no duplica un acceso movido al fusionar sync', () => {
+  const id = 'access-27f8f104-6b4e-447d-bad0-1bbcc06a7b50';
+  const local = normalizeData();
+  local.categories[0].accesses.push({ id, title: 'Documento', url: 'https://example.com/', tags: [], thumbnail: '', matchType: 'document' });
+  // Remoto es el snapshot anterior: el acceso sigue en la sección original.
+  const remote = projectSyncData(local);
+  // Local: el acceso se movió a una sección nueva y luego se cambió el Diseño.
+  local.categories.push({ id: 'nueva', name: 'Nueva', workspaceId: 'general', parentId: '', accesses: [local.categories[0].accesses[0]] });
+  local.categories[0].accesses = [];
+  local.settings.thumbnailSize = 'large';
+  local.settings.thumbnailHeight = 187;
+
+  const merged = mergeSyncData(local, remote);
+  const instances = merged.categories.flatMap(category => category.accesses).filter(access => access.id === id);
+  assert.equal(instances.length, 1, 'el acceso debe conservarse como una sola instancia');
+  assert.equal(merged.settings.thumbnailSize, 'large');
+  assert.equal(merged.settings.thumbnailHeight, 187);
+});
+
+test('mergeSyncData deduplica un id de acceso compartido entre secciones remotas y locales', () => {
+  const id = 'access-duplicado';
+  const local = normalizeData();
+  // El acceso vive en una sección local nueva...
+  local.categories.push({ id: 'otra', name: 'Otra', workspaceId: 'general', parentId: '', accesses: [
+    { id, title: 'Local', url: 'https://example.com/local', tags: [], thumbnail: '', matchType: 'document' },
+  ] });
+  // ...y el remoto todavía lo tiene en la sección original.
+  const remote = projectSyncData(normalizeData());
+  remote.categories[0].accesses.push({ id, title: 'Remoto', url: 'https://example.com/remoto', tags: [], matchType: 'document' });
+
+  const merged = mergeSyncData(local, remote);
+  const instances = merged.categories.flatMap(category => category.accesses).filter(access => access.id === id);
+  assert.equal(instances.length, 1, 'el id no debe existir en dos secciones');
+});
+
 test('createSyncStore guarda por fragmentos y recupera la proyección', async () => {
   const area = memoryArea(), store = createSyncStore(area), data = fixture();
   data.categories[0].accesses[0].title = 'x'.repeat(SYNC_CHUNK_BYTES * 2);
