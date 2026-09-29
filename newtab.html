@@ -26,6 +26,7 @@
         <button type="button" data-narrow-columns="2" aria-pressed="false"><span class="menu-icon" aria-hidden="true">▢</span>2 por fila</button>
       </menu></div>
       </header>
+      <div id="updateBanner" class="update-banner" role="status" hidden><span id="updateBannerText"></span><button id="bannerCopyUpdate" type="button" class="button secondary">Copiar comando</button><button id="bannerReload" type="button" class="button secondary">Recargar nex.b</button><button id="bannerDismiss" type="button" class="button quiet" aria-label="Ocultar aviso de actualización" title="Ocultar">×</button></div>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
       <p id="emptyState" class="empty" hidden>Agrega una categoría para empezar a organizar tus accesos.</p>
@@ -166,8 +167,11 @@
               <button id="openBookmarks" type="button" class="button secondary">Importar favoritos de Chrome</button>
               <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar favoritos importados</button>
               <small>Sincroniza todas las secciones vinculadas, aunque pertenezcan a otro Workspace. Chrome pedirá permiso al usar esta opción; nex.b solo lee tus favoritos.</small>
-              <button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button>
-              <small>Versión instalada: <strong id="extensionVersion"></strong>. Se abrirá el ZIP de GitHub; después reemplaza la carpeta y pulsa «Recargar» en chrome://extensions.</small>
+              <p>Actualizar nex.b</p>
+              <small>Versión instalada: <strong id="extensionVersion"></strong><span id="updateAvailable"></span>. En macOS o Linux, pega este comando en la Terminal (la primera vez instala nex.b en <code>~/nex.b</code>; después lo actualiza). Luego pulsa «Recargar nex.b». Tus datos no se tocan.</small>
+              <code id="updateCommand" class="update-command"></code>
+              <div class="json-actions"><button id="copyUpdateCommand" type="button" class="button secondary">Copiar comando</button><button id="reloadExtension" type="button" class="button secondary">Recargar nex.b</button><button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button></div>
+              <small>«Actualizar desde GitHub» descarga el ZIP (por ejemplo, en Windows): reemplaza la carpeta y pulsa «Recargar nex.b».</small>
               <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
               <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
               <button id="openSidePanel" type="button" class="button secondary">Abrir Side panel</button>

@@ -1,4 +1,4 @@
-# nex.b · 2.0.1
+# nex.b · 2.0.2
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,13 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0.2
+
+- **Instalar y actualizar con un comando (macOS y Linux):** pega en la Terminal
+  `curl -fsSL https://raw.githubusercontent.com/Kilexmommm/Nex-b-Chrome-extension/main/install.sh | bash`.
+  La primera vez instala nex.b en `~/nex.b` (cárgala una vez con «Cargar descomprimida»); después, el mismo comando la actualiza. Si la carpeta es un clon de Git, hace `git pull`. Tus datos viven en Chrome y no se tocan.
+- **Aviso de versión nueva:** nex.b consulta una vez al día la versión publicada y muestra «Copiar comando» y «Recargar nex.b». También está en Configuración → Datos/Respaldo.
 
 ### Novedades 2.0.1
 

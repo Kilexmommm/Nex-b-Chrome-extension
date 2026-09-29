@@ -105,6 +105,9 @@ test('la actualización asistida abre el ZIP de GitHub y muestra la versión ins
   assert.match(app, /const GITHUB_ARCHIVE_URL = 'https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/archive\/refs\/heads\/main\.zip'/);
   assert.match(app, /chrome\.runtime\.getManifest\(\)\.version/);
   assert.match(app, /chrome\.tabs\.create\(\{ url: GITHUB_ARCHIVE_URL \}\)/);
+  assert.match(html, /id="updateBanner"[^>]*hidden/);
+  assert.match(html, /id="copyUpdateCommand"/);
+  assert.match(app, /const reloadExtension = \(\) => chrome\.runtime\.reload\(\)/);
 });
 test('la configuración incluye una pestaña de sincronización sin imágenes en Chrome Sync', () => {
   const app = read('src/app.js'), html = read('newtab.html'), sync = read('src/sync.js');
