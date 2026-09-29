@@ -1,8 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { checkForUpdate, compareVersions, UPDATE_CHECK_INTERVAL, UPDATE_CHECK_KEY, UPDATE_COMMAND } from '../src/update.js';
+import { checkForUpdate, compareVersions, shouldShowUpdateDialog, UPDATE_CHECK_INTERVAL, UPDATE_CHECK_KEY, UPDATE_COMMAND, UPDATE_SNOOZE_MS } from '../src/update.js';
 import { memoryArea } from './helpers.js';
+
+test('el modal de versión nueva sale salvo que se haya pospuesto esa misma versión', () => {
+  const now = 1_000_000;
+  assert.equal(shouldShowUpdateDialog('', undefined, now), false);
+  assert.equal(shouldShowUpdateDialog('2.0.3', undefined, now), true);
+  assert.equal(shouldShowUpdateDialog('2.0.3', { version: '2.0.3', until: now + UPDATE_SNOOZE_MS }, now), false);
+  assert.equal(shouldShowUpdateDialog('2.0.3', { version: '2.0.3', until: now }, now), true);
+  // Una versión aún más nueva vuelve a avisar aunque la anterior esté pospuesta.
+  assert.equal(shouldShowUpdateDialog('2.0.4', { version: '2.0.3', until: now + UPDATE_SNOOZE_MS }, now), true);
+});
+
+test('el modal de actualización explica los pasos y no tapa formularios abiertos', () => {
+  const html = readFileSync(new URL('../newtab.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  assert.match(html, /<dialog id="updateDialog"[\s\S]*Hay una versión nueva de nex\.b[\s\S]*id="dialogCopyUpdate"[\s\S]*id="dialogReload"/);
+  assert.match(html, /id="updateLater"[^>]*>Recordármelo mañana/);
+  assert.match(app, /if \(!shouldShowUpdateDialog\(latest, snooze\) \|\| document\.querySelector\('dialog\[open\]'\)\) return;/);
+  assert.match(app, /showAvailableUpdate\(chrome\.runtime\.getManifest\(\)\.version\)\.catch/);
+});
 
 const manifestResponse = version => async () => new Response(JSON.stringify({ version }), { status: 200 });
 

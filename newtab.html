@@ -104,6 +104,15 @@
       <small>Las URLs que ya existen en cualquier sección del Workspace elegido se ignoran. Si una sección principal tiene este nombre, se agregan ahí solo los enlaces nuevos.</small>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button id="bookmarkImportSubmit" class="button" disabled>Importar nuevos</button></div>
     </form></dialog>
+    <dialog id="updateDialog" class="update-dialog" aria-labelledby="updateDialogTitle"><form method="dialog" class="dialog-form">
+      <h2 id="updateDialogTitle">Hay una versión nueva de nex.b</h2>
+      <p id="updateDialogVersions" class="update-versions"></p>
+      <ol class="update-steps"><li>Pulsa <strong>Copiar comando</strong>.</li><li>Abre la app <strong>Terminal</strong>, pega el comando y pulsa Intro.</li><li>Vuelve aquí y pulsa <strong>Recargar nex.b</strong>.</li></ol>
+      <code id="updateDialogCommand" class="update-command"></code>
+      <small>Tus Workspaces, accesos e imágenes se conservan: viven en Chrome, no en la carpeta de la extensión.</small>
+      <p class="feedback" role="status" hidden></p>
+      <div class="dialog-actions"><button id="updateLater" type="button" class="button secondary">Recordármelo mañana</button><button id="dialogCopyUpdate" type="button" class="button secondary">Copiar comando</button><button id="dialogReload" type="button" class="button">Recargar nex.b</button></div>
+    </form></dialog>
     <dialog id="syncChoiceDialog"><form method="dialog" id="syncChoiceForm" class="dialog-form">
       <h2>Primera sincronización</h2>
       <p class="help">Ya hay datos guardados en la nube y en este equipo. Elige qué conservar para no perder nada.</p>

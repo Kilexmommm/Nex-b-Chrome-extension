@@ -326,3 +326,8 @@ dialog::backdrop { background: #00000099; }
 .update-command { display: block; margin: 6px 0; padding: 8px 10px; border-radius: 7px; background: rgba(0,0,0,.28); font-size: 12px; overflow-wrap: anywhere; user-select: all; }
 .light-theme .update-command { background: rgba(0,0,0,.06); }
 @media (max-width: 600px) { .update-banner { width: 100%; } }
+/* Modal de versión nueva: más grande y destacado que un aviso normal. */
+.update-dialog { max-width: 560px; border: 2px solid var(--accent-color); }
+.update-dialog h2 { font-size: 22px; }
+.update-versions { font-size: 15px; font-weight: 600; margin: 6px 0 4px; }
+.update-steps { margin: 8px 0; padding-left: 22px; line-height: 1.7; font-size: 14px; }

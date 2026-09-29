@@ -9,7 +9,7 @@ import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
-import { checkForUpdate, UPDATE_COMMAND } from './update.js';
+import { checkForUpdate, shouldShowUpdateDialog, UPDATE_COMMAND, UPDATE_SNOOZE_KEY, UPDATE_SNOOZE_MS } from './update.js';
 import { createSyncStore, mergeThreeWay, applyRemoteData, decideSyncAction, projectSyncData, SyncCorruptError } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
@@ -451,7 +451,11 @@ function closeSearch() {
 }
 function renderTagView() {
   const groups = new Map();
+  // Los archivos locales no tienen dominio ni tags automáticos: se agrupan aparte
+  // para que no desaparezcan de esta vista.
+  let localFiles = [];
   for (const category of data.categories) for (const access of category.accesses) {
+    if (access.url.startsWith('file:')) localFiles.push({ access, category });
     for (const tag of allTags(access)) {
       if (!groups.has(tag)) groups.set(tag, []);
       groups.get(tag).push({ access, category });
@@ -461,16 +465,18 @@ function renderTagView() {
     const matching = items.filter(({ access }) => matchesSearch(access));
     if (matching.length) groups.set(tag, matching); else groups.delete(tag);
   }
-  $('emptyState').hidden = groups.size > 0;
+  if (searchQuery) localFiles = localFiles.filter(({ access }) => matchesSearch(access));
+  $('emptyState').hidden = groups.size > 0 || localFiles.length > 0;
   const entries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  if (localFiles.length) entries.unshift(['', localFiles, true]);
   let shownGroups = 0;
   const moreGroups = button('Mostrar más tags', 'Mostrar otros 20 tags', appendGroups);
   function appendGroups() {
     moreGroups.remove();
-    for (const [tag, items] of entries.slice(shownGroups, shownGroups + 20)) {
+    for (const [tag, items, local] of entries.slice(shownGroups, shownGroups + 20)) {
     const section = node('section', 'category');
     const heading = node('div', 'category-heading');
-    heading.append(node('h2', '', '# ' + tag), accessCount(items.length));
+    heading.append(node('h2', local ? 'local-files-heading' : '', local ? '⌂ Archivos locales' : '# ' + tag), accessCount(items.length));
     const cards = node('div', 'cards');
     // Large tag groups are rendered incrementally to avoid creating thousands of image nodes.
     let shown = 0;
@@ -1274,13 +1280,33 @@ onClick('bannerCopyUpdate', copyUpdateCommand);
 onClick('reloadExtension', reloadExtension);
 onClick('bannerReload', reloadExtension);
 onClick('bannerDismiss', () => { $('updateBanner').hidden = true; sessionStorage.setItem('nexbUpdateDismissed', '1'); });
+onClick('dialogCopyUpdate', copyUpdateCommand);
+onClick('dialogReload', reloadExtension);
+async function snoozeUpdate() {
+  const version = $('updateDialog').dataset.version;
+  $('updateDialog').close();
+  await chrome.storage.local.set({ [UPDATE_SNOOZE_KEY]: { version, until: Date.now() + UPDATE_SNOOZE_MS } });
+}
+onClick('updateLater', snoozeUpdate);
+// Esc equivale a «Recordármelo mañana».
+$('updateDialog').addEventListener('cancel', event => { event.preventDefault(); run(snoozeUpdate); });
 async function showAvailableUpdate(current) {
   const latest = await checkForUpdate(current, { storage: chrome.storage.local });
   if (!latest) return;
   $('updateAvailable').textContent = ' · disponible: ' + latest;
-  if (sessionStorage.getItem('nexbUpdateDismissed')) return;
-  $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Copia el comando, pégalo en la Terminal y pulsa «Recargar nex.b».';
-  $('updateBanner').hidden = false;
+  if (!sessionStorage.getItem('nexbUpdateDismissed')) {
+    $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Copia el comando, pégalo en la Terminal y pulsa «Recargar nex.b».';
+    $('updateBanner').hidden = false;
+  }
+  const snooze = (await chrome.storage.local.get(UPDATE_SNOOZE_KEY))[UPDATE_SNOOZE_KEY];
+  // No interrumpe un formulario abierto (p. ej. un acceso pendiente de guardar).
+  if (!shouldShowUpdateDialog(latest, snooze) || document.querySelector('dialog[open]')) return;
+  const dialog = $('updateDialog');
+  dialog.dataset.version = latest;
+  $('updateDialogVersions').textContent = 'Tienes la ' + current + ' y ya está disponible la ' + latest + '.';
+  $('updateDialogCommand').textContent = UPDATE_COMMAND;
+  dialog.querySelector('.feedback').hidden = true;
+  dialog.showModal();
 }
 onClick('openUpdate', async () => {
   await chrome.tabs.create({ url: GITHUB_ARCHIVE_URL });
@@ -1784,7 +1810,6 @@ async function initialize() {
   const installedVersion = chrome.runtime.getManifest().version;
   $('extensionVersion').textContent = installedVersion;
   $('updateCommand').textContent = UPDATE_COMMAND;
-  showAvailableUpdate(installedVersion).catch(() => {});
   // 2.0.0 se muestra como 2.0; un parche distinto de cero se conserva (2.0.1).
   $('footerVersion').textContent = 'v' + installedVersion.replace(/^(\d+\.\d+)\.0$/, '$1');
   await updateSyncAccount();
@@ -1817,6 +1842,8 @@ async function initialize() {
     showPreview();
     showMessage(pending.notice || 'Revisa el acceso y elige su categoría antes de guardar.');
   } else if (pendingKey) { pendingKey = ''; showMessage('El acceso pendiente ya no está disponible. Agrégalo de nuevo desde la página.'); }
+  // Al final, para no tapar el formulario de un acceso pendiente.
+  showAvailableUpdate(chrome.runtime.getManifest().version).catch(() => {});
 }
 setNarrow(narrowMedia.matches);
 run(initialize);

@@ -482,3 +482,10 @@ test('la lupa tras Tags filtra por nombre en Workspace y en Tags', () => {
   assert.match(app, /items\.filter\(\(\{ access \}\) => matchesSearch\(access\)\)/);
   assert.match(app, /if \(!searchQuery\) cards\.append\(button\('\+'/);
 });
+test('la vista Tags agrupa los accesos file:// en «Archivos locales»', () => {
+  const app = read('src/app.js');
+  assert.match(app, /if \(access\.url\.startsWith\('file:'\)\) localFiles\.push\(\{ access, category \}\)/);
+  assert.match(app, /if \(localFiles\.length\) entries\.unshift\(\['', localFiles, true\]\)/);
+  assert.match(app, /local \? '⌂ Archivos locales' : '# ' \+ tag/);
+  assert.match(app, /localFiles = localFiles\.filter\(\(\{ access \}\) => matchesSearch\(access\)\)/);
+});
