@@ -9,7 +9,7 @@ import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
-import { checkForUpdate, UPDATE_COMMAND } from './update.js';
+import { checkForUpdate, shouldShowUpdateDialog, UPDATE_COMMAND, UPDATE_SNOOZE_KEY, UPDATE_SNOOZE_MS } from './update.js';
 import { createSyncStore, mergeThreeWay, applyRemoteData, decideSyncAction, projectSyncData, SyncCorruptError } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
@@ -1274,13 +1274,33 @@ onClick('bannerCopyUpdate', copyUpdateCommand);
 onClick('reloadExtension', reloadExtension);
 onClick('bannerReload', reloadExtension);
 onClick('bannerDismiss', () => { $('updateBanner').hidden = true; sessionStorage.setItem('nexbUpdateDismissed', '1'); });
+onClick('dialogCopyUpdate', copyUpdateCommand);
+onClick('dialogReload', reloadExtension);
+async function snoozeUpdate() {
+  const version = $('updateDialog').dataset.version;
+  $('updateDialog').close();
+  await chrome.storage.local.set({ [UPDATE_SNOOZE_KEY]: { version, until: Date.now() + UPDATE_SNOOZE_MS } });
+}
+onClick('updateLater', snoozeUpdate);
+// Esc equivale a «Recordármelo mañana».
+$('updateDialog').addEventListener('cancel', event => { event.preventDefault(); run(snoozeUpdate); });
 async function showAvailableUpdate(current) {
   const latest = await checkForUpdate(current, { storage: chrome.storage.local });
   if (!latest) return;
   $('updateAvailable').textContent = ' · disponible: ' + latest;
-  if (sessionStorage.getItem('nexbUpdateDismissed')) return;
-  $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Copia el comando, pégalo en la Terminal y pulsa «Recargar nex.b».';
-  $('updateBanner').hidden = false;
+  if (!sessionStorage.getItem('nexbUpdateDismissed')) {
+    $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Copia el comando, pégalo en la Terminal y pulsa «Recargar nex.b».';
+    $('updateBanner').hidden = false;
+  }
+  const snooze = (await chrome.storage.local.get(UPDATE_SNOOZE_KEY))[UPDATE_SNOOZE_KEY];
+  // No interrumpe un formulario abierto (p. ej. un acceso pendiente de guardar).
+  if (!shouldShowUpdateDialog(latest, snooze) || document.querySelector('dialog[open]')) return;
+  const dialog = $('updateDialog');
+  dialog.dataset.version = latest;
+  $('updateDialogVersions').textContent = 'Tienes la ' + current + ' y ya está disponible la ' + latest + '.';
+  $('updateDialogCommand').textContent = UPDATE_COMMAND;
+  dialog.querySelector('.feedback').hidden = true;
+  dialog.showModal();
 }
 onClick('openUpdate', async () => {
   await chrome.tabs.create({ url: GITHUB_ARCHIVE_URL });
@@ -1784,7 +1804,6 @@ async function initialize() {
   const installedVersion = chrome.runtime.getManifest().version;
   $('extensionVersion').textContent = installedVersion;
   $('updateCommand').textContent = UPDATE_COMMAND;
-  showAvailableUpdate(installedVersion).catch(() => {});
   // 2.0.0 se muestra como 2.0; un parche distinto de cero se conserva (2.0.1).
   $('footerVersion').textContent = 'v' + installedVersion.replace(/^(\d+\.\d+)\.0$/, '$1');
   await updateSyncAccount();
@@ -1817,6 +1836,8 @@ async function initialize() {
     showPreview();
     showMessage(pending.notice || 'Revisa el acceso y elige su categoría antes de guardar.');
   } else if (pendingKey) { pendingKey = ''; showMessage('El acceso pendiente ya no está disponible. Agrégalo de nuevo desde la página.'); }
+  // Al final, para no tapar el formulario de un acceso pendiente.
+  showAvailableUpdate(chrome.runtime.getManifest().version).catch(() => {});
 }
 setNarrow(narrowMedia.matches);
 run(initialize);

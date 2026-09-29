@@ -1,4 +1,4 @@
-# nex.b · 2.0.2
+# nex.b · 2.0.3
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,10 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0.3
+
+- **Aviso grande de versión nueva:** cuando hay una versión más reciente en GitHub, nex.b abre un modal con la versión instalada y la nueva, los tres pasos para actualizar, «Copiar comando» y «Recargar nex.b». «Recordármelo mañana» (o Esc) lo pospone 24 horas para esa versión; una versión aún más nueva vuelve a avisar. No se abre encima de un formulario. La comprobación se hace cada 3 horas.
 
 ### Novedades 2.0.2
 

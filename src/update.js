@@ -1,7 +1,17 @@
 export const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/Kilexmommm/Nex-b-Chrome-extension/main/manifest.json';
 export const UPDATE_COMMAND = 'curl -fsSL https://raw.githubusercontent.com/Kilexmommm/Nex-b-Chrome-extension/main/install.sh | bash';
 export const UPDATE_CHECK_KEY = 'nexbUpdateCheck';
-export const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+export const UPDATE_CHECK_INTERVAL = 3 * 60 * 60 * 1000;
+export const UPDATE_SNOOZE_KEY = 'nexbUpdateSnooze';
+export const UPDATE_SNOOZE_MS = 24 * 60 * 60 * 1000;
+
+// El aviso grande se muestra salvo que el usuario lo haya pospuesto para esta
+// misma versión en las últimas 24 horas; una versión aún más nueva vuelve a avisar.
+export function shouldShowUpdateDialog(latest, snooze, now = Date.now()) {
+  if (!latest) return false;
+  if (!snooze || snooze.version !== latest || typeof snooze.until !== 'number') return true;
+  return now >= snooze.until;
+}
 
 // Compara versiones de Chrome ("2.0.1"): negativo si a < b, 0 si iguales.
 export function compareVersions(a, b) {
@@ -13,7 +23,7 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-// Consulta como mucho una vez al día la versión publicada en main. Devuelve la
+// Consulta como mucho cada 3 horas la versión publicada en main. Devuelve la
 // versión nueva o '' si no hay; un fallo de red nunca interrumpe la app.
 export async function checkForUpdate(current, { storage, fetch: request = fetch, now = Date.now() } = {}) {
   let cached = (await storage.get(UPDATE_CHECK_KEY))[UPDATE_CHECK_KEY];
