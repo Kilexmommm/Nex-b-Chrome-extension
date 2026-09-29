@@ -66,6 +66,7 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ### Novedades 2.0.3
 
+- **Archivos locales en la vista Tags:** los accesos `file://` (HTML y carpetas del equipo) aparecen agrupados en «⌂ Archivos locales», el primer grupo de la vista Tags. Antes no salían porque no tienen dominio ni tags automáticos. La lupa también los filtra.
 - **Aviso grande de versión nueva:** cuando hay una versión más reciente en GitHub, nex.b abre un modal con la versión instalada y la nueva, los tres pasos para actualizar, «Copiar comando» y «Recargar nex.b». «Recordármelo mañana» (o Esc) lo pospone 24 horas para esa versión; una versión aún más nueva vuelve a avisar. No se abre encima de un formulario. La comprobación se hace cada 3 horas.
 
 ### Novedades 2.0.2

@@ -451,7 +451,11 @@ function closeSearch() {
 }
 function renderTagView() {
   const groups = new Map();
+  // Los archivos locales no tienen dominio ni tags automáticos: se agrupan aparte
+  // para que no desaparezcan de esta vista.
+  let localFiles = [];
   for (const category of data.categories) for (const access of category.accesses) {
+    if (access.url.startsWith('file:')) localFiles.push({ access, category });
     for (const tag of allTags(access)) {
       if (!groups.has(tag)) groups.set(tag, []);
       groups.get(tag).push({ access, category });
@@ -461,16 +465,18 @@ function renderTagView() {
     const matching = items.filter(({ access }) => matchesSearch(access));
     if (matching.length) groups.set(tag, matching); else groups.delete(tag);
   }
-  $('emptyState').hidden = groups.size > 0;
+  if (searchQuery) localFiles = localFiles.filter(({ access }) => matchesSearch(access));
+  $('emptyState').hidden = groups.size > 0 || localFiles.length > 0;
   const entries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  if (localFiles.length) entries.unshift(['', localFiles, true]);
   let shownGroups = 0;
   const moreGroups = button('Mostrar más tags', 'Mostrar otros 20 tags', appendGroups);
   function appendGroups() {
     moreGroups.remove();
-    for (const [tag, items] of entries.slice(shownGroups, shownGroups + 20)) {
+    for (const [tag, items, local] of entries.slice(shownGroups, shownGroups + 20)) {
     const section = node('section', 'category');
     const heading = node('div', 'category-heading');
-    heading.append(node('h2', '', '# ' + tag), accessCount(items.length));
+    heading.append(node('h2', local ? 'local-files-heading' : '', local ? '⌂ Archivos locales' : '# ' + tag), accessCount(items.length));
     const cards = node('div', 'cards');
     // Large tag groups are rendered incrementally to avoid creating thousands of image nodes.
     let shown = 0;
