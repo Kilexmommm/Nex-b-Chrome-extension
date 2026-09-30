@@ -333,7 +333,7 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead', 'sidePanel']);
+  assert.deepEqual(manifest.permissions, ['tabs', 'tabGroups', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead', 'sidePanel']);
   assert.equal(manifest.optional_host_permissions, undefined);
   assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
   assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
@@ -506,4 +506,19 @@ test('Diseño permite poner el título y las etiquetas encima de la miniatura (i
   assert.match(css, /\.card-open > \.card-overlay\.card-tags-above \{ position: static;/);
   // El título sigue siendo el botón que abre o enfoca el acceso.
   assert.match(app, /button\(access\.title, 'Abrir o enfocar: ' \+ access\.title, \(\) => openAccess\(access\), 'card-title card-title-link'\)/);
+});
+test('el inventario es ancho y ofrece la pestaña «Agrupar» con grupos nativos de Chrome', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), css = read('src/overrides.css');
+  assert.match(html, /id="inventoryGroupTab" type="button" role="tab" aria-controls="inventoryGroupPanel" aria-selected="false"/);
+  assert.match(html, /id="inventoryGroupPanel" role="tabpanel" aria-labelledby="inventoryGroupTab" hidden/);
+  assert.match(html, /id="inventoryGroupGather" type="checkbox"/);
+  assert.match(html, /id="inventoryGroupAll"[^>]*>Agrupar todas/);
+  assert.match(html, /id="inventoryGroupSelected"[^>]*>Agrupar seleccionados/);
+  assert.match(app, /chrome\.tabGroups\.query\(\{\}\)/);
+  assert.match(app, /chrome\.tabs\.group\(\{ groupId: action\.groupId, tabIds: action\.tabIds \}\)/);
+  assert.match(app, /createProperties: \{ windowId: action\.windowId \}/);
+  assert.match(app, /chrome\.tabGroups\.update\(groupId, \{ title: action\.title, color: action\.color \}\)/);
+  assert.match(css, /\.inventory-form \{ width: min\(1480px/);
+  assert.match(css, /calc\(\(100% - 32px\) \/ 5\)/);
+  assert.match(css, /\[data-narrow="true"\] #inventoryDialog \.inventory-list \{ grid-template-columns: minmax\(0, 1fr\)/);
 });
