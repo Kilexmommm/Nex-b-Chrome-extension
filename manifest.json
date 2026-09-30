@@ -11,6 +11,7 @@
   "optional_permissions": ["bookmarks"],
   "permissions": [
     "tabs",
+    "tabGroups",
     "storage",
     "contextMenus",
     "activeTab",

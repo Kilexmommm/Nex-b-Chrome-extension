@@ -326,6 +326,7 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | Permiso | Uso |
 | --- | --- |
 | `tabs` | Consultar URLs para detectar y reutilizar pestañas abiertas. |
+| `tabGroups` | Ponerle nombre y color a los grupos de pestañas que crea **Inventario → Agrupar** y reutilizar los grupos que ya existen con ese nombre. |
 | `storage` | Guardar biblioteca y configuración localmente. |
 | `contextMenus` | Agregar sitios y actualizar capturas desde los menús de Chrome. |
 | `activeTab` | Capturar la pestaña tras una acción del usuario. |
