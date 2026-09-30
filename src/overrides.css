@@ -335,10 +335,10 @@ dialog::backdrop { background: #00000099; }
 /* Issue #37: título y etiquetas de la miniatura, opcionalmente encima de la imagen.
    Por defecto (data-title-position="below", data-tags-position="overlay") no cambia nada. */
 html[data-title-position="above"] .card { display: flex; flex-direction: column; }
-html[data-title-position="above"] .card > .card-footer { order: -1; padding: 2px 34px 7px 2px; }
-/* Reserva dos líneas de título en la fila (no en el botón: Chrome centra el texto de un
-   botón y un título de una línea se separaría del punto) para alinear las imágenes. */
-html[data-title-position="above"] .card > .card-footer { box-sizing: border-box; min-height: calc(11px * 1.4 * 2 + 9px); }
+html[data-title-position="above"] .card > .card-footer { order: -1; padding: 2px 34px 6px 2px; }
+/* Con el título arriba se muestra en una sola línea (con «…»; el nombre completo sale al
+   pasar el ratón): todas las filas miden lo mismo y no queda hueco sobre la imagen. */
+html[data-title-position="above"] .card-footer .card-title { -webkit-line-clamp: 1; max-height: 1.4em; }
 /* Etiquetas arriba a la izquierda dentro de la imagen: mismo overlay, anclado arriba y con
    el degradado invertido; deja libre la esquina derecha para el botón de editar. */
 html[data-tags-position="above"] .thumb .card-overlay { inset: 0 0 auto; padding: 9px 38px 26px 10px; background: linear-gradient(rgba(6,10,18,.92), transparent); }
