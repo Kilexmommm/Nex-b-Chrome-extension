@@ -167,6 +167,7 @@
         <div class="setting-grid"><label>Fuente<select id="fontFamily"><option value="system">Sistema</option><option value="rounded">Redondeada</option><option value="serif">Serif</option><option value="mono">Monoespaciada</option></select></label><label>Estilo de tarjeta<select id="cardStyle"><option value="flat">Plano</option><option value="soft">Suave</option><option value="glass">Cristal</option></select></label></div>
         <div class="setting-grid"><label>Borde de tarjetas<select id="cardBorder"><option value="none">Sin borde</option><option value="soft">Suave</option><option value="strong">Marcado</option></select></label><label>Color del borde<input id="cardBorderColor" type="color" /></label></div>
         <div class="setting-grid"><label>Separación de tarjetas<select id="cardSpacing"><option value="compact">Compacta</option><option value="normal">Normal</option><option value="wide">Amplia</option></select></label><label>Estilo de iconos<select id="iconStyle"><option value="minimal">Minimalista</option><option value="filled">Rellenos</option><option value="round">Redondos</option></select></label></div>
+        <div class="setting-grid"><label>Título de la miniatura<select id="titlePosition"><option value="below">Debajo de la imagen</option><option value="above">Arriba de la imagen</option></select></label><label>Etiquetas de la miniatura<select id="tagsPosition"><option value="overlay">Sobre la imagen</option><option value="above">Encima de la imagen</option></select></label></div>
         <label class="checkbox-label"><input id="showWorkspaceTabs" type="checkbox" checked /> Mostrar pestañas de Workspaces</label>
         </section>
         <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
@@ -200,7 +201,9 @@
       <div class="settings-tabs" role="tablist" aria-label="Vistas del inventario">
         <button id="inventoryAllTab" type="button" role="tab" aria-controls="inventoryAllPanel" aria-selected="true">Todas</button>
         <button id="inventoryDupTab" type="button" role="tab" aria-controls="inventoryDupPanel" aria-selected="false" tabindex="-1">Repetidas</button>
+        <button id="inventoryGroupTab" type="button" role="tab" aria-controls="inventoryGroupPanel" aria-selected="false" tabindex="-1">Agrupar</button>
       </div>
+      <p class="feedback" role="status" hidden></p>
       <section id="inventoryAllPanel" role="tabpanel" aria-labelledby="inventoryAllTab">
         <input id="inventorySearch" type="search" class="inventory-search" placeholder="Filtrar por palabra (título o URL): amazon, docs…" aria-label="Filtrar pestañas por palabra" />
         <div class="inventory-toolbar">
@@ -226,6 +229,18 @@
         <div class="inventory-actions">
           <button id="inventoryDupGather" type="button" class="button secondary">Reunir en una ventana</button>
           <button id="inventoryDupClose" type="button" class="button">Cierre pasivo (dejar 1 de cada una)</button>
+        </div>
+      </section>
+      <section id="inventoryGroupPanel" role="tabpanel" aria-labelledby="inventoryGroupTab" hidden>
+        <p id="inventoryGroupSummary" class="help"></p>
+        <div class="inventory-toolbar">
+          <label class="inventory-check"><input id="inventoryGroupGather" type="checkbox" /> Reunir antes en esta ventana</label>
+          <button id="inventoryGroupToggle" type="button" class="button secondary">Marcar / desmarcar todos</button>
+        </div>
+        <div id="inventoryGroupList" class="inventory-list inventory-group-list"></div>
+        <div class="inventory-actions">
+          <button id="inventoryGroupSelected" type="button" class="button secondary">Agrupar seleccionados</button>
+          <button id="inventoryGroupAll" type="button" class="button">Agrupar todas</button>
         </div>
       </section>
       <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cerrar</button></div>

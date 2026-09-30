@@ -331,3 +331,43 @@ dialog::backdrop { background: #00000099; }
 .update-dialog h2 { font-size: 22px; }
 .update-versions { font-size: 15px; font-weight: 600; margin: 6px 0 4px; }
 .update-steps { margin: 8px 0; padding-left: 22px; line-height: 1.7; font-size: 14px; }
+
+/* Issue #37: título y etiquetas de la miniatura, opcionalmente encima de la imagen.
+   Por defecto (data-title-position="below", data-tags-position="overlay") no cambia nada. */
+html[data-title-position="above"] .card { display: flex; flex-direction: column; }
+html[data-title-position="above"] .card > .card-footer { order: -1; padding: 2px 34px 7px 2px; }
+/* Reserva dos líneas de título para que las imágenes de una misma fila queden alineadas. */
+html[data-title-position="above"] .card-footer .card-title { min-height: 2.8em; }
+/* Franja propia de etiquetas antes de la imagen: sin degradado ni posición absoluta. */
+.card-open > .card-overlay.card-tags-above { position: static; inset: auto; min-height: 25px; padding: 0 0 6px; background: none; color: inherit; }
+.card-open > .card-overlay.card-tags-above .tags { margin-top: 0; }
+.card-open > .card-overlay.card-tags-above > .workspace-tag + .tags { margin-top: 4px; }
+html[data-tags-position="above"]:not([data-title-position="above"]) .card-open > .card-tags-above { padding-right: 34px; }
+/* Con contenido encima, el botón de editar se alinea con la primera fila en vez de tapar la imagen. */
+html:is([data-title-position="above"], [data-tags-position="above"]) .card-edit { top: 0; }
+/* Inventario ancho: rejilla de hasta 5 columnas para ver muchas pestañas a la vez. */
+.inventory-form { width: min(1480px, calc(100vw - 48px)); }
+#inventoryDialog .inventory-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 32px) / 5)), 1fr)); gap: 8px; align-content: start; max-height: 62vh; padding: 8px; }
+#inventoryDialog .inventory-row, #inventoryDialog .dup-group { min-width: 0; border: 1px solid #2a3450; border-radius: 8px; }
+#inventoryDialog .inventory-row:last-child, #inventoryDialog .dup-group:last-child { border-bottom: 1px solid #2a3450; }
+#inventoryDialog label.inventory-row { cursor: pointer; }
+#inventoryDialog .inventory-row:hover { border-color: #52627f; }
+#inventoryDialog .inventory-row:has(input[type=checkbox]:checked) { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 14%, transparent); }
+#inventoryDialog .inventory-row input[type=checkbox] { width: 18px; height: 18px; }
+[data-narrow="true"] #inventoryDialog .inventory-list { grid-template-columns: minmax(0, 1fr); max-height: 58vh; }
+@media (max-width: 600px) { #inventoryDialog .inventory-list { grid-template-columns: minmax(0, 1fr); } }
+/* Panel «Agrupar»: propuesta de grupos nativos de Chrome. */
+.inventory-check { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 13px; cursor: pointer; }
+.inventory-check input { width: auto; margin: 0; }
+.group-name { width: 100%; margin: 0; border: 1px solid #3b4969; border-radius: 6px; background: #111724; color: inherit; padding: 5px 8px; font: inherit; font-size: 13px; font-weight: 600; }
+.light-theme .group-name { border-color: #b7c4db; background: #fff; }
+.group-swatch { flex: 0 0 12px; width: 12px; height: 12px; border-radius: 50%; background: #9aa0a6; }
+.group-color-grey { background: #9aa0a6; }
+.group-color-blue { background: #8ab4f8; }
+.group-color-red { background: #f28b82; }
+.group-color-yellow { background: #fdd663; }
+.group-color-green { background: #81c995; }
+.group-color-pink { background: #ff8bcb; }
+.group-color-purple { background: #c58af9; }
+.group-color-cyan { background: #78d9ec; }
+.group-color-orange { background: #fcad70; }

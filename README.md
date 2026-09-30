@@ -1,4 +1,4 @@
-# nex.b · 2.0.3
+# nex.b · 2.0.4
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,13 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0.4
+
+- **Título y etiquetas encima de la miniatura (#37):** en Configuración → Diseño puedes poner el título arriba de la imagen y las etiquetas («⌂ Archivo local», tags automáticos y propios) en una franja encima de la imagen, sin taparla. Por defecto todo se ve como antes.
+- **Inventario más ancho (#38):** las pestañas se ven en una rejilla de hasta 5 columnas (1 en el Side Panel) y los mensajes aparecen dentro del inventario.
+- **Agrupar pestañas (#38):** nueva pestaña «Agrupar» en el inventario que propone grupos nativos de Chrome con la misma lógica que los tags automáticos (4 Gmail → un grupo «Gmail»; si no hay regla, por dominio). Nombres editables, «Agrupar seleccionados» o «Agrupar todas», reutiliza grupos con el mismo nombre y puede reunir antes todo en la ventana actual. No toca las pestañas fijadas.
+- **Permiso nuevo `tabGroups`:** necesario para poner nombre y color a los grupos. Al actualizar, Chrome puede pedir que lo aceptes.
 
 ### Novedades 2.0.3
 
@@ -326,6 +333,7 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | Permiso | Uso |
 | --- | --- |
 | `tabs` | Consultar URLs para detectar y reutilizar pestañas abiertas. |
+| `tabGroups` | Ponerle nombre y color a los grupos de pestañas que crea **Inventario → Agrupar** y reutilizar los grupos que ya existen con ese nombre. |
 | `storage` | Guardar biblioteca y configuración localmente. |
 | `contextMenus` | Agregar sitios y actualizar capturas desde los menús de Chrome. |
 | `activeTab` | Capturar la pestaña tras una acción del usuario. |

@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "General", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", showWorkspaceTabs: true },
+    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", titlePosition: "below", tagsPosition: "overlay", showWorkspaceTabs: true },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -47,6 +47,11 @@ function enumValue(value, allowed, label) {
     if (!allowed.includes(value))
         fail(label + ": valor no permitido.");
     return value;
+}
+// Para ajustes de solo presentación: un valor desconocido (p. ej. de una versión
+// más nueva o de una copia editada a mano) vuelve al valor por defecto sin fallar.
+function optionValue(value, allowed, fallback) {
+    return allowed.includes(value) ? value : fallback;
 }
 export function webUrl(value) {
     const raw = text(value, "URL", 8192);
@@ -223,7 +228,9 @@ export function normalizeData(stored = DEFAULT_DATA) {
             cardBorder: enumValue(s.cardBorder, ["none", "soft", "strong"], "Borde de tarjeta"),
             cardBorderColor: /^#[0-9a-f]{6}$/i.test(s.cardBorderColor) ? s.cardBorderColor : fail("Color de borde inválido."),
             cardSpacing: enumValue(s.cardSpacing, ["compact", "normal", "wide"], "Separación de tarjetas"),
-            iconStyle: enumValue(s.iconStyle, ["minimal", "filled", "round"], "Estilo de icono") },
+            iconStyle: enumValue(s.iconStyle, ["minimal", "filled", "round"], "Estilo de icono"),
+            titlePosition: optionValue(s.titlePosition, ["below", "above"], "below"),
+            tagsPosition: optionValue(s.tagsPosition, ["overlay", "above"], "overlay") },
         autoTagRules: validateRules(stored.autoTagRules ?? DEFAULT_DATA.autoTagRules) };
 }
 function appDocumentId(url) {

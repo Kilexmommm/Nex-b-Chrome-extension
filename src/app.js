@@ -1,3 +1,4 @@
+import { proposeTabGroups, planGroupActions, groupingSummary } from './grouping.js';
 import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab, openOrFocusMany } from './tabs.js';
@@ -67,6 +68,8 @@ function arrangeDialogFields() {
     cardBorderColor: 'Solo se usa si activas un borde.',
     cardSpacing: 'Espacio entre tarjetas del Workspace.',
     iconStyle: 'Aspecto de los controles con icono.',
+    titlePosition: 'Dónde se muestra el título de cada miniatura.',
+    tagsPosition: 'Dónde se muestran el chip de archivo local y las etiquetas.',
     showWorkspaceTabs: 'Muestra la fila de pestañas para cambiar de Workspace.',
     settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
     captureEnabled: 'Crea una miniatura al agregar un acceso.',
@@ -249,6 +252,9 @@ function applySettings() {
   document.documentElement.dataset.theme = s.themeId;
   document.documentElement.dataset.cardStyle = s.cardStyle;
   document.documentElement.dataset.iconStyle = s.iconStyle;
+  // Posición del título y de las etiquetas de las miniaturas (issue #37); el CSS lee estos atributos.
+  document.documentElement.dataset.titlePosition = s.titlePosition;
+  document.documentElement.dataset.tagsPosition = s.tagsPosition;
   document.documentElement.style.setProperty('--accent-color', s.accentColor);
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -549,7 +555,12 @@ function makeCard(access, categoryId) {
   const automatic = new Set(automaticTags(access.url));
   allTags(access).forEach(tag => tags.append(node('span', 'tag' + (automatic.has(tag) ? ' auto' : ''), tag)));
   overlay.append(tags);
-  thumb.append(overlay);
+  // «Encima de la imagen»: las etiquetas van en una franja propia antes de la miniatura
+  // (dentro del mismo botón, así siguen abriendo el acceso); por defecto, sobre la imagen.
+  if (data.settings.tagsPosition === 'above') {
+    overlay.classList.add('card-tags-above');
+    open.append(overlay);
+  } else thumb.append(overlay);
   const status = node('span', 'status');
   status.setAttribute('role', 'img');
   const footer = node('div', 'card-footer');
@@ -829,14 +840,96 @@ async function openInventoryDialog() {
   await refreshInventory();
   openDialog('inventoryDialog');
 }
+const INVENTORY_VIEWS = { all: ['inventoryAllTab', 'inventoryAllPanel'], dup: ['inventoryDupTab', 'inventoryDupPanel'], group: ['inventoryGroupTab', 'inventoryGroupPanel'] };
 function selectInventoryTab(tab) {
-  const dup = tab === 'dup';
-  $('inventoryAllPanel').hidden = dup;
-  $('inventoryDupPanel').hidden = !dup;
-  $('inventoryAllTab').setAttribute('aria-selected', String(!dup));
-  $('inventoryDupTab').setAttribute('aria-selected', String(dup));
-  $('inventoryAllTab').tabIndex = dup ? -1 : 0;
-  $('inventoryDupTab').tabIndex = dup ? 0 : -1;
+  for (const [name, [tabId, panelId]] of Object.entries(INVENTORY_VIEWS)) {
+    const active = name === tab;
+    $(panelId).hidden = !active;
+    $(tabId).setAttribute('aria-selected', String(active));
+    $(tabId).tabIndex = active ? 0 : -1;
+  }
+}
+// Agrupar: propone grupos nativos de Chrome por etiqueta automática o dominio.
+let groupProposals = [];
+async function groupingContext() {
+  const [tabs, existingGroups, current] = await Promise.all([
+    chrome.tabs.query({ windowType: 'normal' }),
+    chrome.tabGroups.query({}),
+    chrome.windows.getCurrent()
+  ]);
+  return { tabs, existingGroups, current };
+}
+async function refreshGroupProposals() {
+  const { tabs, existingGroups, current } = await groupingContext();
+  const gather = $('inventoryGroupGather').checked;
+  groupProposals = proposeTabGroups(tabs, data.autoTagRules, {
+    existingGroups, targetWindowId: gather ? current.id : null, extensionOrigin: chrome.runtime.getURL('')
+  });
+  const labels = buildWindowLabels(tabs);
+  const fragment = document.createDocumentFragment();
+  groupProposals.forEach((proposal, index) => {
+    const row = node('div', 'inventory-row group-proposal');
+    row.dataset.index = String(index);
+    const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
+    checkbox.setAttribute('aria-label', 'Incluir el grupo ' + proposal.title);
+    const swatch = node('span', 'group-swatch group-color-' + proposal.color);
+    swatch.setAttribute('aria-hidden', 'true');
+    const info = node('span', 'inventory-row-info');
+    const name = node('input', 'group-name'); name.type = 'text'; name.value = proposal.title; name.maxLength = 80;
+    name.setAttribute('aria-label', 'Nombre del grupo (' + proposal.tabIds.length + ' pestañas)');
+    name.onkeydown = event => { if (event.key === 'Enter') event.preventDefault(); };
+    const count = proposal.tabIds.length + (proposal.tabIds.length === 1 ? ' pestaña' : ' pestañas');
+    const where = gather ? 'esta ventana' : (labels.get(proposal.windowId) || 'Ventana ?');
+    const state = proposal.existingGroupId !== null ? ' · se añade al grupo existente' : ' · grupo nuevo';
+    info.append(name, node('small', 'inventory-row-url', count + ' · ' + where + state));
+    row.append(checkbox, swatch, info);
+    fragment.append(row);
+  });
+  $('inventoryGroupList').replaceChildren(fragment);
+  const total = groupProposals.reduce((sum, proposal) => sum + proposal.tabIds.length, 0);
+  $('inventoryGroupSummary').textContent = groupProposals.length
+    ? groupProposals.length + (groupProposals.length === 1 ? ' grupo propuesto' : ' grupos propuestos') + ' con ' + total + ' pestañas, según los tags automáticos por URL o el dominio. Puedes renombrarlos antes de agrupar.'
+    : 'No hay pestañas que agrupar: hacen falta al menos 2 pestañas web (no fijadas) del mismo sitio, o ya están agrupadas.';
+}
+function toggleGroupProposals() {
+  const boxes = [...$('inventoryGroupList').querySelectorAll('input[type=checkbox]')];
+  const allChecked = boxes.length > 0 && boxes.every(box => box.checked);
+  boxes.forEach(box => { box.checked = !allChecked; });
+}
+async function applyGrouping(all = false) {
+  const chosen = [...$('inventoryGroupList').querySelectorAll('.group-proposal')]
+    .filter(row => all || row.querySelector('input[type=checkbox]').checked)
+    .map(row => ({ ...groupProposals[Number(row.dataset.index)], title: row.querySelector('.group-name').value.trim() }))
+    .filter(proposal => proposal.tabIds);
+  if (!chosen.length) { showMessage('Marca al menos un grupo para agrupar.', true); return; }
+  if (chosen.some(proposal => !proposal.title)) { showMessage('Escribe un nombre para cada grupo marcado.', true); return; }
+  const { tabs, current } = await groupingContext();
+  const alive = new Map(tabs.filter(tab => !tab.pinned).map(tab => [tab.id, tab]));
+  for (const proposal of chosen) proposal.tabIds = proposal.tabIds.filter(id => alive.has(id));
+  if ($('inventoryGroupGather').checked) {
+    const away = chosen.flatMap(proposal => proposal.tabIds).filter(id => alive.get(id).windowId !== current.id);
+    if (away.length) await chrome.tabs.move(away, { windowId: current.id, index: -1 });
+    for (const proposal of chosen) proposal.windowId = current.id;
+  }
+  const existingGroups = await chrome.tabGroups.query({});
+  const result = { created: 0, reused: 0, tabs: 0 };
+  let failed = 0;
+  for (const action of planGroupActions(chosen, existingGroups)) {
+    try {
+      if (action.groupId !== null) {
+        await chrome.tabs.group({ groupId: action.groupId, tabIds: action.tabIds });
+        result.reused++;
+      } else {
+        const groupId = await chrome.tabs.group({ tabIds: action.tabIds, createProperties: { windowId: action.windowId } });
+        await chrome.tabGroups.update(groupId, { title: action.title, color: action.color });
+        result.created++;
+      }
+      result.tabs += action.tabIds.length;
+    } catch { failed++; }
+  }
+  await refreshGroupProposals();
+  await refreshInventory();
+  showMessage(groupingSummary(result) + (failed ? ' ' + failed + (failed === 1 ? ' grupo no se pudo crear.' : ' grupos no se pudieron crear.') : ''), failed > 0 && !result.tabs);
 }
 function fillDupCategories(workspaceId, selectedId = '') {
   const categories = data.categories.filter(c => c.workspaceId === workspaceId);
@@ -1148,6 +1241,11 @@ onClick('inventoryCloseSelected', closeSelectedInventory);
 onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
+onClick('inventoryGroupTab', async () => { selectInventoryTab('group'); await refreshGroupProposals(); });
+onClick('inventoryGroupToggle', toggleGroupProposals);
+onClick('inventoryGroupSelected', () => applyGrouping(false));
+onClick('inventoryGroupAll', () => applyGrouping(true));
+$('inventoryGroupGather').onchange = () => run(refreshGroupProposals);
 onClick('captureAllImages', captureAllImages);
 $('cancelCapture').onclick = () => { if (captureBusy) { captureCancelled = true; showMessage('Se cancelará al terminar la página actual.'); } };
 $('inventorySearch').oninput = () => {
@@ -1366,7 +1464,7 @@ onClick('openSettings', () => {
   renderStylePresets(s.themeId);
   $('settingsDialog').dataset.themeId = s.themeId;
   $('settingsDialog').dataset.pattern = s.backgroundPattern;
-  for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) $(key).value = s[key];
+  for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle', 'titlePosition', 'tagsPosition']) $(key).value = s[key];
   $('thumbnailCustomHeight').value = s.thumbnailHeight;
   $('thumbnailHeightRange').value = s.thumbnailHeight;
   $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
@@ -1429,6 +1527,7 @@ onSubmit('settingsForm', async () => {
      backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
+    titlePosition: $('titlePosition').value, tagsPosition: $('tagsPosition').value,
     captureEnabled: $('captureEnabled').checked,
     showWorkspaceTabs: $('showWorkspaceTabs').checked
   };
