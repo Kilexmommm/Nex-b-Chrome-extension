@@ -374,3 +374,6 @@ html[data-title-position="above"] .card-edit { top: 0; }
 .group-color-purple { background: #c58af9; }
 .group-color-cyan { background: #78d9ec; }
 .group-color-orange { background: #fcad70; }
+/* «+ Nuevo acceso»: un botón pequeño a la derecha de la última miniatura, no una tarjeta entera. */
+.cards > .add-card { aspect-ratio: auto; width: 40px; height: 40px; justify-self: start; align-self: center; padding: 0; font-size: 22px; line-height: 1; border-radius: 999px; }
+.cards > .add-card:hover, .cards > .add-card:focus-visible { border-style: solid; border-color: var(--accent-color); color: var(--accent-color); }

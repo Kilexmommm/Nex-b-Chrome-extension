@@ -66,6 +66,7 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ### Novedades 2.0.6
 
+- **Botón «+» pequeño:** el botón para añadir un acceso ya no ocupa el tamaño de una miniatura; es un botón redondo junto a la última miniatura de cada sección.
 - **Sin hueco entre el título y la imagen:** con el título arriba, ahora ocupa una sola línea (con «…» si no cabe; el nombre completo aparece al pasar el ratón), en vez de reservar dos líneas que dejaban espacio vacío con títulos cortos.
 
 ### Novedades 2.0.5

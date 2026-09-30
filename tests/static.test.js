@@ -165,7 +165,8 @@ test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3
   assert.match(css, /--card-min-width:168px/);
   assert.match(css, /minmax\(min\(var\(--card-min-width\),100%\),1fr\)/);
   assert.match(css, /\.thumb \{[\s\S]*?aspect-ratio:5 \/ 3/);
-  assert.match(css, /\.add-card \{[\s\S]*?aspect-ratio:5 \/ 3/);
+  // El «+» es un botón pequeño junto a la última miniatura, no una tarjeta del tamaño de una miniatura.
+  assert.match(read('src/overrides.css'), /\.cards > \.add-card \{ aspect-ratio: auto; width: 40px; height: 40px; justify-self: start;/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
   assert.match(read('newtab.html'), /id="thumbnailCustomHeight"/);
 });
