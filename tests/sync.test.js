@@ -354,3 +354,11 @@ test('fragmentos con suma de control distinta se marcan como dañados', async ()
   await area.set({ [key]: all[key].slice(0, -4) + 'AAAA' });
   await assert.rejects(store.load(), SyncCorruptError);
 });
+test('la posición del título y de las etiquetas viaja por Chrome Sync', () => {
+  const local = normalizeData();
+  local.settings = { ...local.settings, titlePosition: 'above', tagsPosition: 'above' };
+  const projected = projectSyncData(local);
+  assert.equal(projected.settings.titlePosition, 'above');
+  assert.equal(projected.settings.tagsPosition, 'above');
+  assert.equal(normalizeData(projected).settings.titlePosition, 'above');
+});

@@ -331,3 +331,17 @@ dialog::backdrop { background: #00000099; }
 .update-dialog h2 { font-size: 22px; }
 .update-versions { font-size: 15px; font-weight: 600; margin: 6px 0 4px; }
 .update-steps { margin: 8px 0; padding-left: 22px; line-height: 1.7; font-size: 14px; }
+
+/* Issue #37: título y etiquetas de la miniatura, opcionalmente encima de la imagen.
+   Por defecto (data-title-position="below", data-tags-position="overlay") no cambia nada. */
+html[data-title-position="above"] .card { display: flex; flex-direction: column; }
+html[data-title-position="above"] .card > .card-footer { order: -1; padding: 2px 34px 7px 2px; }
+/* Reserva dos líneas de título para que las imágenes de una misma fila queden alineadas. */
+html[data-title-position="above"] .card-footer .card-title { min-height: 2.8em; }
+/* Franja propia de etiquetas antes de la imagen: sin degradado ni posición absoluta. */
+.card-open > .card-overlay.card-tags-above { position: static; inset: auto; min-height: 25px; padding: 0 0 6px; background: none; color: inherit; }
+.card-open > .card-overlay.card-tags-above .tags { margin-top: 0; }
+.card-open > .card-overlay.card-tags-above > .workspace-tag + .tags { margin-top: 4px; }
+html[data-tags-position="above"]:not([data-title-position="above"]) .card-open > .card-tags-above { padding-right: 34px; }
+/* Con contenido encima, el botón de editar se alinea con la primera fila en vez de tapar la imagen. */
+html:is([data-title-position="above"], [data-tags-position="above"]) .card-edit { top: 0; }

@@ -67,6 +67,8 @@ function arrangeDialogFields() {
     cardBorderColor: 'Solo se usa si activas un borde.',
     cardSpacing: 'Espacio entre tarjetas del Workspace.',
     iconStyle: 'Aspecto de los controles con icono.',
+    titlePosition: 'Dónde se muestra el título de cada miniatura.',
+    tagsPosition: 'Dónde se muestran el chip de archivo local y las etiquetas.',
     showWorkspaceTabs: 'Muestra la fila de pestañas para cambiar de Workspace.',
     settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
     captureEnabled: 'Crea una miniatura al agregar un acceso.',
@@ -249,6 +251,9 @@ function applySettings() {
   document.documentElement.dataset.theme = s.themeId;
   document.documentElement.dataset.cardStyle = s.cardStyle;
   document.documentElement.dataset.iconStyle = s.iconStyle;
+  // Posición del título y de las etiquetas de las miniaturas (issue #37); el CSS lee estos atributos.
+  document.documentElement.dataset.titlePosition = s.titlePosition;
+  document.documentElement.dataset.tagsPosition = s.tagsPosition;
   document.documentElement.style.setProperty('--accent-color', s.accentColor);
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -549,7 +554,12 @@ function makeCard(access, categoryId) {
   const automatic = new Set(automaticTags(access.url));
   allTags(access).forEach(tag => tags.append(node('span', 'tag' + (automatic.has(tag) ? ' auto' : ''), tag)));
   overlay.append(tags);
-  thumb.append(overlay);
+  // «Encima de la imagen»: las etiquetas van en una franja propia antes de la miniatura
+  // (dentro del mismo botón, así siguen abriendo el acceso); por defecto, sobre la imagen.
+  if (data.settings.tagsPosition === 'above') {
+    overlay.classList.add('card-tags-above');
+    open.append(overlay);
+  } else thumb.append(overlay);
   const status = node('span', 'status');
   status.setAttribute('role', 'img');
   const footer = node('div', 'card-footer');
@@ -1366,7 +1376,7 @@ onClick('openSettings', () => {
   renderStylePresets(s.themeId);
   $('settingsDialog').dataset.themeId = s.themeId;
   $('settingsDialog').dataset.pattern = s.backgroundPattern;
-  for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle']) $(key).value = s[key];
+  for (const key of ['accentColor', 'backgroundColor', 'backgroundImageUrl', 'thumbnailSize', 'fontFamily', 'cardStyle', 'cardBorder', 'cardBorderColor', 'cardSpacing', 'iconStyle', 'titlePosition', 'tagsPosition']) $(key).value = s[key];
   $('thumbnailCustomHeight').value = s.thumbnailHeight;
   $('thumbnailHeightRange').value = s.thumbnailHeight;
   $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
@@ -1429,6 +1439,7 @@ onSubmit('settingsForm', async () => {
      backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
+    titlePosition: $('titlePosition').value, tagsPosition: $('tagsPosition').value,
     captureEnabled: $('captureEnabled').checked,
     showWorkspaceTabs: $('showWorkspaceTabs').checked
   };

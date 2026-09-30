@@ -180,3 +180,30 @@ test('guardar y recargar conserva todos los ajustes de Diseño', () => {
   assert.equal(reloaded.thumbnailSize, 'large');
   assert.equal(reloaded.thumbnailHeight, 187);
 });
+test('posición del título y de las etiquetas: por defecto el diseño actual', () => {
+  const defaults = normalizeData().settings;
+  assert.equal(defaults.titlePosition, 'below');
+  assert.equal(defaults.tagsPosition, 'overlay');
+  // Datos guardados antes de estos ajustes: se completan con el valor por defecto.
+  const legacy = fixture();
+  delete legacy.settings.titlePosition;
+  delete legacy.settings.tagsPosition;
+  const loaded = normalizeData(JSON.parse(JSON.stringify(legacy))).settings;
+  assert.equal(loaded.titlePosition, 'below');
+  assert.equal(loaded.tagsPosition, 'overlay');
+});
+test('posición del título y de las etiquetas: guarda valores válidos e ignora los inválidos sin fallar', () => {
+  const saved = fixture();
+  saved.settings = { ...saved.settings, titlePosition: 'above', tagsPosition: 'above' };
+  const reloaded = normalizeData(JSON.parse(JSON.stringify(saved))).settings;
+  assert.equal(reloaded.titlePosition, 'above');
+  assert.equal(reloaded.tagsPosition, 'above');
+  for (const [titlePosition, tagsPosition] of [['left', 'bottom'], [null, 42], ['', {}], ['ABOVE', 'Overlay']]) {
+    const invalid = fixture();
+    invalid.settings = { ...invalid.settings, titlePosition, tagsPosition };
+    let settings;
+    assert.doesNotThrow(() => { settings = normalizeData(invalid).settings; });
+    assert.equal(settings.titlePosition, 'below');
+    assert.equal(settings.tagsPosition, 'overlay');
+  }
+});
