@@ -493,17 +493,22 @@ test('Diseño permite poner el título y las etiquetas encima de la miniatura (i
   const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css');
   const design = html.split('id="settingsDesignPanel"')[1].split('id="settingsDataPanel"')[0];
   assert.match(design, /<select id="titlePosition"><option value="below">Debajo de la imagen<\/option><option value="above">Arriba de la imagen<\/option><\/select>/);
-  assert.match(design, /<select id="tagsPosition"><option value="overlay">Sobre la imagen<\/option><option value="above">Encima de la imagen<\/option><\/select>/);
+  assert.match(design, /<select id="tagsPosition"><option value="overlay">Abajo, sobre la imagen<\/option><option value="above">Arriba a la izquierda, sobre la imagen<\/option><\/select>/);
   // Se rellenan al abrir Configuración y se guardan con el formulario.
   assert.match(app, /'iconStyle', 'titlePosition', 'tagsPosition'\]\) \$\(key\)\.value = s\[key\]/);
   assert.match(app, /titlePosition: \$\('titlePosition'\)\.value, tagsPosition: \$\('tagsPosition'\)\.value/);
   // Se aplican como atributos del documento y, para las etiquetas, en una franja antes de la imagen.
   assert.match(app, /dataset\.titlePosition = s\.titlePosition/);
   assert.match(app, /dataset\.tagsPosition = s\.tagsPosition/);
-  assert.match(app, /data\.settings\.tagsPosition === 'above'[\s\S]{0,200}open\.append\(overlay\);\s*\} else thumb\.append\(overlay\);/);
+  // Las etiquetas siempre van dentro de la imagen; «arriba» las ancla a la esquina superior izquierda.
+  assert.match(app, /overlay\.append\(tags\);\s*\/\/[^\n]*\n\s*thumb\.append\(overlay\);/);
+  assert.match(css, /html\[data-tags-position="above"\] \.thumb \.card-overlay \{ inset: 0 0 auto;/);
   assert.match(css, /html\[data-title-position="above"\] \.card \{ display: flex; flex-direction: column; \}/);
   assert.match(css, /html\[data-title-position="above"\] \.card > \.card-footer \{ order: -1;/);
-  assert.match(css, /\.card-open > \.card-overlay\.card-tags-above \{ position: static;/);
+  // La altura de dos líneas se reserva en la fila, no en el botón (el punto queda alineado).
+  assert.match(css, /html\[data-title-position="above"\] \.card > \.card-footer \{ box-sizing: border-box; min-height:/);
+  assert.doesNotMatch(css, /\.card-footer \.card-title \{ min-height/);
+  assert.match(css, /\.card-footer \.status \{[^}]*margin-top: calc\(\(11px \* 1\.4 - 9px\) \/ 2\)/);
   // El título sigue siendo el botón que abre o enfoca el acceso.
   assert.match(app, /button\(access\.title, 'Abrir o enfocar: ' \+ access\.title, \(\) => openAccess\(access\), 'card-title card-title-link'\)/);
 });

@@ -1,4 +1,4 @@
-# nex.b · 2.0.4
+# nex.b · 2.0.5
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,11 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0.5
+
+- **Punto de estado alineado con el título:** con el título arriba, un título de una línea quedaba más abajo que el punto. Ahora el punto se centra con la primera línea del título en todas las posiciones.
+- **Etiquetas arriba a la izquierda, dentro de la imagen:** la opción «Arriba a la izquierda, sobre la imagen» coloca las etiquetas en la esquina superior izquierda de la miniatura (con un degradado suave), en vez de en una franja aparte.
 
 ### Novedades 2.0.4
 
