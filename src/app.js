@@ -555,12 +555,8 @@ function makeCard(access, categoryId) {
   const automatic = new Set(automaticTags(access.url));
   allTags(access).forEach(tag => tags.append(node('span', 'tag' + (automatic.has(tag) ? ' auto' : ''), tag)));
   overlay.append(tags);
-  // «Encima de la imagen»: las etiquetas van en una franja propia antes de la miniatura
-  // (dentro del mismo botón, así siguen abriendo el acceso); por defecto, sobre la imagen.
-  if (data.settings.tagsPosition === 'above') {
-    overlay.classList.add('card-tags-above');
-    open.append(overlay);
-  } else thumb.append(overlay);
+  // Siempre sobre la imagen; «arriba» (tagsPosition) solo cambia la esquina por CSS.
+  thumb.append(overlay);
   const status = node('span', 'status');
   status.setAttribute('role', 'img');
   const footer = node('div', 'card-footer');

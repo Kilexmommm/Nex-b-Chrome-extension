@@ -37,7 +37,7 @@ body { min-height: 100vh; }
 @media (prefers-reduced-motion: reduce) { .card-edit { transition: none; } }
 .status { pointer-events: none; }
 .card-footer { display: flex; align-items: flex-start; gap: 9px; padding: 10px 2px; background: transparent; color: #eef2ff; }
-.card-footer .status { position: static; flex: 0 0 9px; margin-top: 5px; }
+.card-footer .status { position: static; flex: 0 0 9px; /* Centrado con la primera línea del título (11px × 1.4). */ margin-top: calc((11px * 1.4 - 9px) / 2); }
 .card-title-link { flex: 1; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .card-duplicates { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 3px 6px; background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; font: inherit; font-size: 10px; cursor: pointer; }
 .card-duplicates:hover { text-decoration: underline; }
@@ -336,15 +336,18 @@ dialog::backdrop { background: #00000099; }
    Por defecto (data-title-position="below", data-tags-position="overlay") no cambia nada. */
 html[data-title-position="above"] .card { display: flex; flex-direction: column; }
 html[data-title-position="above"] .card > .card-footer { order: -1; padding: 2px 34px 7px 2px; }
-/* Reserva dos líneas de título para que las imágenes de una misma fila queden alineadas. */
-html[data-title-position="above"] .card-footer .card-title { min-height: 2.8em; }
-/* Franja propia de etiquetas antes de la imagen: sin degradado ni posición absoluta. */
-.card-open > .card-overlay.card-tags-above { position: static; inset: auto; min-height: 25px; padding: 0 0 6px; background: none; color: inherit; }
-.card-open > .card-overlay.card-tags-above .tags { margin-top: 0; }
-.card-open > .card-overlay.card-tags-above > .workspace-tag + .tags { margin-top: 4px; }
-html[data-tags-position="above"]:not([data-title-position="above"]) .card-open > .card-tags-above { padding-right: 34px; }
-/* Con contenido encima, el botón de editar se alinea con la primera fila en vez de tapar la imagen. */
-html:is([data-title-position="above"], [data-tags-position="above"]) .card-edit { top: 0; }
+/* Reserva dos líneas de título en la fila (no en el botón: Chrome centra el texto de un
+   botón y un título de una línea se separaría del punto) para alinear las imágenes. */
+html[data-title-position="above"] .card > .card-footer { box-sizing: border-box; min-height: calc(11px * 1.4 * 2 + 9px); }
+/* Etiquetas arriba a la izquierda dentro de la imagen: mismo overlay, anclado arriba y con
+   el degradado invertido; deja libre la esquina derecha para el botón de editar. */
+html[data-tags-position="above"] .thumb .card-overlay { inset: 0 0 auto; padding: 9px 38px 26px 10px; background: linear-gradient(rgba(6,10,18,.92), transparent); }
+html[data-tags-position="above"] .thumb .card-overlay .tags { margin-top: 0; justify-content: flex-start; }
+html[data-tags-position="above"][data-theme="papel"] .thumb .card-overlay { background: linear-gradient(#5c39251a, transparent); }
+html[data-tags-position="above"]:is([data-theme="minimalista"], [data-theme="bosque"]) .thumb .card-overlay { background: linear-gradient(#101c1426, transparent); }
+html[data-tags-position="above"] .thumb:not(.has-thumbnail) .card-overlay { background: none; }
+/* Con el título encima, el botón de editar se alinea con él en vez de tapar la imagen. */
+html[data-title-position="above"] .card-edit { top: 0; }
 /* Inventario ancho: rejilla de hasta 5 columnas para ver muchas pestañas a la vez. */
 .inventory-form { width: min(1480px, calc(100vw - 48px)); }
 #inventoryDialog .inventory-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 32px) / 5)), 1fr)); gap: 8px; align-content: start; max-height: 62vh; padding: 8px; }
