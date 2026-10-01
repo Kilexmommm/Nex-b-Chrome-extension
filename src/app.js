@@ -71,6 +71,7 @@ function arrangeDialogFields() {
     titlePosition: 'Dónde se muestra el título de cada miniatura.',
     tagsPosition: 'Dónde se muestran el chip de archivo local y las etiquetas.',
     showWorkspaceTabs: 'Muestra la fila de pestañas para cambiar de Workspace.',
+    imageShade: 'Oscurece el borde de la miniatura para que las etiquetas se lean mejor.',
     settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
     captureEnabled: 'Crea una miniatura al agregar un acceso.',
     bookmarkLink: 'Mantiene la sección vinculada a esa carpeta de Chrome.'
@@ -255,6 +256,7 @@ function applySettings() {
   // Posición del título y de las etiquetas de las miniaturas (issue #37); el CSS lee estos atributos.
   document.documentElement.dataset.titlePosition = s.titlePosition;
   document.documentElement.dataset.tagsPosition = s.tagsPosition;
+  document.documentElement.dataset.imageShade = String(s.imageShade !== false);
   document.documentElement.style.setProperty('--accent-color', s.accentColor);
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -1466,6 +1468,7 @@ onClick('openSettings', () => {
   $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
   $('captureEnabled').checked = s.captureEnabled;
   $('showWorkspaceTabs').checked = s.showWorkspaceTabs;
+  $('imageShade').checked = s.imageShade !== false;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('syncEnabled').checked = syncEnabled;
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
@@ -1525,7 +1528,8 @@ onSubmit('settingsForm', async () => {
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
     titlePosition: $('titlePosition').value, tagsPosition: $('tagsPosition').value,
     captureEnabled: $('captureEnabled').checked,
-    showWorkspaceTabs: $('showWorkspaceTabs').checked
+    showWorkspaceTabs: $('showWorkspaceTabs').checked,
+    imageShade: $('imageShade').checked
   };
   candidate.autoTagRules = parseRules($('settingsTagRules').value);
   await commit(candidate); $('settingsDialog').close();

@@ -530,3 +530,11 @@ test('el inventario es ancho y ofrece la pestaña «Agrupar» con grupos nativos
   assert.match(css, /calc\(\(100% - 32px\) \/ 5\)/);
   assert.match(css, /\[data-narrow="true"\] #inventoryDialog \.inventory-list \{ grid-template-columns: minmax\(0, 1fr\)/);
 });
+test('Diseño permite quitar el degradado de la imagen y los diálogos grandes quedan anclados arriba', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(html, /<input id="imageShade" type="checkbox" checked \/> Degradado oscuro sobre la imagen/);
+  assert.match(app, /dataset\.imageShade = String\(s\.imageShade !== false\)/);
+  assert.match(app, /imageShade: \$\('imageShade'\)\.checked/);
+  assert.match(css, /html\[data-image-shade="false"\] \.thumb \.card-overlay \{ background: none !important; \}/);
+  assert.match(css, /:is\(#settingsDialog, #inventoryDialog\)\[open\] \{ margin-top: 32px; margin-bottom: auto;/);
+});

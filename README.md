@@ -66,6 +66,8 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ### Novedades 2.0.7
 
+- **Configuración sin saltos:** Configuración y el Inventario se abren anclados arriba, con un pequeño margen, y ya no se mueven al cambiar de pestaña.
+- **Quitar el degradado de la imagen:** en Diseño, «Degradado oscuro sobre la imagen» se puede desactivar para ver las miniaturas limpias; las etiquetas conservan su propio fondo.
 - **Lápiz ✎ a la altura del título:** con el título arriba, el botón de editar se reduce a la altura de la línea del título y se centra con ella, sin invadir la imagen.
 
 ### Novedades 2.0.6

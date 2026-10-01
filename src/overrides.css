@@ -378,3 +378,9 @@ html[data-title-position="above"] .card-edit { top: 1px; padding: 0 6px; font-si
 /* «+ Nuevo acceso»: un botón pequeño a la derecha de la última miniatura, no una tarjeta entera. */
 .cards > .add-card { aspect-ratio: auto; width: 40px; height: 40px; justify-self: start; align-self: center; padding: 0; font-size: 22px; line-height: 1; border-radius: 999px; }
 .cards > .add-card:hover, .cards > .add-card:focus-visible { border-style: solid; border-color: var(--accent-color); color: var(--accent-color); }
+/* Diseño → «Degradado oscuro sobre la imagen» desactivado: la miniatura se ve limpia; las
+   etiquetas conservan su propio fondo. Gana a las variantes por tema y posición. */
+html[data-image-shade="false"] .thumb .card-overlay { background: none !important; }
+/* Configuración e inventario anclados arriba: no saltan al cambiar de pestaña. */
+:is(#settingsDialog, #inventoryDialog)[open] { margin-top: 32px; margin-bottom: auto; max-height: calc(100vh - 64px); }
+@media (max-width: 600px) { :is(#settingsDialog, #inventoryDialog)[open] { margin-top: 12px; max-height: calc(100vh - 24px); } }

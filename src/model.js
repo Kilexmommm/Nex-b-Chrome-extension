@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "General", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", titlePosition: "below", tagsPosition: "overlay", showWorkspaceTabs: true },
+    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", titlePosition: "below", tagsPosition: "overlay", imageShade: true, showWorkspaceTabs: true },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -222,6 +222,7 @@ export function normalizeData(stored = DEFAULT_DATA) {
             backgroundImageUrl: imageUrl(s.backgroundImageUrl), backgroundPattern,
             captureEnabled: typeof s.captureEnabled === 'boolean' ? s.captureEnabled : true,
             showWorkspaceTabs: typeof s.showWorkspaceTabs === 'boolean' ? s.showWorkspaceTabs : true,
+            imageShade: typeof s.imageShade === 'boolean' ? s.imageShade : true,
             thumbnailSize, thumbnailHeight,
             fontFamily: enumValue(s.fontFamily, ["system", "rounded", "serif", "mono"], "Fuente"),
             cardStyle: enumValue(s.cardStyle, ["flat", "soft", "glass"], "Estilo de tarjeta"),
