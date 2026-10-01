@@ -207,3 +207,13 @@ test('posición del título y de las etiquetas: guarda valores válidos e ignora
     assert.equal(settings.tagsPosition, 'overlay');
   }
 });
+
+test('imageShade es true por defecto y solo acepta booleanos', () => {
+  assert.equal(normalizeData().settings.imageShade, true);
+  const off = normalizeData(); off.settings.imageShade = false;
+  assert.equal(normalizeData(off).settings.imageShade, false);
+  for (const value of ['no', 0, null, {}]) {
+    const invalid = normalizeData(); invalid.settings.imageShade = value;
+    assert.equal(normalizeData(invalid).settings.imageShade, true);
+  }
+});

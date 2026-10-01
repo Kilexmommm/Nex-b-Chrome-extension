@@ -509,6 +509,8 @@ test('Diseño permite poner el título y las etiquetas encima de la miniatura (i
   // Con el título arriba va en una sola línea: sin hueco sobre la imagen y filas alineadas.
   assert.match(css, /html\[data-title-position="above"\] \.card-footer \.card-title \{ -webkit-line-clamp: 1; max-height: 1\.4em; \}/);
   assert.doesNotMatch(css, /\.card-footer \.card-title \{ min-height/);
+  // Con el título arriba, el ✎ mide una línea de título y no invade la imagen.
+  assert.match(css, /html\[data-title-position="above"\] \.card-edit \{ top: 1px; padding: 0 6px; font-size: 11px; line-height: calc\(11px \* 1\.4\); \}/);
   assert.match(css, /\.card-footer \.status \{[^}]*margin-top: calc\(\(11px \* 1\.4 - 9px\) \/ 2\)/);
   // El título sigue siendo el botón que abre o enfoca el acceso.
   assert.match(app, /button\(access\.title, 'Abrir o enfocar: ' \+ access\.title, \(\) => openAccess\(access\), 'card-title card-title-link'\)/);
@@ -527,4 +529,12 @@ test('el inventario es ancho y ofrece la pestaña «Agrupar» con grupos nativos
   assert.match(css, /\.inventory-form \{ width: min\(1480px/);
   assert.match(css, /calc\(\(100% - 32px\) \/ 5\)/);
   assert.match(css, /\[data-narrow="true"\] #inventoryDialog \.inventory-list \{ grid-template-columns: minmax\(0, 1fr\)/);
+});
+test('Diseño permite quitar el degradado de la imagen y los diálogos grandes quedan anclados arriba', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(html, /<input id="imageShade" type="checkbox" checked \/> Degradado oscuro sobre la imagen/);
+  assert.match(app, /dataset\.imageShade = String\(s\.imageShade !== false\)/);
+  assert.match(app, /imageShade: \$\('imageShade'\)\.checked/);
+  assert.match(css, /html\[data-image-shade="false"\] \.thumb \.card-overlay \{ background: none !important; \}/);
+  assert.match(css, /:is\(#settingsDialog, #inventoryDialog\)\[open\] \{ margin-top: 32px; margin-bottom: auto;/);
 });
