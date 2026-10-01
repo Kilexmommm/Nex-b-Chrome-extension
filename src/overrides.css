@@ -389,3 +389,14 @@ html[data-image-shade="false"] .thumb .card-overlay { background: none !importan
 .light-theme .thumb .file-path { background: #ffffffd9; color: #2b2b2b; }
 /* Con las etiquetas abajo, suben para dejar sitio a la ruta. */
 html:not([data-tags-position="above"]) .thumb.has-file-path .card-overlay { padding-bottom: 32px; }
+/* Inventario: × arriba a la derecha como en Configuración. */
+.inventory-form { position: relative; }
+.inventory-form > h2 { padding-right: 44px; }
+/* Casilla arriba a la izquierda junto al título (la regla general de .dialog-form label
+   la ponía en una línea aparte) y títulos largos en dos líneas sin salirse de la tarjeta. */
+#inventoryDialog :is(label.inventory-row, .dup-group-head) { display: flex; align-items: flex-start; gap: 10px; margin: 0; min-width: 0; }
+#inventoryDialog :is(.inventory-row, .dup-group-head) input[type=checkbox] { flex: 0 0 18px; width: 18px; height: 18px; margin: 1px 0 0; }
+#inventoryDialog .inventory-row-info { min-width: 0; }
+#inventoryDialog .inventory-row-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-width: 0; white-space: normal; overflow: hidden; overflow-wrap: anywhere; line-height: 1.35; }
+#inventoryDialog .dup-group { min-width: 0; overflow: hidden; }
+#inventoryDialog .dup-copy { margin-left: 28px; overflow-wrap: anywhere; }

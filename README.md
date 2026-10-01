@@ -66,6 +66,8 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ### Novedades 2.0.8
 
+- **Inventario más claro:** se cierra con una × arriba a la derecha (como Configuración), la casilla de cada pestaña va arriba a la izquierda junto al título y los títulos largos ocupan dos líneas sin salirse de la tarjeta.
+- **Inventario más rápido con muchas pestañas:** las repetidas se cruzan con tus accesos mediante un índice (con 1.000 pestañas y 2.000 accesos: de ~510 ms a ~2 ms). Con nex.b en segundo plano ya no se recalcula el estado de las pestañas; se hace una sola vez al volver.
 - **Dónde está cada archivo local:** las miniaturas de accesos `file://` muestran abajo a la izquierda la última carpeta y el nombre del archivo (por ejemplo `/workspace-launcher-mvp/newtab.html`; las carpetas terminan en `/`). La ruta completa aparece al pasar el ratón.
 
 ### Novedades 2.0.7

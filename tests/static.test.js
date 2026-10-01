@@ -545,3 +545,18 @@ test('los accesos file:// muestran su carpeta y archivo abajo a la izquierda de 
   assert.match(css, /\.thumb \.file-path \{ position: absolute; left: 8px; bottom: 8px;/);
   assert.match(css, /html:not\(\[data-tags-position="above"\]\) \.thumb\.has-file-path \.card-overlay \{ padding-bottom: 32px; \}/);
 });
+test('el estado de pestañas no se recalcula en segundo plano y las repetidas usan un índice', () => {
+  const app = read('src/app.js');
+  assert.match(app, /if \(document\.hidden\) \{ tabRefreshPending = true; return; \}/);
+  assert.match(app, /document\.addEventListener\('visibilitychange'/);
+  assert.match(app, /const saved = groups\.length \? savedAccessIndex\(\) : new Map\(\);/);
+  assert.doesNotMatch(app, /savedAccessForTabKey/);
+});
+test('el inventario se cierra con una × arriba y las casillas quedan junto al título', () => {
+  const html = read('newtab.html'), css = read('src/overrides.css');
+  const inventory = html.split('<dialog id="inventoryDialog"')[1].split('</dialog>')[0];
+  assert.match(inventory, /^[^]*?<button type="button" data-cancel class="dialog-close" aria-label="Cerrar inventario"/);
+  assert.doesNotMatch(inventory, /class="button secondary">Cerrar<\/button>/);
+  assert.match(css, /#inventoryDialog :is\(label\.inventory-row, \.dup-group-head\) \{ display: flex; align-items: flex-start;/);
+  assert.match(css, /#inventoryDialog \.inventory-row-title \{ display: -webkit-box;[^}]*-webkit-line-clamp: 2;/);
+});

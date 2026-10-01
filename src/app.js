@@ -338,11 +338,17 @@ async function refreshTabs() {
   }
   updateStatuses();
 }
-let tabRefreshTimer;
+let tabRefreshTimer, tabRefreshPending = false;
+// Con nex.b en segundo plano no se recalcula nada: se marca como pendiente y se hace una
+// sola vez al volver a la pestaña. Con muchas pestañas cargando, se agrupan los avisos.
 function scheduleTabRefresh() {
   clearTimeout(tabRefreshTimer);
-  tabRefreshTimer = setTimeout(() => run(refreshTabs), 150);
+  if (document.hidden) { tabRefreshPending = true; return; }
+  tabRefreshTimer = setTimeout(() => run(refreshTabs), 300);
 }
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && tabRefreshPending) { tabRefreshPending = false; scheduleTabRefresh(); }
+});
 async function openAccess(access) {
   await openOrFocusTab(access, chrome, navigator.locks);
   scheduleTabRefresh();
@@ -722,12 +728,15 @@ function fillInventoryCategories(workspaceId, selectedId = '') {
   if (!options.length) options.push(new Option('General (se creará al guardar)', '__new'));
   $('inventoryCategory').replaceChildren(...options);
 }
-function savedAccessForTabKey(key) {
-  for (const category of data.categories) {
-    const access = category.accesses.find(item => tabKey(item.url) === key);
-    if (access) return access;
+// Índice clave de documento → acceso guardado, construido una vez por refresco: antes cada
+// grupo de repetidas recorría (y analizaba la URL de) toda la biblioteca.
+function savedAccessIndex() {
+  const index = new Map();
+  for (const category of data.categories) for (const access of category.accesses) {
+    const key = tabKey(access.url);
+    if (key && !index.has(key)) index.set(key, access);
   }
-  return null;
+  return index;
 }
 function inventoryThumbnail(access) {
   const thumbnail = node('span', 'inventory-thumbnail');
@@ -758,8 +767,9 @@ async function refreshInventory() {
   const duplicateIds = new Set(groups.flatMap(group => [group.keep, ...group.duplicates].map(tab => tab.id)));
   const list = $('inventoryList');
   const fragment = document.createDocumentFragment();
+  const saved = groups.length ? savedAccessIndex() : new Map();
   for (const group of groups) {
-    const access = savedAccessForTabKey(group.key);
+    const access = saved.get(group.key) || null;
     const total = group.duplicates.length + 1;
     const title = access?.title || tabLabel(group.keep);
     const row = node('div', 'inventory-row inventory-group-row');
@@ -965,7 +975,8 @@ async function refreshDuplicates(onlyKey = '') {
     const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
     checkbox.dataset.key = group.key;
     checkbox.dataset.tabIds = JSON.stringify([group.keep, ...group.duplicates].map(tab => tab.id));
-    head.append(checkbox, node('span', 'inventory-row-title', tabLabel(group.keep)));
+    const title = node('span', 'inventory-row-title', tabLabel(group.keep)); title.title = tabLabel(group.keep);
+    head.append(checkbox, title);
     section.append(head);
     for (const tab of [group.keep, ...group.duplicates]) {
       const location = (labels.get(tab.windowId) || 'Ventana ?') + ' · posición ' + ((tab.index ?? 0) + 1);
