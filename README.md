@@ -1,4 +1,4 @@
-# nex.b · 2.0.6
+# nex.b · 2.0.7
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,10 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0.7
+
+- **Lápiz ✎ a la altura del título:** con el título arriba, el botón de editar se reduce a la altura de la línea del título y se centra con ella, sin invadir la imagen.
 
 ### Novedades 2.0.6
 

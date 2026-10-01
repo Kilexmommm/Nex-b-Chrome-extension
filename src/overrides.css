@@ -346,8 +346,9 @@ html[data-tags-position="above"] .thumb .card-overlay .tags { margin-top: 0; jus
 html[data-tags-position="above"][data-theme="papel"] .thumb .card-overlay { background: linear-gradient(#5c39251a, transparent); }
 html[data-tags-position="above"]:is([data-theme="minimalista"], [data-theme="bosque"]) .thumb .card-overlay { background: linear-gradient(#101c1426, transparent); }
 html[data-tags-position="above"] .thumb:not(.has-thumbnail) .card-overlay { background: none; }
-/* Con el título encima, el botón de editar se alinea con él en vez de tapar la imagen. */
-html[data-title-position="above"] .card-edit { top: 0; }
+/* Con el título encima, el ✎ se reduce a la altura de la línea del título y se centra con ella,
+   sin invadir la imagen. */
+html[data-title-position="above"] .card-edit { top: 1px; padding: 0 6px; font-size: 11px; line-height: calc(11px * 1.4); }
 /* Inventario ancho: rejilla de hasta 5 columnas para ver muchas pestañas a la vez. */
 .inventory-form { width: min(1480px, calc(100vw - 48px)); }
 #inventoryDialog .inventory-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 32px) / 5)), 1fr)); gap: 8px; align-content: start; max-height: 62vh; padding: 8px; }

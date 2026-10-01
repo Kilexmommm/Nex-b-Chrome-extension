@@ -509,6 +509,8 @@ test('Diseño permite poner el título y las etiquetas encima de la miniatura (i
   // Con el título arriba va en una sola línea: sin hueco sobre la imagen y filas alineadas.
   assert.match(css, /html\[data-title-position="above"\] \.card-footer \.card-title \{ -webkit-line-clamp: 1; max-height: 1\.4em; \}/);
   assert.doesNotMatch(css, /\.card-footer \.card-title \{ min-height/);
+  // Con el título arriba, el ✎ mide una línea de título y no invade la imagen.
+  assert.match(css, /html\[data-title-position="above"\] \.card-edit \{ top: 1px; padding: 0 6px; font-size: 11px; line-height: calc\(11px \* 1\.4\); \}/);
   assert.match(css, /\.card-footer \.status \{[^}]*margin-top: calc\(\(11px \* 1\.4 - 9px\) \/ 2\)/);
   // El título sigue siendo el botón que abre o enfoca el acceso.
   assert.match(app, /button\(access\.title, 'Abrir o enfocar: ' \+ access\.title, \(\) => openAccess\(access\), 'card-title card-title-link'\)/);
