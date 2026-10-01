@@ -538,3 +538,10 @@ test('Diseño permite quitar el degradado de la imagen y los diálogos grandes q
   assert.match(css, /html\[data-image-shade="false"\] \.thumb \.card-overlay \{ background: none !important; \}/);
   assert.match(css, /:is\(#settingsDialog, #inventoryDialog\)\[open\] \{ margin-top: 32px; margin-bottom: auto;/);
 });
+test('los accesos file:// muestran su carpeta y archivo abajo a la izquierda de la miniatura', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /thumb\.append\(node\('span', 'file-path', filePathLabel\(access\.url\)\)\)/);
+  assert.match(app, /thumb\.classList\.add\('has-file-path'\)/);
+  assert.match(css, /\.thumb \.file-path \{ position: absolute; left: 8px; bottom: 8px;/);
+  assert.match(css, /html:not\(\[data-tags-position="above"\]\) \.thumb\.has-file-path \.card-overlay \{ padding-bottom: 32px; \}/);
+});

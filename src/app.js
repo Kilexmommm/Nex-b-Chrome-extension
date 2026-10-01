@@ -1,5 +1,5 @@
 import { proposeTabGroups, planGroupActions, groupingSummary } from './grouping.js';
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride, filePathLabel } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab, openOrFocusMany } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -553,6 +553,10 @@ function makeCard(access, categoryId) {
     const local = node('span', 'tag link-type local-link', '⌂ Archivo local');
     local.title = 'Acceso a archivo o carpeta local';
     tags.append(local);
+    // Abajo a la izquierda: última carpeta y archivo, para saber dónde está.
+    // La ruta completa ya aparece en el tooltip de la miniatura (thumb.title).
+    thumb.append(node('span', 'file-path', filePathLabel(access.url)));
+    thumb.classList.add('has-file-path');
   }
   const automatic = new Set(automaticTags(access.url));
   allTags(access).forEach(tag => tags.append(node('span', 'tag' + (automatic.has(tag) ? ' auto' : ''), tag)));

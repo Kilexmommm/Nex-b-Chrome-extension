@@ -1,4 +1,4 @@
-# nex.b · 2.0.7
+# nex.b · 2.0.8
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -63,6 +63,10 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.0.8
+
+- **Dónde está cada archivo local:** las miniaturas de accesos `file://` muestran abajo a la izquierda la última carpeta y el nombre del archivo (por ejemplo `/workspace-launcher-mvp/newtab.html`; las carpetas terminan en `/`). La ruta completa aparece al pasar el ratón.
 
 ### Novedades 2.0.7
 

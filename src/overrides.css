@@ -384,3 +384,8 @@ html[data-image-shade="false"] .thumb .card-overlay { background: none !importan
 /* Configuración e inventario anclados arriba: no saltan al cambiar de pestaña. */
 :is(#settingsDialog, #inventoryDialog)[open] { margin-top: 32px; margin-bottom: auto; max-height: calc(100vh - 64px); }
 @media (max-width: 600px) { :is(#settingsDialog, #inventoryDialog)[open] { margin-top: 12px; max-height: calc(100vh - 24px); } }
+/* Accesos file://: última carpeta y archivo abajo a la izquierda de la miniatura. */
+.thumb .file-path { position: absolute; left: 8px; bottom: 8px; z-index: 1; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 7px; border-radius: 5px; background: #000000a6; color: #f0f0f0; font-size: 11px; font-weight: 500; line-height: 1.4; pointer-events: none; }
+.light-theme .thumb .file-path { background: #ffffffd9; color: #2b2b2b; }
+/* Con las etiquetas abajo, suben para dejar sitio a la ruta. */
+html:not([data-tags-position="above"]) .thumb.has-file-path .card-overlay { padding-bottom: 32px; }

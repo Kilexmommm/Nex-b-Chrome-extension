@@ -217,3 +217,14 @@ test('imageShade es true por defecto y solo acepta booleanos', () => {
     assert.equal(normalizeData(invalid).settings.imageShade, true);
   }
 });
+
+test('filePathLabel muestra la última carpeta y el archivo de un acceso file://', async () => {
+  const { filePathLabel } = await import('../src/model.js');
+  assert.equal(filePathLabel('file:///Users/botkdk/Documents/Codex/2026-09-07/referenced-chatgpt-conversation-this-is-an/workspace-launcher-mvp/newtab.html'), '/workspace-launcher-mvp/newtab.html');
+  assert.equal(filePathLabel('file:///Users/botkdk/Mis%20Proyectos/informe%20final.pdf'), '/Mis Proyectos/informe final.pdf');
+  assert.equal(filePathLabel('file:///Users/botkdk/Proyectos/web/'), '/Proyectos/web/');
+  assert.equal(filePathLabel('file:///notas.txt'), '/notas.txt');
+  assert.equal(filePathLabel('file:///'), '/');
+  assert.equal(filePathLabel('https://example.com/a/b.html'), '');
+  assert.equal(filePathLabel('no es una url'), '');
+});

@@ -98,6 +98,25 @@ export function imageUrl(value = "") {
 export function normalizeNarrowColumns(value) {
     return value === 2 ? 2 : 1;
 }
+// Para file://: la última carpeta y el nombre del archivo, p. ej.
+// file:///Users/x/proyecto/newtab.html → "/proyecto/newtab.html"; una carpeta acaba en "/".
+export function filePathLabel(value) {
+    let path;
+    try {
+        const url = new URL(value);
+        if (url.protocol !== "file:")
+            return "";
+        path = decodeURIComponent(url.pathname);
+    }
+    catch {
+        return "";
+    }
+    const folder = path.endsWith("/") && path.length > 1;
+    const parts = path.split("/").filter(Boolean);
+    if (!parts.length)
+        return "/";
+    return "/" + parts.slice(-2).join("/") + (folder ? "/" : "");
+}
 export function domainOf(value) {
     try {
         return new URL(value).hostname.replace(/^www\./, "");
