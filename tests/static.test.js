@@ -165,7 +165,8 @@ test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3
   assert.match(css, /--card-min-width:168px/);
   assert.match(css, /minmax\(min\(var\(--card-min-width\),100%\),1fr\)/);
   assert.match(css, /\.thumb \{[\s\S]*?aspect-ratio:5 \/ 3/);
-  assert.match(css, /\.add-card \{[\s\S]*?aspect-ratio:5 \/ 3/);
+  // El «+» es un botón pequeño junto a la última miniatura, no una tarjeta del tamaño de una miniatura.
+  assert.match(read('src/overrides.css'), /\.cards > \.add-card \{ aspect-ratio: auto; width: 40px; height: 40px; justify-self: start;/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
   assert.match(read('newtab.html'), /id="thumbnailCustomHeight"/);
 });
@@ -505,8 +506,8 @@ test('Diseño permite poner el título y las etiquetas encima de la miniatura (i
   assert.match(css, /html\[data-tags-position="above"\] \.thumb \.card-overlay \{ inset: 0 0 auto;/);
   assert.match(css, /html\[data-title-position="above"\] \.card \{ display: flex; flex-direction: column; \}/);
   assert.match(css, /html\[data-title-position="above"\] \.card > \.card-footer \{ order: -1;/);
-  // La altura de dos líneas se reserva en la fila, no en el botón (el punto queda alineado).
-  assert.match(css, /html\[data-title-position="above"\] \.card > \.card-footer \{ box-sizing: border-box; min-height:/);
+  // Con el título arriba va en una sola línea: sin hueco sobre la imagen y filas alineadas.
+  assert.match(css, /html\[data-title-position="above"\] \.card-footer \.card-title \{ -webkit-line-clamp: 1; max-height: 1\.4em; \}/);
   assert.doesNotMatch(css, /\.card-footer \.card-title \{ min-height/);
   assert.match(css, /\.card-footer \.status \{[^}]*margin-top: calc\(\(11px \* 1\.4 - 9px\) \/ 2\)/);
   // El título sigue siendo el botón que abre o enfoca el acceso.
