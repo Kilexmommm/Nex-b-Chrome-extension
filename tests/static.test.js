@@ -538,3 +538,25 @@ test('Diseño permite quitar el degradado de la imagen y los diálogos grandes q
   assert.match(css, /html\[data-image-shade="false"\] \.thumb \.card-overlay \{ background: none !important; \}/);
   assert.match(css, /:is\(#settingsDialog, #inventoryDialog\)\[open\] \{ margin-top: 32px; margin-bottom: auto;/);
 });
+test('los accesos file:// muestran su carpeta y archivo abajo a la izquierda de la miniatura', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /thumb\.append\(node\('span', 'file-path', filePathLabel\(access\.url\)\)\)/);
+  assert.match(app, /thumb\.classList\.add\('has-file-path'\)/);
+  assert.match(css, /\.thumb \.file-path \{ position: absolute; left: 8px; bottom: 8px;/);
+  assert.match(css, /html:not\(\[data-tags-position="above"\]\) \.thumb\.has-file-path \.card-overlay \{ padding-bottom: 32px; \}/);
+});
+test('el estado de pestañas no se recalcula en segundo plano y las repetidas usan un índice', () => {
+  const app = read('src/app.js');
+  assert.match(app, /if \(document\.hidden\) \{ tabRefreshPending = true; return; \}/);
+  assert.match(app, /document\.addEventListener\('visibilitychange'/);
+  assert.match(app, /const saved = groups\.length \? savedAccessIndex\(\) : new Map\(\);/);
+  assert.doesNotMatch(app, /savedAccessForTabKey/);
+});
+test('el inventario se cierra con una × arriba y las casillas quedan junto al título', () => {
+  const html = read('newtab.html'), css = read('src/overrides.css');
+  const inventory = html.split('<dialog id="inventoryDialog"')[1].split('</dialog>')[0];
+  assert.match(inventory, /^[^]*?<button type="button" data-cancel class="dialog-close" aria-label="Cerrar inventario"/);
+  assert.doesNotMatch(inventory, /class="button secondary">Cerrar<\/button>/);
+  assert.match(css, /#inventoryDialog :is\(label\.inventory-row, \.dup-group-head\) \{ display: flex; align-items: flex-start;/);
+  assert.match(css, /#inventoryDialog \.inventory-row-title \{ display: -webkit-box;[^}]*-webkit-line-clamp: 2;/);
+});
