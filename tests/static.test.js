@@ -362,6 +362,27 @@ test('showWorkspaceTabs existe, persiste y se aplica sin romper Tags', () => {
   assert.match(app, /\$\('workspacePicker'\)\.hidden = !workspaceTabsHidden/);
   assert.match(html, /id="tagRules"/);
 });
+test('el tamaño de miniaturas del panel Diseño deriva su alto y se aplica al guardar', () => {
+  const app = read('src/app.js'), model = read('src/model.js');
+  assert.match(model, /export function thumbnailHeightForSize\(size, fallback\)/);
+  assert.match(app, /const thumbnailSize = \$\('thumbnailSize'\)\.value/);
+  assert.match(app, /thumbnailSize, thumbnailHeight: thumbnailHeightForSize\(thumbnailSize, data\.settings\.thumbnailHeight\)/);
+  assert.match(app, /thumbnailHeightForSize\(control\.dataset\.thumbnailSize/);
+});
+test('el color de borde elegido gana en los temas y el color de tema queda como reserva', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /borderColorOverride\(s\.cardBorderColor\)/);
+  assert.match(app, /removeProperty\('--card-border-color'\)/);
+  assert.match(css, /:root \{[^}]*--card-border-color: #4a4a4a/);
+  for (const theme of ['papel', 'minimalista', 'bosque']) {
+    const palette = [...css.matchAll(new RegExp('\\[data-theme="' + theme + '"\\] \\{([^}]+)\\}', 'g'))].map(match => match[1]).join(' ');
+    assert.match(palette, /--card-border-color:/, 'Falta el color de borde reserva en ' + theme);
+  }
+  assert.match(css, /\[data-theme="papel"\] \.card \.thumb \{[^}]*border-color: var\(--card-border-color\)/);
+  assert.match(css, /:is\(\[data-theme="minimalista"\], \[data-theme="bosque"\]\) \.card \.thumb \{[^}]*border-color: var\(--card-border-color\)/);
+  assert.doesNotMatch(css, /\[data-theme="papel"\] \.card \.thumb \{[^}]*border-color: #b9a28680/);
+  assert.doesNotMatch(css, /:is\(\[data-theme="minimalista"\], \[data-theme="bosque"\]\) \.card \.thumb \{[^}]*border-color: var\(--tile-border\)/);
+});
 test('cardBorder permite tarjetas sin borde y conserva las variantes de estilo', () => {
   const app = read('src/app.js'), css = read('src/overrides.css');
   assert.match(app, /\{ none: '0px', soft: '1px', strong: '2px' \}\[s\.cardBorder\]/);

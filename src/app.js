@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey, thumbnailHeightForSize, borderColorOverride } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -245,7 +245,9 @@ function applySettings() {
   // La relación 5:3 se calcula en CSS desde el ancho de cada tarjeta.
   document.documentElement.style.setProperty('--card-min-width', Math.round(s.thumbnailHeight * 5 / 3) + 'px');
   document.documentElement.style.setProperty('--ui-font', ({ system: 'Inter,ui-sans-serif,system-ui,-apple-system,sans-serif', rounded: 'ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif', serif: 'ui-serif,Georgia,serif', mono: 'ui-monospace,SFMono-Regular,Menlo,monospace' }[s.fontFamily]));
-  document.documentElement.style.setProperty('--card-border-color', s.cardBorderColor);
+  const borderOverride = borderColorOverride(s.cardBorderColor);
+  if (borderOverride) document.documentElement.style.setProperty('--card-border-color', borderOverride);
+  else document.documentElement.style.removeProperty('--card-border-color');
   document.documentElement.style.setProperty('--card-border-width', ({ none: '0px', soft: '1px', strong: '2px' }[s.cardBorder]));
   document.documentElement.style.setProperty('--card-gap', ({ compact: '9px', normal: '16px', wide: '25px' }[s.cardSpacing]));
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
@@ -1143,7 +1145,7 @@ document.querySelectorAll('[data-thumbnail-size]').forEach(control => {
   control.onclick = () => run(async () => {
     const candidate = structuredClone(data);
     candidate.settings.thumbnailSize = control.dataset.thumbnailSize;
-    candidate.settings.thumbnailHeight = ({ small: 101, medium: 144, large: 187 }[control.dataset.thumbnailSize]);
+    candidate.settings.thumbnailHeight = thumbnailHeightForSize(control.dataset.thumbnailSize, candidate.settings.thumbnailHeight);
     await commit(candidate); $('thumbnailSizeMenu').hidden = true;
   });
 });
@@ -1294,10 +1296,11 @@ $('accessTags').onkeydown = event => {
 };
 onSubmit('settingsForm', async () => {
   const candidate = structuredClone(data);
+  const thumbnailSize = $('thumbnailSize').value;
   candidate.settings = {
     themeId: $('settingsDialog').dataset.themeId, backgroundPattern: $('settingsDialog').dataset.pattern,
     accentColor: $('accentColor').value, backgroundColor: $('backgroundColor').value,
-     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize: $('thumbnailSize').value, thumbnailHeight: data.settings.thumbnailHeight,
+     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
     captureEnabled: $('captureEnabled').checked,

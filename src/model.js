@@ -18,6 +18,15 @@ export const THEME_PRESETS = {
     claro: { name: "Claro", accentColor: "#436dba", backgroundColor: "#eaf1ff", backgroundPattern: "linear-gradient(135deg,#f8fbff,#dfeaff)", light: true }
 };
 export const LIMITS = Object.freeze({ image: 8 * 1024 * 1024, archive: 64 * 1024 * 1024, data: 80 * 1024 * 1024, accesses: 2000 });
+export const THUMBNAIL_HEIGHTS = Object.freeze({ small: 101, medium: 144, large: 187 });
+export function thumbnailHeightForSize(size, fallback) {
+    return THUMBNAIL_HEIGHTS[size] ?? fallback;
+}
+// El color de borde predeterminado no cuenta como elección: los temas pueden
+// conservar su propio color mientras el usuario no elija uno distinto.
+export function borderColorOverride(cardBorderColor, defaultColor = DEFAULT_DATA.settings.cardBorderColor) {
+    return typeof cardBorderColor === "string" && cardBorderColor.toLowerCase() !== defaultColor.toLowerCase() ? cardBorderColor : "";
+}
 const fail = (message) => { throw new Error(message); };
 function record(value, label) {
     if (!value || typeof value !== "object" || Array.isArray(value))
@@ -172,7 +181,7 @@ export function normalizeData(stored = DEFAULT_DATA) {
     // Never accept arbitrary CSS from an imported backup.
     const backgroundPattern = Object.values(THEME_PRESETS).some(p => p.backgroundPattern === s.backgroundPattern) ? s.backgroundPattern : "";
     const thumbnailSize = enumValue(s.thumbnailSize, ["small", "medium", "large", "custom"], "Miniaturas");
-    const fallbackHeight = { small: 101, medium: 144, large: 187, custom: 144 }[thumbnailSize];
+    const fallbackHeight = THUMBNAIL_HEIGHTS[thumbnailSize] ?? 144;
     const thumbnailHeight = Number.isInteger(s.thumbnailHeight) && s.thumbnailHeight >= 80 && s.thumbnailHeight <= 480 ? s.thumbnailHeight : fallbackHeight;
     return { schemaVersion: 1, workspaces, categories,
         activeWorkspaceId: workspaceIds.has(stored.activeWorkspaceId) ? stored.activeWorkspaceId : workspaces[0].id,
