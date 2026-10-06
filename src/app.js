@@ -1,4 +1,4 @@
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, documentKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, matchOrigin, documentMatchKey, webUrl, accessUrl, duplicateTabGroups, tabKey } from './model.js';
 import { createRepository } from './storage.js';
 import { openOrFocusTab } from './tabs.js';
 import { createBackupZip, readStoredZip } from './backup.js';
@@ -286,7 +286,7 @@ function renderStylePresets(themeId) {
 function isOpen(access) {
   try {
     if (access.url.startsWith('file:')) return openIndex.exact.has(accessUrl(access.url));
-    const key = access.matchType === 'domain' ? new URL(access.url).origin : access.matchType === 'exact' ? webUrl(access.url) : documentKey(access.url);
+    const key = access.matchType === 'domain' ? matchOrigin(access.url) : access.matchType === 'exact' ? webUrl(access.url) : documentMatchKey(access.url);
     return openIndex[access.matchType].has(key);
   } catch { return false; }
 }
@@ -311,8 +311,8 @@ async function refreshTabs() {
       const url = accessUrl(tab.pendingUrl || tab.url);
       openIndex.exact.add(url);
       if (url.startsWith('file:')) continue;
-      openIndex.domain.add(new URL(url).origin);
-      openIndex.document.add(documentKey(url));
+      openIndex.domain.add(matchOrigin(url));
+      openIndex.document.add(documentMatchKey(url));
     } catch { /* Internal browser pages cannot match saved accesses. */ }
   }
   updateStatuses();

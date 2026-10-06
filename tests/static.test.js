@@ -59,6 +59,17 @@ test('la apertura local usa pestañas y ofrece la configuración de archivos', (
   assert.match(read('newtab.html'), /id="openLocalSettings"/);
   assert.doesNotMatch(read('newtab.html'), /Instalar asistente macOS/);
 });
+test('el indicador abierto y la reutilización comparten la misma identidad de documento', () => {
+  const app = read('src/app.js'), model = read('src/model.js'), tabs = read('src/tabs.js');
+  // app.js construye la clave del indicador con documentMatchKey/matchOrigin...
+  assert.match(app, /openIndex\.document\.add\(documentMatchKey\(url\)\)/);
+  assert.match(app, /openIndex\.domain\.add\(matchOrigin\(url\)\)/);
+  assert.match(app, /: documentMatchKey\(access\.url\)/);
+  // ...y model.js usa exactamente las mismas claves para decidir el foco.
+  assert.match(model, /return documentMatchKey\(access\.url\) === documentMatchKey\(tabUrl\)/);
+  assert.match(model, /return matchOrigin\(access\.url\) === matchOrigin\(tabUrl\)/);
+  assert.match(tabs, /matches\(access, tab\.pendingUrl \|\| tab\.url\)/);
+});
 test('captura por lote usa acceso de host y conserva miniaturas existentes', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="captureAllImages"/);

@@ -78,11 +78,19 @@ test('descarta CSS arbitrario y claves no definidas sin contaminar prototipos', 
   assert.equal(Object.hasOwn(result, '__proto__'), false);
   assert.throws(() => validateRules(JSON.parse('{"__proto__":"evil"}')));
 });
-test('conserva mayúsculas, query y fragmento en aplicaciones desconocidas', () => {
+test('en sitios desconocidos la ruta y las mayúsculas identifican el documento', () => {
   assert.equal(matches(access('https://example.com/doc/AbC'), 'https://example.com/doc/abc'), false);
-  assert.equal(matches(access('https://example.com/?id=1'), 'https://example.com/?id=2'), false);
-  assert.equal(matches(access('https://example.com/#one'), 'https://example.com/#two'), false);
   assert.equal(matches(access('https://example.com/'), 'https://example.com/private'), false);
+});
+test('query y fragmento no crean duplicados cuando el acceso no los define', () => {
+  assert.equal(matches(access('https://example.com/page'), 'https://example.com/page?x=1'), true);
+  assert.equal(matches(access('https://example.com/page'), 'https://example.com/page#seccion'), true);
+  assert.equal(matches(access('https://example.com/page#uno'), 'https://example.com/page#otro'), true);
+  assert.equal(matches(access('https://example.com/?id=1'), 'https://example.com/?id=2'), true);
+});
+test('una redireccion con www. no duplica el acceso', () => {
+  assert.equal(matches(access('https://example.com/pagina'), 'https://www.example.com/pagina'), true);
+  assert.equal(matches(access('https://www.example.com/', 'domain'), 'https://example.com/ruta'), true);
 });
 test('reconoce IDs de Google Docs, Drive, Figma y Miro', () => {
   for (const [a, b] of [

@@ -189,9 +189,8 @@ export function normalizeData(stored = DEFAULT_DATA) {
             iconStyle: enumValue(s.iconStyle, ["minimal", "filled", "round"], "Estilo de icono") },
         autoTagRules: validateRules(stored.autoTagRules ?? DEFAULT_DATA.autoTagRules) };
 }
-export function documentKey(value) {
-    const url = new URL(webUrl(value));
-    // Document IDs are case sensitive. Unknown apps keep query and fragment.
+function appDocumentId(url) {
+    // Document IDs are case sensitive.
     if (url.hostname === "docs.google.com") {
         const match = url.pathname.match(/^\/(document|spreadsheets|presentation)\/(?:u\/\d+\/)?d\/([^/]+)/);
         if (match)
@@ -213,7 +212,28 @@ export function documentKey(value) {
         if (match)
             return url.origin + "/app/board/" + match[1];
     }
-    return url.href;
+    return null;
+}
+// Identidad de documento usada por el inventario: para sitios desconocidos
+// conserva la mayor precision posible (URL completa con query y fragmento).
+export function documentKey(value) {
+    const url = new URL(webUrl(value));
+    return appDocumentId(url) ?? url.href;
+}
+// Origen comparable: mismo protocolo, host y puerto, tratando www. como alias.
+// Evita duplicados cuando el sitio redirige entre example.com y www.example.com.
+export function matchOrigin(value) {
+    const url = new URL(webUrl(value));
+    return url.protocol + "//" + url.hostname.replace(/^www\./, "") + (url.port ? ":" + url.port : "");
+}
+// Identidad de documento usada para abrir/enfocar accesos. El fragmento nunca
+// cambia el recurso y la query suele ser efimera (seguimiento, sesion), por lo
+// que para sitios desconocidos el documento queda definido por origen + ruta.
+// Es la misma clave que construye el indicador "abierto" en app.js, de modo que
+// un punto verde garantiza que el clic enfoca en vez de duplicar.
+export function documentMatchKey(value) {
+    const url = new URL(webUrl(value));
+    return appDocumentId(url) ?? (matchOrigin(value) + url.pathname);
 }
 export function matches(access, tabUrl) {
     try {
@@ -222,10 +242,10 @@ export function matches(access, tabUrl) {
         if (url.startsWith("file:"))
             return url === accessUrl(tabUrl);
         if (access.matchType === "domain")
-            return new URL(webUrl(access.url)).origin === new URL(webUrl(tabUrl)).origin;
+            return matchOrigin(access.url) === matchOrigin(tabUrl);
         if (access.matchType === "exact")
             return webUrl(access.url) === webUrl(tabUrl);
-        return documentKey(access.url) === documentKey(tabUrl);
+        return documentMatchKey(access.url) === documentMatchKey(tabUrl);
     }
     catch {
         return false;
