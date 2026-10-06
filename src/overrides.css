@@ -162,6 +162,9 @@ dialog::backdrop { background: #080b12aa; }
 .dialog-form .button.secondary:hover, .dialog-form .style-preset:hover { border-color: #646464; background: #313131; filter: none; }
 .dialog-form .button:not(.secondary) { background: #4d8dff; color: #ffffff; }
 .dialog-form .button:not(.secondary):hover { background: #639bff; filter: none; }
+.dialog-form .button.danger { margin-right: auto; background: #7a2434; color: #ffe3e8; }
+.dialog-form .button.danger:hover { background: #93303f; filter: none; }
+.dialog-form .button.danger:disabled { background: #3a2a2e; color: #8f7c81; cursor: not-allowed; }
 .dialog-form .button { font-weight: 500; }
 .dialog-form #recaptureStart { margin-left: auto; text-align: right; }
 .dialog-form .dialog-actions { margin-top: 28px; padding-top: 18px; border-top: 1px solid #3d3d3d; }

@@ -6,6 +6,7 @@ import { resizeImage } from './images.js';
 import { collectTags, suggestTags, insertTag } from './tags.js';
 import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
+import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
 import { createSyncStore, mergeSyncData } from './sync.js';
 import { syncDriveImages } from './drive.js';
@@ -1118,7 +1119,23 @@ onClick('editWorkspace', () => {
   $('editWorkspaceDialog').dataset.workspaceId = workspace.id;
   $('editWorkspaceName').value = workspace.name;
   $('editWorkspaceKind').value = workspace.type;
+  const onlyWorkspace = data.workspaces.length <= 1;
+  $('deleteWorkspace').disabled = onlyWorkspace;
+  $('deleteWorkspace').title = onlyWorkspace ? 'No puedes eliminar el último Workspace' : 'Eliminar este Workspace y sus datos';
   openDialog('editWorkspaceDialog');
+});
+onClick('deleteWorkspace', () => {
+  const workspaceId = $('editWorkspaceDialog').dataset.workspaceId;
+  $('deleteWorkspaceDialog').dataset.workspaceId = workspaceId;
+  $('deleteWorkspaceSummary').textContent = workspaceDeletionSummary(data, workspaceId);
+  $('editWorkspaceDialog').close();
+  openDialog('deleteWorkspaceDialog');
+});
+onSubmit('deleteWorkspaceForm', async () => {
+  const candidate = deleteWorkspace(data, $('deleteWorkspaceDialog').dataset.workspaceId, true);
+  await commit(candidate);
+  $('deleteWorkspaceDialog').close();
+  showMessage('Workspace eliminado. Puedes restaurarlo desde Configuración → Datos.');
 });
 async function moveWorkspaceToPosition(sourceId, targetId, after) {
   if (sourceId === targetId) return;

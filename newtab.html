@@ -80,7 +80,13 @@
     <dialog id="editWorkspaceDialog"><form method="dialog" id="editWorkspaceForm" class="dialog-form">
       <h2>Editar Workspace</h2><label>Nombre<input id="editWorkspaceName" required maxlength="40" /></label>
       <label>Tipo<select id="editWorkspaceKind"><option value="principal">Principal</option><option value="standard">Estándar</option></select></label>
-      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar Workspace</button></div>
+      <div class="dialog-actions"><button type="button" id="deleteWorkspace" class="button danger">Eliminar Workspace</button><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button">Guardar Workspace</button></div>
+    </form></dialog>
+    <dialog id="deleteWorkspaceDialog"><form method="dialog" id="deleteWorkspaceForm" class="dialog-form">
+      <h2>Eliminar Workspace</h2>
+      <p id="deleteWorkspaceSummary" class="help"></p>
+      <small>Se eliminarán sus categorías, subcategorías y accesos. La copia anterior quedará como respaldo local para restaurarla desde Configuración → Datos.</small>
+      <div class="dialog-actions"><button type="button" data-cancel class="button secondary">Cancelar</button><button class="button danger">Eliminar Workspace</button></div>
     </form></dialog>
     <dialog id="bookmarksDialog"><form id="bookmarksForm" class="dialog-form" method="dialog">
       <h2>Importar favoritos de Chrome</h2>
