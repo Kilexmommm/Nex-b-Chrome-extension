@@ -927,6 +927,7 @@ onSubmit('accessForm', async () => {
     thumbnail: $('accessThumbnailUrl').value.trim() || pastedImage };
   const originalAccess = existingId ? candidate.categories.flatMap(category => category.accesses).find(item => item.id === existingId) : null;
   if (originalAccess) Object.assign(access, { bookmarkId: originalAccess.bookmarkId, bookmarkFolderId: originalAccess.bookmarkFolderId, bookmarkMissing: originalAccess.bookmarkMissing });
+  if (originalAccess?.pinned) access.pinned = true;
   if (existingId) {
     const original = candidate.categories.find(c => c.id === $('accessDialog').dataset.categoryId);
     if (!original?.accesses.some(a => a.id === existingId)) throw new Error('El acceso ya no existe; cancela y vuelve a abrirlo.');
