@@ -132,6 +132,9 @@ export function applyRemoteData(local, remote) {
 export function decideSyncAction(remoteRevision, lastRevision, dirty) {
   if (remoteRevision && remoteRevision === lastRevision) return dirty ? 'upload' : 'none';
   if (!remoteRevision) return 'upload';
+  // Sin revisión conocida (equipo nuevo o actualizado desde 1.9.1) no se sabe qué
+  // es más reciente: se combina en vez de reemplazar la biblioteca local.
+  if (!lastRevision) return 'merge';
   return dirty ? 'merge' : 'apply';
 }
 
@@ -199,7 +202,10 @@ export function createSyncStore(area) {
       if (!manifest) return null;
       if (manifest.schemaVersion !== 1 || !manifest.revision || !Number.isInteger(manifest.count) || manifest.count < 1 || manifest.count > SYNC_QUOTA.MAX_ITEMS)
         throw new Error('El manifiesto sincronizado no es válido.');
-      const keys = Array.from({ length: manifest.count }, (_, index) => chunkKey(manifest.revision, index));
+      // Hasta 1.9.1 los fragmentos no llevaban la revisión en la clave ni el manifiesto
+      // guardaba length; se leen igual y el próximo save() los migra al formato nuevo.
+      const legacy = !Number.isInteger(manifest.length);
+      const keys = Array.from({ length: manifest.count }, (_, index) => legacy ? SYNC_CHUNK_PREFIX + index : chunkKey(manifest.revision, index));
       const stored = await area.get(keys);
       if (keys.some(key => typeof stored[key] !== 'string')) throw new Error('Faltan datos sincronizados; se conserva la copia local.');
       const encoded = keys.map(key => stored[key]).join('');

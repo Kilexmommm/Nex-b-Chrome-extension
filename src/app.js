@@ -68,6 +68,7 @@ function arrangeDialogFields() {
     showWorkspaceTabs: 'Muestra la fila de pestañas para cambiar de Workspace.',
     settingsTagRules: 'Una regla por línea para etiquetar accesos automáticamente.',
     captureEnabled: 'Crea una miniatura al agregar un acceso.',
+    syncEnabled: 'Mantiene tus Workspaces iguales en los equipos con esta cuenta de Chrome.',
     bookmarkLink: 'Mantiene la sección vinculada a esa carpeta de Chrome.'
   };
   document.querySelectorAll('.dialog-form label').forEach(label => {

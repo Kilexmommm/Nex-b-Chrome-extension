@@ -118,6 +118,7 @@ test('decideSyncAction elige la acción correcta', () => {
   assert.equal(decideSyncAction('r1', 'r1', true), 'upload');
   assert.equal(decideSyncAction('r2', 'r1', false), 'apply');
   assert.equal(decideSyncAction('r2', 'r1', true), 'merge');
+  assert.equal(decideSyncAction('r1', '', false), 'merge');
 });
 
 test('una edición local no se revierte al sincronizar (regresión del bug)', async () => {
@@ -299,4 +300,21 @@ test('borra los fragmentos viejos cuando juntos exceden la cuota total', async (
   assert.equal(loaded.data.categories[0].accesses[0].title, 'y'.repeat(SYNC_CHUNK_BYTES));
   const after = Object.entries(await area.get(null)).reduce((sum, [key, value]) => sum + key.length + JSON.stringify(value).length, 0);
   assert.ok(after <= area.QUOTA_BYTES);
+});
+
+test('load lee el formato de 1.9.1 y save lo migra al formato nuevo', async () => {
+  const area = memoryArea(), data = fixture();
+  const encoded = Buffer.from(JSON.stringify(projectSyncData(data))).toString('base64');
+  await area.set({
+    [SYNC_MANIFEST_KEY]: { schemaVersion: 1, count: 1, revision: 'antigua' },
+    [SYNC_CHUNK_PREFIX + '0']: encoded
+  });
+  const store = createSyncStore(area);
+  const loaded = await store.load();
+  assert.equal(loaded.revision, 'antigua');
+  assert.equal(loaded.data.categories[0].accesses[0].title, 'Documento');
+  const saved = await store.save(data);
+  const all = await area.get(null);
+  assert.equal(SYNC_CHUNK_PREFIX + '0' in all, false);
+  assert.equal((await store.load()).revision, saved.revision);
 });
