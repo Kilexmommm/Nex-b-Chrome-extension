@@ -82,7 +82,7 @@ test('captura por lote usa acceso de host y conserva miniaturas existentes', () 
   assert.match(html, /id="captureAllImages"/);
   assert.doesNotMatch(app, /permissions\.request\(\{ origins: \['http:\/\/\*\/\*'/);
   assert.match(app, /!access\.thumbnail && \/\^https\?:\//);
-  assert.match(app, /chrome\.tabs\.captureVisibleTab/);
+  assert.match(app, /captureStableTab\(chrome\.tabs, tab\)/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
 });
 test('la captura masiva ofrece cancelar y respeta el límite de Chrome', () => {
@@ -98,11 +98,11 @@ test('la sincronización global recorre todas las secciones vinculadas y muestra
   assert.match(app, /unavailable\.push\(category\.name/);
   assert.match(html, /id="syncWorkspaceBookmarks"[^>]*>↻ Sincronizar favoritos importados/);
 });
-test('la actualización asistida abre el ZIP de GitHub y muestra la versión instalada', () => {
+test('la actualización asistida abre las versiones publicadas y muestra la versión instalada', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="openUpdate"[^>]*>Actualizar desde GitHub/);
   assert.match(html, /id="extensionVersion"/);
-  assert.match(app, /const GITHUB_ARCHIVE_URL = 'https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/archive\/refs\/heads\/main\.zip'/);
+  assert.match(app, /const GITHUB_ARCHIVE_URL = UPDATE_COMMAND/);
   assert.match(app, /chrome\.runtime\.getManifest\(\)\.version/);
   assert.match(app, /chrome\.tabs\.create\(\{ url: GITHUB_ARCHIVE_URL \}\)/);
   assert.match(html, /id="updateBanner"[^>]*hidden/);
@@ -131,8 +131,8 @@ test('Drive usa OAuth privado y la pestaña ofrece subida y descarga de imágene
   assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/drive.appdata']);
   assert.ok(manifest.oauth2.client_id.endsWith('.apps.googleusercontent.com'));
   assert.ok(manifest.permissions.includes('identity'));
-  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
-  assert.match(app, /syncDriveImages\(data\)/);
+  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/*', 'https://api.github.com/*']);
+  assert.match(app, /syncDriveImages\(snapshot\.data, imageStore\)/);
   assert.match(drive, /appDataFolder/);
   assert.match(html, /id="syncDriveNow"/);
 });
@@ -165,7 +165,8 @@ test('tamaño usa bajo por defecto, tarjetas 20% más angostas y proporción 5:3
   assert.match(css, /--card-min-width:168px/);
   assert.match(css, /minmax\(min\(var\(--card-min-width\),100%\),1fr\)/);
   assert.match(css, /\.thumb \{[\s\S]*?aspect-ratio:5 \/ 3/);
-  assert.match(css, /\.add-card \{[\s\S]*?aspect-ratio:5 \/ 3/);
+  // El «+» es un botón pequeño junto a la última miniatura, no una tarjeta del tamaño de una miniatura.
+  assert.match(read('src/overrides.css'), /\.cards > \.add-card \{ aspect-ratio: auto; width: 40px; height: 40px; justify-self: start;/);
   assert.match(read('newtab.html'), /title="Alto de miniaturas"/);
   assert.match(read('newtab.html'), /id="thumbnailCustomHeight"/);
 });
@@ -333,10 +334,10 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead', 'sidePanel']);
-  assert.equal(manifest.optional_host_permissions, undefined);
-  assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
-  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
+  assert.deepEqual(manifest.permissions, ['tabs', 'tabGroups', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'sidePanel']);
+  assert.deepEqual(manifest.optional_host_permissions, ['<all_urls>']);
+  assert.deepEqual(manifest.optional_permissions, ['bookmarks', 'clipboardRead', 'identity.email']);
+  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/*', 'https://api.github.com/*']);
   assert.deepEqual(manifest.side_panel, { default_path: 'newtab.html' });
   for (const key of ['content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);
@@ -488,4 +489,74 @@ test('la vista Tags agrupa los accesos file:// en «Archivos locales»', () => {
   assert.match(app, /if \(localFiles\.length\) entries\.unshift\(\['', localFiles, true\]\)/);
   assert.match(app, /local \? '⌂ Archivos locales' : '# ' \+ tag/);
   assert.match(app, /localFiles = localFiles\.filter\(\(\{ access \}\) => matchesSearch\(access\)\)/);
+});
+test('Diseño permite poner el título y las etiquetas encima de la miniatura (issue #37)', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css');
+  const design = html.split('id="settingsDesignPanel"')[1].split('id="settingsDataPanel"')[0];
+  assert.match(design, /<select id="titlePosition"><option value="below">Debajo de la imagen<\/option><option value="above">Arriba de la imagen<\/option><\/select>/);
+  assert.match(design, /<select id="tagsPosition"><option value="overlay">Abajo, sobre la imagen<\/option><option value="above">Arriba a la izquierda, sobre la imagen<\/option><\/select>/);
+  // Se rellenan al abrir Configuración y se guardan con el formulario.
+  assert.match(app, /'iconStyle', 'titlePosition', 'tagsPosition'\]\) \$\(key\)\.value = s\[key\]/);
+  assert.match(app, /titlePosition: \$\('titlePosition'\)\.value, tagsPosition: \$\('tagsPosition'\)\.value/);
+  // Se aplican como atributos del documento y, para las etiquetas, en una franja antes de la imagen.
+  assert.match(app, /dataset\.titlePosition = s\.titlePosition/);
+  assert.match(app, /dataset\.tagsPosition = s\.tagsPosition/);
+  // Las etiquetas siempre van dentro de la imagen; «arriba» las ancla a la esquina superior izquierda.
+  assert.match(app, /overlay\.append\(tags\);\s*\/\/[^\n]*\n\s*thumb\.append\(overlay\);/);
+  assert.match(css, /html\[data-tags-position="above"\] \.thumb \.card-overlay \{ inset: 0 0 auto;/);
+  assert.match(css, /html\[data-title-position="above"\] \.card \{ display: flex; flex-direction: column; \}/);
+  assert.match(css, /html\[data-title-position="above"\] \.card > \.card-footer \{ order: -1;/);
+  // Con el título arriba va en una sola línea: sin hueco sobre la imagen y filas alineadas.
+  assert.match(css, /html\[data-title-position="above"\] \.card-footer \.card-title \{ -webkit-line-clamp: 1; max-height: 1\.4em; \}/);
+  assert.doesNotMatch(css, /\.card-footer \.card-title \{ min-height/);
+  // Con el título arriba, el ✎ mide una línea de título y no invade la imagen.
+  assert.match(css, /html\[data-title-position="above"\] \.card-edit \{ top: 1px; padding: 0 6px; font-size: 11px; line-height: calc\(11px \* 1\.4\); \}/);
+  assert.match(css, /\.card-footer \.status \{[^}]*margin-top: calc\(\(11px \* 1\.4 - 9px\) \/ 2\)/);
+  // El título sigue siendo el botón que abre o enfoca el acceso.
+  assert.match(app, /button\(access\.title, 'Abrir o enfocar: ' \+ access\.title, \(\) => openAccess\(access\), 'card-title card-title-link'\)/);
+});
+test('el inventario es ancho y ofrece la pestaña «Agrupar» con grupos nativos de Chrome', () => {
+  const app = read('src/app.js'), html = read('newtab.html'), css = read('src/overrides.css');
+  assert.match(html, /id="inventoryGroupTab" type="button" role="tab" aria-controls="inventoryGroupPanel" aria-selected="false"/);
+  assert.match(html, /id="inventoryGroupPanel" role="tabpanel" aria-labelledby="inventoryGroupTab" hidden/);
+  assert.match(html, /id="inventoryGroupGather" type="checkbox"/);
+  assert.match(html, /id="inventoryGroupAll"[^>]*>Agrupar todas/);
+  assert.match(html, /id="inventoryGroupSelected"[^>]*>Agrupar seleccionados/);
+  assert.match(app, /chrome\.tabGroups\.query\(\{\}\)/);
+  assert.match(app, /chrome\.tabs\.group\(\{ groupId: action\.groupId, tabIds: action\.tabIds \}\)/);
+  assert.match(app, /createProperties: \{ windowId: action\.windowId \}/);
+  assert.match(app, /chrome\.tabGroups\.update\(groupId, \{ title: action\.title, color: action\.color \}\)/);
+  assert.match(css, /\.inventory-form \{ width: min\(1480px/);
+  assert.match(css, /calc\(\(100% - 32px\) \/ 5\)/);
+  assert.match(css, /\[data-narrow="true"\] #inventoryDialog \.inventory-list \{ grid-template-columns: minmax\(0, 1fr\)/);
+});
+test('Diseño permite quitar el degradado de la imagen y los diálogos grandes quedan anclados arriba', () => {
+  const html = read('newtab.html'), app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(html, /<input id="imageShade" type="checkbox" checked \/> Degradado oscuro sobre la imagen/);
+  assert.match(app, /dataset\.imageShade = String\(s\.imageShade !== false\)/);
+  assert.match(app, /imageShade: \$\('imageShade'\)\.checked/);
+  assert.match(css, /html\[data-image-shade="false"\] \.thumb \.card-overlay \{ background: none !important; \}/);
+  assert.match(css, /:is\(#settingsDialog, #inventoryDialog\)\[open\] \{ margin-top: 32px; margin-bottom: auto;/);
+});
+test('los accesos file:// muestran su carpeta y archivo abajo a la izquierda de la miniatura', () => {
+  const app = read('src/app.js'), css = read('src/overrides.css');
+  assert.match(app, /thumb\.append\(node\('span', 'file-path', filePathLabel\(access\.url\)\)\)/);
+  assert.match(app, /thumb\.classList\.add\('has-file-path'\)/);
+  assert.match(css, /\.thumb \.file-path \{ position: absolute; left: 8px; bottom: 8px;/);
+  assert.match(css, /html:not\(\[data-tags-position="above"\]\) \.thumb\.has-file-path \.card-overlay \{ padding-bottom: 32px; \}/);
+});
+test('el estado de pestañas no se recalcula en segundo plano y las repetidas usan un índice', () => {
+  const app = read('src/app.js');
+  assert.match(app, /if \(document\.hidden\) \{ tabRefreshPending = true; return; \}/);
+  assert.match(app, /document\.addEventListener\('visibilitychange'/);
+  assert.match(app, /const saved = groups\.length \? savedAccessIndex\(\) : new Map\(\);/);
+  assert.doesNotMatch(app, /savedAccessForTabKey/);
+});
+test('el inventario se cierra con una × arriba y las casillas quedan junto al título', () => {
+  const html = read('newtab.html'), css = read('src/overrides.css');
+  const inventory = html.split('<dialog id="inventoryDialog"')[1].split('</dialog>')[0];
+  assert.match(inventory, /^[^]*?<button type="button" data-cancel class="dialog-close" aria-label="Cerrar inventario"/);
+  assert.doesNotMatch(inventory, /class="button secondary">Cerrar<\/button>/);
+  assert.match(css, /#inventoryDialog :is\(label\.inventory-row, \.dup-group-head\) \{ display: flex; align-items: flex-start;/);
+  assert.match(css, /#inventoryDialog \.inventory-row-title \{ display: -webkit-box;[^}]*-webkit-line-clamp: 2;/);
 });

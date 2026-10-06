@@ -38,6 +38,7 @@ La versión previa escapaba títulos/tags antes de usar innerHTML: por eso no se
 | Permiso | Uso concreto | Decisión y riesgo residual |
 | --- | --- | --- |
 | tabs | Consultar URL de pestañas abiertas para mostrar estado y reutilizarlas | Mantener. Da visibilidad de URLs/títulos de pestañas; activeTab no sustituye la consulta global |
+| tabGroups | Inventario → Agrupar: consultar los grupos de pestañas existentes y ponerles título y color | Mantener. Solo actúa tras la acción del usuario; no lee contenido de páginas. Sin él, `chrome.tabs.group` crearía grupos sin nombre ni se podrían reutilizar por título |
 | storage | Guardar biblioteca y borradores | Mantener. Datos locales sensibles, no cifrados por esta aplicación |
 | contextMenus | Agregar página/enlace desde clic derecho | Mantener; se filtran identificadores y URLs esperados |
 | activeTab | Captura de la pestaña tras la acción explícita del usuario | Mantener; permite una captura temporal, no una monitorización continua |

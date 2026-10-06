@@ -180,3 +180,51 @@ test('guardar y recargar conserva todos los ajustes de Diseño', () => {
   assert.equal(reloaded.thumbnailSize, 'large');
   assert.equal(reloaded.thumbnailHeight, 187);
 });
+test('posición del título y de las etiquetas: por defecto el diseño actual', () => {
+  const defaults = normalizeData().settings;
+  assert.equal(defaults.titlePosition, 'below');
+  assert.equal(defaults.tagsPosition, 'overlay');
+  // Datos guardados antes de estos ajustes: se completan con el valor por defecto.
+  const legacy = fixture();
+  delete legacy.settings.titlePosition;
+  delete legacy.settings.tagsPosition;
+  const loaded = normalizeData(JSON.parse(JSON.stringify(legacy))).settings;
+  assert.equal(loaded.titlePosition, 'below');
+  assert.equal(loaded.tagsPosition, 'overlay');
+});
+test('posición del título y de las etiquetas: guarda valores válidos e ignora los inválidos sin fallar', () => {
+  const saved = fixture();
+  saved.settings = { ...saved.settings, titlePosition: 'above', tagsPosition: 'above' };
+  const reloaded = normalizeData(JSON.parse(JSON.stringify(saved))).settings;
+  assert.equal(reloaded.titlePosition, 'above');
+  assert.equal(reloaded.tagsPosition, 'above');
+  for (const [titlePosition, tagsPosition] of [['left', 'bottom'], [null, 42], ['', {}], ['ABOVE', 'Overlay']]) {
+    const invalid = fixture();
+    invalid.settings = { ...invalid.settings, titlePosition, tagsPosition };
+    let settings;
+    assert.doesNotThrow(() => { settings = normalizeData(invalid).settings; });
+    assert.equal(settings.titlePosition, 'below');
+    assert.equal(settings.tagsPosition, 'overlay');
+  }
+});
+
+test('imageShade es true por defecto y solo acepta booleanos', () => {
+  assert.equal(normalizeData().settings.imageShade, true);
+  const off = normalizeData(); off.settings.imageShade = false;
+  assert.equal(normalizeData(off).settings.imageShade, false);
+  for (const value of ['no', 0, null, {}]) {
+    const invalid = normalizeData(); invalid.settings.imageShade = value;
+    assert.equal(normalizeData(invalid).settings.imageShade, true);
+  }
+});
+
+test('filePathLabel muestra la última carpeta y el archivo de un acceso file://', async () => {
+  const { filePathLabel } = await import('../src/model.js');
+  assert.equal(filePathLabel('file:///Users/botkdk/Documents/Codex/2026-09-07/referenced-chatgpt-conversation-this-is-an/workspace-launcher-mvp/newtab.html'), '/workspace-launcher-mvp/newtab.html');
+  assert.equal(filePathLabel('file:///Users/botkdk/Mis%20Proyectos/informe%20final.pdf'), '/Mis Proyectos/informe final.pdf');
+  assert.equal(filePathLabel('file:///Users/botkdk/Proyectos/web/'), '/Proyectos/web/');
+  assert.equal(filePathLabel('file:///notas.txt'), '/notas.txt');
+  assert.equal(filePathLabel('file:///'), '/');
+  assert.equal(filePathLabel('https://example.com/a/b.html'), '');
+  assert.equal(filePathLabel('no es una url'), '');
+});

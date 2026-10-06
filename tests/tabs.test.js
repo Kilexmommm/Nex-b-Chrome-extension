@@ -106,13 +106,13 @@ test('conserva errores reales de Chrome sin intentar otro programa', async () =>
   await assert.rejects(openOrFocusTab({ url: 'file:///tmp/a.html', matchType: 'exact' }, api, locks()), /File URL navigation is not allowed/);
 });
 
-test('abre en lote: una URL ya abierta se enfoca y no se crea', async () => {
+test('abre en lote: conserva la pestaña existente sin despertarla', async () => {
   const api = mock([{ id: 4, windowId: 9, url: access.url }]);
   const result = await openOrFocusMany([access], api, locks());
   assert.deepEqual(result, { opened: 0, focused: 1, failed: 0 });
   assert.equal(api.state.creates, 0);
-  assert.deepEqual(api.state.updates, [4]);
-  assert.deepEqual(api.state.windows, [9]);
+  assert.deepEqual(api.state.updates, []);
+  assert.deepEqual(api.state.windows, []);
 });
 
 test('abre en lote: una URL nueva se crea', async () => {

@@ -284,7 +284,7 @@ function quotaEnforcedArea(quotaBytes) {
   };
 }
 
-test('borra los fragmentos viejos cuando juntos exceden la cuota total', async () => {
+test('conserva la última revisión si actualizar excede la cuota total', async () => {
   const area = quotaEnforcedArea(100000);
   const store = createSyncStore(area);
   const data = fixture();
@@ -295,9 +295,10 @@ test('borra los fragmentos viejos cuando juntos exceden la cuota total', async (
   area.QUOTA_BYTES = Math.floor(singleSize * 1.5);
   const updated = structuredClone(data);
   updated.categories[0].accesses[0].title = 'y'.repeat(SYNC_CHUNK_BYTES);
-  await store.save(updated);
+  await assert.rejects(store.save(updated), /sin eliminar la copia anterior/);
   const loaded = await store.load();
-  assert.equal(loaded.data.categories[0].accesses[0].title, 'y'.repeat(SYNC_CHUNK_BYTES));
+  assert.equal(loaded.data.categories[0].accesses[0].title, 'x'.repeat(SYNC_CHUNK_BYTES));
+  assert.deepEqual(await area.get(null), first);
   const after = Object.entries(await area.get(null)).reduce((sum, [key, value]) => sum + key.length + JSON.stringify(value).length, 0);
   assert.ok(after <= area.QUOTA_BYTES);
 });
@@ -353,4 +354,12 @@ test('fragmentos con suma de control distinta se marcan como dañados', async ()
   const key = Object.keys(all).find(k => k.startsWith(SYNC_CHUNK_PREFIX));
   await area.set({ [key]: all[key].slice(0, -4) + 'AAAA' });
   await assert.rejects(store.load(), SyncCorruptError);
+});
+test('la posición del título y de las etiquetas viaja por Chrome Sync', () => {
+  const local = normalizeData();
+  local.settings = { ...local.settings, titlePosition: 'above', tagsPosition: 'above' };
+  const projected = projectSyncData(local);
+  assert.equal(projected.settings.titlePosition, 'above');
+  assert.equal(projected.settings.tagsPosition, 'above');
+  assert.equal(normalizeData(projected).settings.titlePosition, 'above');
 });
