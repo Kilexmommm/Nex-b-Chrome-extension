@@ -1,23 +1,31 @@
 import { proposeTabGroups, planGroupActions, groupingSummary } from './grouping.js';
-import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride, filePathLabel } from './model.js';
+import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride, filePathLabel, retainAccessMetadata } from './model.js';
 import { createRepository } from './storage.js';
-import { openOrFocusTab, openOrFocusMany } from './tabs.js';
-import { createBackupZip, readStoredZip } from './backup.js';
+import { createImageStore, isImageRef } from './image-store.js';
+import { createImageView } from './image-view.js';
+import { backupTask } from './backup-client.js';
+import { discardSelected, parseExcludedHosts } from './memory.js';
+import { syncRetryDelay } from './retry.js';
+import { createSyncController, SyncConflictError } from './sync-controller.js';
+import { openOrFocusTab, openOrFocusMany, openSectionInNewWindow } from './tabs.js';
 import { resizeImage } from './images.js';
 import { collectTags, suggestTags, insertTag } from './tags.js';
 import { planBookmarkImport, readBookmarkFolder, placeAccess, syncBookmarkSection } from './bookmarks.js';
 import { moveSection, reorderSection, sectionSiblings } from './sections.js';
 import { deleteWorkspace, workspaceDeletionSummary } from './workspaces.js';
 import { prepareRecapture, findRecaptureTarget } from './recapture.js';
-import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS } from './capture.js';
+import { waitForCaptureTab, createBatchCommitter, createCaptureThrottle, delay, CAPTURE_PAINT_DELAY_MS, captureStableTab } from './capture.js';
 import { checkForUpdate, shouldShowUpdateDialog, UPDATE_COMMAND, UPDATE_SNOOZE_KEY, UPDATE_SNOOZE_MS } from './update.js';
-import { createSyncStore, mergeThreeWay, applyRemoteData, decideSyncAction, projectSyncData, SyncCorruptError } from './sync.js';
+import { createSyncStore, projectSyncData } from './sync.js';
 import { cleanupDriveOrphans, syncDriveImages } from './drive.js';
 
 const $ = id => document.getElementById(id);
 const uid = prefix => prefix + '-' + crypto.randomUUID();
-const repository = createRepository(chrome.storage.local, navigator.locks);
+const imageStore = createImageStore();
+const imageView = createImageView(imageStore, () => data.settings.remoteImagesEnabled);
+const repository = createRepository(chrome.storage.local, navigator.locks, imageStore);
 const syncStore = createSyncStore(chrome.storage.sync);
+const syncController = createSyncController({ repository, store: syncStore, area: chrome.storage.local, locks: navigator.locks });
 let data = normalizeData(DEFAULT_DATA), revision = 0;
 let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = false;
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
@@ -27,10 +35,14 @@ let searchQuery = '', searchTimer = null;
 let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let localThumbnailPreference = null;
+let collapsedSections = new Set();
+let titlesOnly = false;
 let narrowColumns = 1;
 const narrowMedia = window.matchMedia('(max-width: 600px)');
 let syncEnabled = false, syncBusy = false, syncTimer = null, syncDirty = false, syncLastRevision = '';
+let syncFailures = 0, syncPaused = false;
 let captureBusy = false, captureCancelled = false;
+let backgroundObjectUrl = '', backgroundGeneration = 0;
 const captureThrottle = createCaptureThrottle();
 
 function node(tag, className, text) {
@@ -157,6 +169,32 @@ async function setNarrowColumns(value) {
   await chrome.storage.local.set({ 'nexb.narrowColumns': narrowColumns });
   applyNarrowColumns();
 }
+// Preferencias de vista por dispositivo (no viajan en la sincronización):
+// el estado de secciones contraídas y el modo «solo títulos».
+async function restoreCollapsedSections() {
+  const stored = await chrome.storage.local.get('nexb.collapsedSections');
+  const list = Array.isArray(stored['nexb.collapsedSections']) ? stored['nexb.collapsedSections'] : [];
+  collapsedSections = new Set(list.filter(id => typeof id === 'string'));
+}
+async function setSectionCollapsed(id, collapsed) {
+  if (collapsed) collapsedSections.add(id); else collapsedSections.delete(id);
+  await chrome.storage.local.set({ 'nexb.collapsedSections': [...collapsedSections] });
+  render();
+}
+function applyTitlesOnly() {
+  document.documentElement.dataset.titlesOnly = String(titlesOnly);
+  document.querySelectorAll('[data-main-action="titlesOnly"]').forEach(item => item.setAttribute('aria-pressed', String(titlesOnly)));
+}
+async function restoreTitlesOnly() {
+  const stored = await chrome.storage.local.get('nexb.titlesOnly');
+  titlesOnly = stored['nexb.titlesOnly'] === true;
+  applyTitlesOnly();
+}
+async function setTitlesOnly(value) {
+  titlesOnly = value === true;
+  await chrome.storage.local.set({ 'nexb.titlesOnly': titlesOnly });
+  applyTitlesOnly();
+}
 function closeMainMenu(restoreFocus = false) {
   const menu = $('mainMenu');
   if (!menu || menu.hidden) return;
@@ -188,13 +226,14 @@ async function reload() {
   reloadPending = false;
 }
 async function commit(candidate, options = {}) {
-  const { markDirty = true } = options;
+  const { markDirty = true, underStateLock = false, expectedRevision = revision } = options;
+  if (!underStateLock) return navigator.locks.request('nex-b-state', () => commit(candidate, { ...options, underStateLock: true, expectedRevision }));
   if (!ready) throw new Error('Los datos no están listos para guardar.');
   if (saving) throw new Error('Espera a que termine el guardado.');
   saving = true;
   document.querySelectorAll('dialog[open] button, dialog[open] input, dialog[open] select, dialog[open] textarea').forEach(b => { b.disabled = true; });
   try {
-    const snapshot = await repository.save(candidate, revision);
+    const snapshot = await repository.save(candidate, expectedRevision, { markDirty });
     data = snapshot.data;
     revision = snapshot.revision;
     sessionStorage.setItem('activeWorkspace', data.activeWorkspaceId);
@@ -203,7 +242,7 @@ async function commit(candidate, options = {}) {
     render();
     if (markDirty) {
       syncDirty = true;
-      await chrome.storage.local.set({ nexbSyncDirty: true });
+      syncFailures = 0; syncPaused = false;
       scheduleSync();
     }
   } finally {
@@ -257,6 +296,7 @@ function applySettings() {
   document.documentElement.dataset.titlePosition = s.titlePosition;
   document.documentElement.dataset.tagsPosition = s.tagsPosition;
   document.documentElement.dataset.imageShade = String(s.imageShade !== false);
+  document.documentElement.dataset.thumbnailShadow = String(s.thumbnailShadow !== false);
   document.documentElement.style.setProperty('--accent-color', s.accentColor);
   const rgb = s.accentColor.slice(1).match(/../g).map(v => parseInt(v, 16) / 255).map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
@@ -271,14 +311,26 @@ function applySettings() {
   document.documentElement.style.setProperty('--card-gap', ({ compact: '9px', normal: '16px', wide: '25px' }[s.cardSpacing]));
   document.documentElement.classList.toggle('light-theme', Boolean(THEME_PRESETS[s.themeId]?.light));
   document.body.style.backgroundColor = s.backgroundColor;
-  document.body.style.backgroundImage = s.backgroundImageUrl
-    ? 'linear-gradient(rgba(10,14,25,.66),rgba(10,14,25,.86)), url(' + JSON.stringify(s.backgroundImageUrl) + ')'
-    : (s.backgroundPattern || 'none');
+  applyBackground(s);
   const preset = THEME_PRESETS[s.themeId];
   const hasImage = Boolean(s.backgroundImageUrl || (preset?.backgroundAsset && s.backgroundPattern === preset.backgroundPattern));
   document.body.style.backgroundSize = hasImage ? 'cover' : '';
   document.body.style.backgroundPosition = hasImage ? 'center' : '';
   document.body.style.backgroundAttachment = hasImage ? 'fixed' : '';
+}
+function applyBackground(settings) {
+  const generation = ++backgroundGeneration;
+  if (backgroundObjectUrl) URL.revokeObjectURL(backgroundObjectUrl);
+  backgroundObjectUrl = '';
+  document.body.style.backgroundImage = settings.backgroundPattern || 'none';
+  const value = settings.backgroundImageUrl;
+  if (!value || (value.startsWith('https:') && !settings.remoteImagesEnabled)) return;
+  run(async () => {
+    const url = isImageRef(value) ? URL.createObjectURL(await imageStore.get(value)) : value;
+    if (generation !== backgroundGeneration) { if (url.startsWith('blob:')) URL.revokeObjectURL(url); return; }
+    if (url.startsWith('blob:')) backgroundObjectUrl = url;
+    document.body.style.backgroundImage = 'linear-gradient(rgba(10,14,25,.66),rgba(10,14,25,.86)), url(' + JSON.stringify(url) + ')';
+  });
 }
 function applyPresetToForm(themeId) {
   const preset = THEME_PRESETS[themeId];
@@ -286,6 +338,7 @@ function applyPresetToForm(themeId) {
   $('accentColor').value = preset.accentColor;
   $('backgroundColor').value = preset.backgroundColor;
   $('backgroundImageUrl').value = '';
+  $('settingsDialog').dataset.storedBackground = '';
   $('settingsDialog').dataset.themeId = themeId;
   $('settingsDialog').dataset.pattern = preset.backgroundPattern;
   document.querySelectorAll('.style-preset').forEach(b => b.classList.toggle('selected', b.dataset.themeId === themeId));
@@ -356,9 +409,31 @@ async function openAccess(access) {
 async function openCategoryAccesses(category) {
   const { opened, focused, failed } = await openOrFocusMany(category.accesses, chrome, navigator.locks);
   scheduleTabRefresh();
-  let message = 'Se abrieron ' + opened + ' y se enfocaron ' + focused + '.';
+  let message = 'Se abrieron ' + opened + ' y ya estaban abiertas ' + focused + '.';
   if (failed) message += ' ' + failed + ' no se pudieron abrir.';
   showMessage(message, failed > 0 && !opened && !focused);
+}
+// Título del grupo de Chrome: Workspace · sección (issue #46).
+function sectionGroupTitle(category) {
+  const workspace = data.workspaces.find(w => w.id === category.workspaceId);
+  return (workspace?.name || 'Workspace') + ' · ' + category.name;
+}
+async function openCategoryInNewWindow(category) {
+  const title = sectionGroupTitle(category);
+  const { opened, failed, grouped, titled } = await openSectionInNewWindow(category.accesses, title, chrome, navigator.locks);
+  scheduleTabRefresh();
+  let message;
+  if (!opened) {
+    message = 'No hay enlaces compatibles para abrir en una ventana nueva.';
+  } else if (grouped && titled) {
+    message = 'Se abrieron ' + opened + ' en una ventana nueva, con el grupo «' + title + '».';
+  } else if (grouped) {
+    message = 'Se abrieron ' + opened + ' en una ventana nueva y se agruparon, pero no se pudo poner el título «' + title + '».';
+  } else {
+    message = 'Se abrieron ' + opened + ' en una ventana nueva, pero no se pudieron agrupar.';
+  }
+  if (failed) message += ' ' + failed + ' no se pudieron abrir.';
+  showMessage(message, !opened || failed > 0 || (opened > 0 && (!grouped || !titled)));
 }
 let sidePanelWindowId = null;
 if (chrome.windows?.getCurrent) chrome.windows.getCurrent().then(window => { sidePanelWindowId = window?.id ?? null; }).catch(() => {});
@@ -427,6 +502,7 @@ function render() {
   $('thumbnailHeightValue').textContent = data.settings.thumbnailHeight + ' px';
   $('tagRules').textContent = 'Tags';
   $('tagRules').setAttribute('aria-pressed', String(viewMode === 'tags'));
+  imageView.clear($('workspace'));
   $('workspace').replaceChildren();
   $('emptyState').textContent = searchQuery ? 'Ningún acceso coincide con «' + $('accessSearch').value.trim() + '».'
     : viewMode === 'tags' ? 'Aún no hay accesos con tags en tus Workspaces.' : 'Agrega una categoría para empezar a organizar tus accesos.';
@@ -517,6 +593,7 @@ function renderCategory(category, subcategory, accesses = category.accesses) {
   const actions = node('div', 'category-actions');
   actions.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'button quiet category-icon'),
     button('⧉', 'Abrir todas las ventanas de esta sección', () => openCategoryAccesses(category), 'button quiet category-icon'),
+    button('⊞', 'Abrir esta sección en una ventana nueva con grupo', () => openCategoryInNewWindow(category), 'button quiet category-icon'),
     button('✎', 'Editar categoría', () => renameCategory(category), 'button quiet category-icon'),
     button('⇥', 'Mover sección a otro Workspace', () => openMoveSectionDialog(category), 'button quiet category-icon'));
   if (category.bookmarkFolderId) actions.append(button('↻', 'Sincronizar sección con Favoritos de Chrome', () => syncCategoryBookmarks(category), 'button quiet category-icon'));
@@ -527,10 +604,24 @@ function renderCategory(category, subcategory, accesses = category.accesses) {
     control.disabled = position + direction < 0 || position + direction >= siblings.length;
     actions.append(control);
   }
-  heading.append(node('h2', '', category.name), accessCount(accesses.length), actions);
+  const collapsed = collapsedSections.has(category.id);
+  const collapseToggle = button(collapsed ? '▸' : '▾', (collapsed ? 'Expandir' : 'Contraer') + ' sección ' + category.name, () => setSectionCollapsed(category.id, !collapsedSections.has(category.id)), 'button quiet category-icon category-collapse');
+  collapseToggle.setAttribute('aria-expanded', String(!collapsed));
+  heading.append(collapseToggle, node('h2', '', category.name), accessCount(accesses.length), actions);
   const cards = node('div', 'cards');
-  accesses.forEach(access => cards.append(makeCard(access, category.id)));
+  let shown = 0;
+  const more = button('Mostrar más', 'Mostrar otros 40 accesos', appendPage, 'button secondary');
+  function appendPage() {
+    more.remove();
+    const fragment = document.createDocumentFragment();
+    accesses.slice(shown, shown + 40).forEach(access => fragment.append(makeCard(access, category.id)));
+    cards.append(fragment); shown += 40;
+    if (shown < accesses.length) cards.append(more);
+    updateStatuses();
+  }
+  appendPage();
   if (!searchQuery) cards.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'add-card'));
+  cards.hidden = collapsed && !searchQuery;
   section.append(heading, cards);
   $('workspace').append(section);
 }
@@ -542,7 +633,7 @@ function makeCard(access, categoryId) {
   thumb.draggable = viewMode === 'workspace';
   if (access.thumbnail) {
     thumb.classList.add('has-thumbnail');
-    const img = node('img', 'thumbnail-image'); img.src = access.thumbnail; img.alt = ''; img.title = access.url;
+    const img = node('img', 'thumbnail-image'); imageView.set(img, access.thumbnail); img.alt = ''; img.title = access.url;
     img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
     img.onerror = () => { img.remove(); thumb.classList.remove('has-thumbnail'); thumb.prepend(node('span', 'image-error', 'Imagen no disponible')); };
     thumb.append(img);
@@ -663,6 +754,7 @@ function openAccessDialog(categoryId = '', access = null) {
   $('accessUrl').value = access?.url || '';
   $('accessThumbnailUrl').value = access?.thumbnail?.startsWith('https:') ? access.thumbnail : '';
   $('accessTags').value = (access?.tags || []).join(', ');
+  $('accessLocalOnly').checked = access?.localOnly === true;
   $('matchType').value = access?.matchType || 'document';
   const bookmarkState = $('bookmarkState');
   bookmarkState.hidden = !access?.bookmarkMissing;
@@ -677,8 +769,7 @@ function openAccessDialog(categoryId = '', access = null) {
 }
 function showPreview() {
   $('preview').hidden = !pastedImage;
-  if (pastedImage) $('preview').src = pastedImage;
-  else $('preview').removeAttribute('src');
+  imageView.set($('preview'), pastedImage);
   $('pasteBox').textContent = pastedImage ? 'Miniatura lista · haz clic y pega otra para reemplazarla' : 'Haz clic aquí y pega una captura (⌘V / Ctrl+V)';
 }
 async function renameCategory(category) {
@@ -708,6 +799,15 @@ function openRecaptureDialog(access) {
 }
 function tabLabel(tab) {
   return (tab.title && tab.title.trim()) || tab.url || tab.pendingUrl || 'Pestaña sin título';
+}
+// Issue #27: en el inventario el nombre se muestra recortado a 30 caracteres; el nombre
+// completo queda en el atributo title (tooltip y texto accesible) y en la búsqueda.
+const INVENTORY_TITLE_MAX = 30;
+function shortInventoryTitle(text) {
+  const full = String(text || '').trim() || 'Pestaña sin título';
+  const characters = Array.from(full);
+  if (characters.length <= INVENTORY_TITLE_MAX) return full;
+  return characters.slice(0, INVENTORY_TITLE_MAX - 1).join('').trimEnd() + '…';
 }
 function inventoryBoxes() {
   return [...$('inventoryList').querySelectorAll('input[type=checkbox]')];
@@ -744,7 +844,7 @@ function inventoryThumbnail(access) {
   thumbnail.append(placeholder);
   if (!access?.thumbnail) return thumbnail;
   const image = node('img', 'inventory-thumbnail-image');
-  image.src = access.thumbnail;
+  imageView.set(image, access.thumbnail);
   image.alt = '';
   image.loading = 'lazy';
   image.decoding = 'async';
@@ -771,26 +871,29 @@ async function refreshInventory() {
   for (const group of groups) {
     const access = saved.get(group.key) || null;
     const total = group.duplicates.length + 1;
-    const title = access?.title || tabLabel(group.keep);
+    const fullTitle = access?.title || tabLabel(group.keep);
+    const title = shortInventoryTitle(fullTitle);
     const row = node('div', 'inventory-row inventory-group-row');
     const checkbox = node('input');
     checkbox.type = 'checkbox';
-    checkbox.setAttribute('aria-label', 'Seleccionar copias repetidas de ' + title);
+    checkbox.setAttribute('aria-label', 'Seleccionar copias repetidas de ' + fullTitle);
     checkbox.dataset.tabIds = JSON.stringify(group.duplicates.map(tab => tab.id));
     checkbox.dataset.tabUrls = JSON.stringify(group.duplicates.map(tab => tab.url));
-    checkbox.dataset.search = (title + ' ' + group.keep.url).toLowerCase();
+    checkbox.dataset.search = (fullTitle + ' ' + group.keep.url).toLowerCase();
     const open = node('button', 'inventory-group-open');
     open.type = 'button';
     open.title = 'Abrir repetidas y preparar cierre pasivo';
-    open.setAttribute('aria-label', 'Ver ' + total + ' pestañas repetidas de ' + title);
+    open.setAttribute('aria-label', 'Ver ' + total + ' pestañas repetidas de ' + fullTitle);
     open.onclick = () => run(async () => {
       selectInventoryTab('dup');
       await refreshDuplicates(group.key);
       $('inventoryDupClose').focus();
     });
     const info = node('span', 'inventory-row-info');
-    info.append(node('span', 'inventory-row-title', title + ' (' + total + ')'));
-    info.append(node('small', 'inventory-row-url', group.keep.url));
+    info.title = group.keep.url;
+    const heading = node('span', 'inventory-row-title', title + ' (' + total + ')');
+    heading.title = fullTitle;
+    info.append(heading);
     info.append(node('small', 'inventory-group-meta', group.duplicates.length + (group.duplicates.length === 1 ? ' copia cerrable' : ' copias cerrables')));
     open.append(inventoryThumbnail(access), info);
     row.append(checkbox, open);
@@ -798,15 +901,21 @@ async function refreshInventory() {
   }
   for (const tab of tabs.filter(item => !duplicateIds.has(item.id))) {
     const url = tab.url || tab.pendingUrl || '';
+    const fullTitle = tabLabel(tab);
     const row = node('label', 'inventory-row');
+    row.title = url;
     const checkbox = node('input'); checkbox.type = 'checkbox';
     checkbox.dataset.tabId = String(tab.id);
     checkbox.dataset.url = url;
     checkbox.dataset.title = tab.title || '';
-    checkbox.dataset.search = (tabLabel(tab) + ' ' + url).toLowerCase();
+    checkbox.setAttribute('aria-label', fullTitle);
+    checkbox.dataset.search = (fullTitle + ' ' + url).toLowerCase();
     const info = node('span', 'inventory-row-info');
-    info.append(node('span', 'inventory-row-title', tabLabel(tab)));
-    info.append(node('small', 'inventory-row-url', url));
+    info.title = url;
+    const heading = node('span', 'inventory-row-title', shortInventoryTitle(fullTitle));
+    heading.title = fullTitle;
+    info.append(heading);
+    if (tab.discarded) info.append(node('small', 'inventory-group-meta', 'En reposo · recarga al abrir'));
     row.append(checkbox, info);
     fragment.append(row);
   }
@@ -975,7 +1084,9 @@ async function refreshDuplicates(onlyKey = '') {
     const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
     checkbox.dataset.key = group.key;
     checkbox.dataset.tabIds = JSON.stringify([group.keep, ...group.duplicates].map(tab => tab.id));
-    const title = node('span', 'inventory-row-title', tabLabel(group.keep)); title.title = tabLabel(group.keep);
+    const fullTitle = tabLabel(group.keep);
+    checkbox.setAttribute('aria-label', fullTitle);
+    const title = node('span', 'inventory-row-title', shortInventoryTitle(fullTitle)); title.title = fullTitle;
     head.append(checkbox, title);
     section.append(head);
     for (const tab of [group.keep, ...group.duplicates]) {
@@ -1035,6 +1146,15 @@ async function consolidateInventory() {
   await refreshInventory();
   showMessage('Se reunieron ' + ids.length + ' pestañas visibles en esta ventana.');
 }
+async function releaseInventoryMemory() {
+  const selected = await currentInventorySelection();
+  if (!selected.length) { showMessage('Selecciona las pestañas cuya memoria quieres liberar.'); return; }
+  if (!confirm('Las pestañas seleccionadas se recargarán al volver a ellas. Guarda antes formularios, editores y llamadas; nex.b no puede detectar todo el trabajo sin guardar. Se omiten activas, fijadas, con audio y dominios excluidos. ¿Continuar?')) return;
+  const settings = await chrome.storage.local.get('nexbMemoryExcludedHosts');
+  const result = await discardSelected(selected, chrome.tabs, settings.nexbMemoryExcludedHosts || []);
+  await refreshInventory();
+  showMessage(result.discarded + ' pestañas en reposo; ' + result.skipped + ' protegidas u omitidas; ' + result.failed + ' no se pudieron descargar. No se han cerrado.');
+}
 async function closeSelectedInventory() {
   const ids = (await currentInventorySelection()).map(tab => tab.id);
   if (!ids.length) { showMessage('Selecciona al menos una pestaña para cerrar.', true); return; }
@@ -1092,6 +1212,8 @@ function showCardMenu(event, access, categoryId) {
 }
 async function pasteClipboardImage() {
   if (!navigator.clipboard?.read) throw new Error('Chrome no permite leer imágenes del portapapeles. Usa Ctrl/⌘V dentro del editor.');
+  const permission = await chrome.permissions.request({ permissions: ['clipboardRead'] });
+  if (!permission) throw new Error('Permiso no concedido. Puedes pegar con Ctrl/⌘V dentro del editor.');
   const generation = ++pasteGeneration;
   imageBusy = true;
   try {
@@ -1111,9 +1233,7 @@ async function pasteClipboardImage() {
 }
 
 async function captureBatchThumbnail(tab) {
-  const [active] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-  if (active?.id !== tab.id) throw new Error('La pestaña de captura dejó de estar activa.');
-  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 75 });
+  const dataUrl = await captureStableTab(chrome.tabs, tab);
   const encoded = dataUrl.split(',')[1];
   if (!encoded) throw new Error('Chrome no devolvió una imagen.');
   const bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0));
@@ -1131,6 +1251,7 @@ async function captureAllImages() {
     return;
   }
   if (!confirm('Se capturarán ' + targets.length + ' páginas visibles. Chrome cambiará de pestaña y las capturas pueden incluir información privada. ¿Continuar?')) return;
+  if (!await chrome.permissions.request({ origins: ['<all_urls>'] })) throw new Error('La captura masiva necesita permiso para capturar las páginas. Puedes seguir pegando imágenes manualmente.');
   captureBusy = true;
   captureCancelled = false;
   $('cancelCapture').hidden = false;
@@ -1201,8 +1322,10 @@ document.querySelectorAll('dialog').forEach(dialog => {
   dialog.setAttribute('aria-label', dialog.querySelector('h2').textContent);
   dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
   dialog.addEventListener('close', () => {
+    if (dialog.id === 'inventoryDialog') { imageView.clear($('inventoryList')); $('inventoryList').replaceChildren(); $('inventoryDupList').replaceChildren(); $('inventoryGroupList').replaceChildren(); }
     if (dialog.id === 'accessDialog') { pasteGeneration++; imageBusy = false; pastedImage = ''; showPreview(); run(clearPending); }
     if (reloadPending) run(reload);
+    if (syncEnabled) scheduleSync();
   });
 });
 document.querySelectorAll('[data-cancel]').forEach(b => {
@@ -1228,6 +1351,7 @@ document.querySelectorAll('[data-main-action]').forEach(item => {
   item.onclick = () => run(async () => {
     const action = item.dataset.mainAction;
     closeMainMenu();
+    if (action === 'titlesOnly') { await setTitlesOnly(!titlesOnly); return; }
     if (action === 'sync') {
       $('openSettings').click();
       $('settingsSyncTab').click();
@@ -1251,6 +1375,7 @@ onClick('inventorySelectAll', toggleSelectAllInventory);
 onClick('inventoryConsolidate', consolidateInventory);
 onClick('inventoryAddToCategory', addSelectedToCategory);
 onClick('inventoryCloseSelected', closeSelectedInventory);
+onClick('inventoryReleaseMemory', releaseInventoryMemory);
 onClick('inventoryDupRegister', registerDuplicates);
 onClick('inventoryDupGather', gatherDuplicates);
 onClick('inventoryDupClose', passiveCloseDuplicates);
@@ -1315,7 +1440,8 @@ document.querySelectorAll('[data-thumbnail-size]').forEach(control => {
     const candidate = structuredClone(data);
     candidate.settings.thumbnailSize = control.dataset.thumbnailSize;
     candidate.settings.thumbnailHeight = thumbnailHeightForSize(control.dataset.thumbnailSize, candidate.settings.thumbnailHeight);
-    await commit(candidate); $('thumbnailSizeMenu').hidden = true;
+    await persistLocalThumbnailPreference(candidate.settings);
+    applyLocalThumbnailPreference(); applySettings(); render(); $('thumbnailSizeMenu').hidden = true;
   });
 });
 async function saveCustomThumbnailHeight() {
@@ -1324,7 +1450,8 @@ async function saveCustomThumbnailHeight() {
   const candidate = structuredClone(data);
   candidate.settings.thumbnailSize = 'custom';
   candidate.settings.thumbnailHeight = height;
-  await commit(candidate);
+  await persistLocalThumbnailPreference(candidate.settings);
+  applyLocalThumbnailPreference(); applySettings(); render();
   $('thumbnailSizeMenu').hidden = true;
 }
 onClick('saveThumbnailCustom', saveCustomThumbnailHeight);
@@ -1379,10 +1506,10 @@ onSubmit('recaptureForm', async () => {
     $('recaptureDialog').querySelectorAll('button').forEach(b => { b.disabled = false; });
   }
 });
-const GITHUB_ARCHIVE_URL = 'https://github.com/Kilexmommm/Nex-b-Chrome-extension/archive/refs/heads/main.zip';
+const GITHUB_ARCHIVE_URL = UPDATE_COMMAND;
 async function copyUpdateCommand() {
-  try { await navigator.clipboard.writeText(UPDATE_COMMAND); showMessage('Comando copiado. Pégalo en la Terminal y después pulsa «Recargar nex.b».'); }
-  catch { showMessage('Copia este comando en la Terminal: ' + UPDATE_COMMAND); }
+  try { await navigator.clipboard.writeText(UPDATE_COMMAND); showMessage('Enlace de versiones copiado. Descarga una versión publicada y revisa sus notas.'); }
+  catch { showMessage('Versiones publicadas: ' + UPDATE_COMMAND); }
 }
 // Para una extensión descomprimida, reload() vuelve a leer la carpeta del disco.
 const reloadExtension = () => chrome.runtime.reload();
@@ -1406,7 +1533,7 @@ async function showAvailableUpdate(current) {
   if (!latest) return;
   $('updateAvailable').textContent = ' · disponible: ' + latest;
   if (!sessionStorage.getItem('nexbUpdateDismissed')) {
-    $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Copia el comando, pégalo en la Terminal y pulsa «Recargar nex.b».';
+    $('updateBannerText').textContent = 'Hay una versión nueva de nex.b (' + latest + '). Revisa la versión publicada, guarda un ZIP y actualiza la carpeta de la extensión.';
     $('updateBanner').hidden = false;
   }
   const snooze = (await chrome.storage.local.get(UPDATE_SNOOZE_KEY))[UPDATE_SNOOZE_KEY];
@@ -1421,7 +1548,7 @@ async function showAvailableUpdate(current) {
 }
 onClick('openUpdate', async () => {
   await chrome.tabs.create({ url: GITHUB_ARCHIVE_URL });
-  showMessage('Descarga iniciada. Conserva tu respaldo, reemplaza los archivos de la extensión y pulsa «Recargar» en chrome://extensions.');
+  showMessage('Se abrió la página de versiones. Guarda un respaldo ZIP, descarga la versión elegida y reemplaza los archivos antes de recargar nex.b.');
 });
 onClick('openLocalSettings', () => chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id }));
 onClick('openSidePanel', openSidePanel);
@@ -1439,25 +1566,26 @@ document.querySelector('#settingsDialog .settings-tabs').addEventListener('keydo
   tabs[next].focus();
   tabs[next].click();
 });
-onClick('refreshSyncAccount', updateSyncAccount);
-onClick('syncNow', syncNow);
+onClick('refreshSyncAccount', async () => { if (await chrome.permissions.request({ permissions: ['identity.email'] })) await updateSyncAccount(); });
+onClick('syncNow', () => syncNow(true));
 onClick('syncDriveNow', async () => {
   setSyncStatus('Conectando con Google Drive…');
   try {
-    const result = await syncDriveImages(data);
-    if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
-    const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
-    setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
-  } catch (error) {
-    setSyncStatus(error.message, true);
-    throw error;
-  }
+    await navigator.locks.request('nex-b-drive', async () => {
+      const snapshot = await repository.load();
+      if (snapshot.recovered) throw new Error('Restaura o exporta el respaldo local antes de sincronizar imágenes.');
+      const result = await syncDriveImages(snapshot.data, imageStore);
+      if (result.uploaded || result.downloaded || JSON.stringify(projectSyncData(result.data)) !== JSON.stringify(projectSyncData(snapshot.data))) await commit(result.data, { expectedRevision: snapshot.revision });
+      const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
+      setSyncStatus('Drive sincronizado: ' + result.uploaded + ' subidas, ' + result.unchanged + ' sin cambios, ' + result.downloaded + ' descargadas.' + detail, result.errors.length > 0);
+    });
+  } catch (error) { setSyncStatus(error.message, true); throw error; }
 });
 onClick('cleanupDriveOrphans', async () => {
   if (!confirm('Esta acción borra de Google Drive las imágenes de accesos que no existen en ESTE equipo. Sincroniza todos los equipos antes de continuar, o se perderán sus imágenes. ¿Deseas continuar?')) return;
   setSyncStatus('Buscando imágenes huérfanas en Drive…');
   try {
-    const result = await cleanupDriveOrphans(data);
+    const result = await navigator.locks.request('nex-b-drive', async () => cleanupDriveOrphans((await repository.load()).data));
     const detail = result.errors.length ? ' Errores: ' + result.errors.join(' | ') : '';
     setSyncStatus('Drive limpio: ' + result.deleted + ' imágenes huérfanas borradas.' + detail, result.errors.length > 0);
   } catch (error) {
@@ -1472,7 +1600,7 @@ $('syncEnabled').onchange = () => run(async () => {
   if (syncEnabled) await activateSync();
   else setSyncStatus('Sincronización desactivada en este dispositivo.');
 });
-onClick('openSettings', () => {
+onClick('openSettings', async () => {
   const s = data.settings;
   renderStylePresets(s.themeId);
   $('settingsDialog').dataset.themeId = s.themeId;
@@ -1481,9 +1609,14 @@ onClick('openSettings', () => {
   $('thumbnailCustomHeight').value = s.thumbnailHeight;
   $('thumbnailHeightRange').value = s.thumbnailHeight;
   $('thumbnailHeightValue').textContent = s.thumbnailHeight + ' px';
+  $('remoteImagesEnabled').checked = s.remoteImagesEnabled;
+  $('memoryExcludedHosts').value = ((await chrome.storage.local.get('nexbMemoryExcludedHosts')).nexbMemoryExcludedHosts || []).join('\n');
+  $('settingsDialog').dataset.storedBackground = isImageRef(s.backgroundImageUrl) ? s.backgroundImageUrl : '';
+  if (isImageRef(s.backgroundImageUrl)) $('backgroundImageUrl').value = '';
   $('captureEnabled').checked = s.captureEnabled;
   $('showWorkspaceTabs').checked = s.showWorkspaceTabs;
   $('imageShade').checked = s.imageShade !== false;
+  $('thumbnailShadow').checked = s.thumbnailShadow !== false;
   $('settingsTagRules').value = Object.entries(data.autoTagRules).map(([domain, tag]) => domain + ' = ' + tag).join('\n');
   $('syncEnabled').checked = syncEnabled;
   $('dataJson').value = 'La copia JSON incluye los datos y las imágenes. Usa Copiar JSON o Descargar ZIP para obtenerla.';
@@ -1508,9 +1641,10 @@ onSubmit('accessForm', async () => {
   const existingId = $('accessId').value;
   const access = { id: existingId || uid('access'), title: $('accessTitle').value.trim(), url: $('accessUrl').value.trim(),
     tags: $('accessTags').value.split(',').map(s => s.trim()).filter(Boolean), matchType: $('matchType').value,
-    thumbnail: $('accessThumbnailUrl').value.trim() || pastedImage };
+    thumbnail: $('accessThumbnailUrl').value.trim() || pastedImage,
+    ...($('accessLocalOnly').checked ? { localOnly: true } : {}) };
   const originalAccess = existingId ? candidate.categories.flatMap(category => category.accesses).find(item => item.id === existingId) : null;
-  if (originalAccess) Object.assign(access, { bookmarkId: originalAccess.bookmarkId, bookmarkFolderId: originalAccess.bookmarkFolderId, bookmarkMissing: originalAccess.bookmarkMissing });
+  Object.assign(access, retainAccessMetadata(access, originalAccess));
   if (existingId) {
     const original = candidate.categories.find(c => c.id === $('accessDialog').dataset.categoryId);
     if (!original?.accesses.some(a => a.id === existingId)) throw new Error('El acceso ya no existe; cancela y vuelve a abrirlo.');
@@ -1534,28 +1668,33 @@ $('accessTags').onkeydown = event => {
 };
 onSubmit('settingsForm', async () => {
   const candidate = structuredClone(data);
+  const excludedHosts = parseExcludedHosts($('memoryExcludedHosts').value);
   const thumbnailSize = $('thumbnailSize').value;
   candidate.settings = {
     themeId: $('settingsDialog').dataset.themeId, backgroundPattern: $('settingsDialog').dataset.pattern,
     accentColor: $('accentColor').value, backgroundColor: $('backgroundColor').value,
-     backgroundImageUrl: $('backgroundImageUrl').value.trim(), thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
+     backgroundImageUrl: $('backgroundImageUrl').value.trim() || $('settingsDialog').dataset.storedBackground || '',
+    remoteImagesEnabled: $('remoteImagesEnabled').checked, thumbnailSize, thumbnailHeight: thumbnailHeightForSize(thumbnailSize, data.settings.thumbnailHeight),
     fontFamily: $('fontFamily').value, cardStyle: $('cardStyle').value, cardBorder: $('cardBorder').value,
     cardBorderColor: $('cardBorderColor').value, cardSpacing: $('cardSpacing').value, iconStyle: $('iconStyle').value,
     titlePosition: $('titlePosition').value, tagsPosition: $('tagsPosition').value,
     captureEnabled: $('captureEnabled').checked,
     showWorkspaceTabs: $('showWorkspaceTabs').checked,
-    imageShade: $('imageShade').checked
+    imageShade: $('imageShade').checked,
+    thumbnailShadow: $('thumbnailShadow').checked
   };
   candidate.autoTagRules = parseRules($('settingsTagRules').value);
-  await commit(candidate); $('settingsDialog').close();
+  await commit(candidate);
+  await chrome.storage.local.set({ nexbMemoryExcludedHosts: excludedHosts });
+  imageView.refresh(); $('settingsDialog').close();
 });
 onClick('copyData', async () => {
-  const json = JSON.stringify(data, null, 2);
+  const json = await backupTask('json', data);
   try { await navigator.clipboard.writeText(json); showMessage('JSON copiado. Puede contener datos privados.'); }
   catch { $('dataJson').value = json; $('dataJson').focus(); $('dataJson').select(); showMessage('Pulsa ⌘C / Ctrl+C para copiar el JSON seleccionado.'); }
 });
-onClick('downloadData', () => {
-  const url = URL.createObjectURL(createBackupZip(data));
+onClick('downloadData', async () => {
+  const url = URL.createObjectURL(await backupTask('export', data));
   const link = document.createElement('a');
   link.href = url; link.download = 'nex-b-backup-' + new Date().toISOString().slice(0, 10) + '.zip';
   document.body.append(link); link.click(); link.remove();
@@ -1574,139 +1713,71 @@ function setSyncStatus(message, error = false) {
 async function updateSyncAccount() {
   const status = $('syncAccount');
   try {
+    if (!await chrome.permissions.contains({ permissions: ['identity.email'] })) { status.textContent = 'El correo de la cuenta solo se consulta si pulsas «Actualizar cuenta» y das permiso.'; return; }
     const profile = await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' });
     status.textContent = profile.email ? 'Cuenta de Chrome: ' + profile.email : 'Cuenta de Chrome: no disponible; activa la sincronización del perfil.';
   } catch {
     status.textContent = 'Cuenta de Chrome: no se pudo consultar.';
   }
 }
-async function setSyncLastRevision(value) {
-  syncLastRevision = value;
-  await chrome.storage.local.set({ nexbSyncLastRevision: value });
-}
-async function clearSyncDirty() {
-  syncDirty = false;
-  await chrome.storage.local.set({ nexbSyncDirty: false });
-}
-function isDefaultLibrary(value) {
-  return JSON.stringify(value) === JSON.stringify(normalizeData());
-}
 function askFirstSync() {
   const dialog = $('syncChoiceDialog');
   return new Promise(resolve => {
-    const choose = value => { dialog.close(); resolve(value); };
+    const cancel = () => choose(null);
+    const choose = value => { dialog.removeEventListener('cancel', cancel); dialog.close(); resolve(value); };
     $('syncChoiceLocal').onclick = () => choose('local');
     $('syncChoiceCloud').onclick = () => choose('cloud');
     $('syncChoiceMerge').onclick = () => choose('merge');
-    dialog.addEventListener('cancel', () => choose(null), { once: true });
+    dialog.addEventListener('cancel', cancel, { once: true });
     dialog.showModal();
   });
 }
 async function activateSync() {
-  let remote = null;
-  try { remote = await syncStore.load(); }
-  catch (error) { if (!(error instanceof SyncCorruptError)) throw error; /* syncNow la reemplaza. */ }
-  if (remote && !isDefaultLibrary(data)) {
-    const choice = await askFirstSync();
-    if (!choice) {
-      syncEnabled = false;
-      $('syncEnabled').checked = false;
-      await chrome.storage.local.set({ nexbSyncEnabled: false });
-      setSyncStatus('Sincronización cancelada.');
-      return;
-    }
-    if (choice === 'local') {
-      const saved = await syncStore.save(data);
-      await setSyncLastRevision(saved.revision);
-      await clearSyncDirty();
-      setSyncStatus('Sincronizado con los datos de este equipo.');
-      return;
-    }
-    if (choice === 'cloud') {
-      await commit(applyRemoteData(data, remote.data), { markDirty: false });
-      await setSyncLastRevision(remote.revision);
-      await clearSyncDirty();
-      setSyncStatus('Sincronizado con los datos de la nube.');
-      return;
-    }
-    await commit(mergeThreeWay(data, remote.data, { preferLocal: false }), { markDirty: false });
-    const saved = await syncStore.save(data);
-    await setSyncLastRevision(saved.revision);
-    await clearSyncDirty();
-    setSyncStatus('Sincronizado combinando los datos de ambos equipos.');
-    return;
+  const remote = await syncStore.load();
+  const choice = remote ? await askFirstSync() : null;
+  if (remote && !choice) {
+    syncEnabled = false; $('syncEnabled').checked = false;
+    await chrome.storage.local.set({ nexbSyncEnabled: false });
+    setSyncStatus('Sincronización cancelada.'); return;
   }
-  await syncNow();
+  await syncNow(true, choice);
 }
-// La copia remota no se puede usar (fragmentos mezclados, suma de control o
-// datos inválidos): sin reemplazarla, fallaría en cada apertura.
-async function replaceCorruptRemote() {
-  const saved = await syncStore.save(data);
-  await setSyncLastRevision(saved.revision);
-  await clearSyncDirty();
-  setSyncStatus('La copia sincronizada estaba dañada y se reemplazó con la de este equipo.', true);
-}
-async function syncNow() {
-  if (syncBusy) return;
+async function syncNow(manual = false, choice = null) {
+  if (syncBusy || (!manual && syncPaused)) return;
+  // Keep an in-progress editor on its original revision.
+  if ([...document.querySelectorAll('dialog[open]')].some(d => d.id !== 'settingsDialog')) return;
   syncBusy = true;
   clearTimeout(syncTimer);
+  if (manual) { syncFailures = 0; syncPaused = false; }
+  let retryDelay = null;
   try {
-    if (!syncEnabled) {
-      setSyncStatus('Activa la sincronización primero.');
-      return;
-    }
     setSyncStatus('Leyendo datos sincronizados…');
-    let remote;
-    try { remote = await syncStore.load(); }
+    let result;
+    try { result = await syncController.run(choice); }
     catch (error) {
-      if (!(error instanceof SyncCorruptError)) throw error;
-      await replaceCorruptRemote();
-      return;
+      if (!manual || !(error instanceof SyncConflictError)) throw error;
+      const resolution = await askFirstSync();
+      if (!resolution) { setSyncStatus('Conflicto pendiente; no se reemplazaron tus datos.'); return; }
+      result = await syncController.run(resolution);
     }
-    const action = decideSyncAction(remote?.revision ?? '', syncLastRevision, syncDirty);
-    if (action === 'none') {
-      setSyncStatus('Todo está sincronizado.');
-      return;
-    }
-    if (action === 'upload') {
-      const saved = await syncStore.save(data);
-      await setSyncLastRevision(saved.revision);
-      await clearSyncDirty();
-      setSyncStatus('Sincronizado. Datos pequeños: ' + saved.bytes + ' bytes. Las imágenes siguen siendo locales.');
-      return;
-    }
-    let next;
-    try {
-      next = action === 'apply' ? applyRemoteData(data, remote.data) : mergeThreeWay(data, remote.data, { preferLocal: true });
-    } catch (error) {
-      if (!(error instanceof SyncCorruptError)) throw error;
-      await replaceCorruptRemote();
-      return;
-    }
-    // Se comparan solo los datos sincronizables: serializar todas las miniaturas
-    // en cada sincronización dispararía la memoria con bibliotecas grandes.
-    if (JSON.stringify(projectSyncData(next)) !== JSON.stringify(projectSyncData(data))) await commit(next, { markDirty: false });
-    if (action === 'apply') {
-      await setSyncLastRevision(remote.revision);
-      setSyncStatus('Se aplicaron los datos sincronizados.');
-      return;
-    }
-    const saved = await syncStore.save(data);
-    await setSyncLastRevision(saved.revision);
-    await clearSyncDirty();
-    setSyncStatus('Sincronizado combinando cambios locales y remotos.');
+    if (result.snapshot && result.snapshot.revision !== revision) adopt(result.snapshot);
+    await restoreSyncPreference();
+    syncFailures = 0;
+    setSyncStatus(result.message);
   } catch (error) {
-    setSyncStatus(error.message || 'No se pudo sincronizar; se conserva la copia local.', true);
-    throw error;
+    syncFailures++;
+    retryDelay = error instanceof SyncConflictError ? null : syncRetryDelay(error, syncFailures);
+    syncPaused = retryDelay === null;
+    setSyncStatus(error.message + (syncPaused ? ' Sincronización automática pausada; revisa el problema y pulsa Sincronizar ahora.' : ' Se reintentará en ' + retryDelay / 1000 + ' segundos.'), true);
   } finally {
     syncBusy = false;
-    if (syncEnabled && syncDirty) scheduleSync();
+    if (retryDelay !== null && syncEnabled) scheduleSync(retryDelay);
   }
 }
-function scheduleSync() {
-  if (!syncEnabled || syncBusy) return;
+function scheduleSync(delay = 900) {
+  if (!syncEnabled || syncBusy || syncPaused) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => run(syncNow), 900);
+  syncTimer = setTimeout(() => run(() => syncNow()), delay);
 }
 async function restoreSyncPreference() {
   const stored = await chrome.storage.local.get(['nexbSyncEnabled', 'nexbSyncDirty', 'nexbSyncLastRevision']);
@@ -1729,7 +1800,7 @@ async function syncCategoryBookmarks(category) {
   await requestBookmarkPermission();
   const { children } = await readBookmarkFolder(chrome.bookmarks, category.bookmarkFolderId);
   const result = syncBookmarkSection(data, category.id, children, uid);
-  if (JSON.stringify(result.data) !== JSON.stringify(data)) await commit(result.data);
+  if (result.stats.added || result.stats.missing || result.stats.restored) await commit(result.data);
   showMessage('Sección “' + category.name + '” sincronizada: ' + syncSummary(result.stats));
 }
 async function syncWorkspaceBookmarks() {
@@ -1749,7 +1820,7 @@ async function syncWorkspaceBookmarks() {
     }
   }
   if (!linkedCategories.length) { showMessage('No hay secciones vinculadas a Favoritos.'); return; }
-  if (JSON.stringify(candidate) !== JSON.stringify(data)) await commit(candidate);
+  if (total.added || total.missing || total.restored) await commit(candidate);
   const errors = unavailable.length ? ' No se pudieron sincronizar: ' + unavailable.join(' | ') : '';
   showMessage(linked + ' secciones sincronizadas: ' + syncSummary(total) + errors);
 }
@@ -1835,9 +1906,7 @@ onSubmit('bookmarksForm', async () => {
   }
 });
 onClick('restorePrevious', async () => {
-  const stored = await chrome.storage.local.get('workspaceDataBackup');
-  if (!stored.workspaceDataBackup) throw new Error('Todavía no hay una versión anterior.');
-  const candidate = normalizeData(stored.workspaceDataBackup);
+  const candidate = await repository.loadBackup();
   if (!confirm('¿Restaurar la versión anterior? La configuración actual pasará a ser el respaldo local.')) return;
   await commit(candidate); $('settingsDialog').close(); showMessage('Versión anterior restaurada.');
 });
@@ -1846,9 +1915,10 @@ $('zipImportInput').onchange = event => run(async () => {
   if (!file) return;
   try {
     if (file.size > LIMITS.archive) throw new Error('El ZIP supera 64 MB.');
-    const candidate = readStoredZip(new Uint8Array(await file.arrayBuffer()));
+    const importRevision = revision;
+    const candidate = await backupTask('import', null, await file.arrayBuffer());
     if (!confirm('Importar reemplazará tus Workspaces y configuración actuales. Se conservará la versión anterior como respaldo local. ¿Continuar?')) return;
-    await commit(candidate); viewMode = 'workspace'; render(); $('settingsDialog').close();
+    await commit(candidate, { expectedRevision: importRevision }); viewMode = 'workspace'; render(); $('settingsDialog').close();
     showMessage('Respaldo importado correctamente.');
   } finally { event.target.value = ''; }
 });
@@ -1885,11 +1955,13 @@ $('thumbnailFileInput').onchange = () => run(async () => {
     if (generation === pasteGeneration) imageBusy = false;
   }
 });
+onClick('removeBackground', () => { $('backgroundImageUrl').value = ''; $('settingsDialog').dataset.storedBackground = ''; });
 onClick('pasteBox', () => $('pasteBox').focus());
 onClick('clipboardPaste', pasteClipboardImage);
 onClick('removeThumbnail', () => { pasteGeneration++; imageBusy = false; pastedImage = ''; $('accessThumbnailUrl').value = ''; showPreview(); });
 $('accessThumbnailUrl').onchange = () => run(() => { pastedImage = imageUrl($('accessThumbnailUrl').value.trim()); showPreview(); });
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && ['nexbSyncEnabled', 'nexbSyncDirty', 'nexbSyncLastRevision'].some(key => key in changes)) run(restoreSyncPreference);
   if (area === 'local' && ('workspaceRevision' in changes || 'workspaceData' in changes)) run(reload);
   if (area === 'sync' && syncEnabled && Object.keys(changes).some(key => key.startsWith('nexb.sync.'))) {
     if (syncDirty) setSyncStatus('Hay cambios sincronizados y cambios locales pendientes. Pulsa «Sincronizar ahora» para combinarlos.');
@@ -1918,7 +1990,10 @@ async function initialize() {
   await chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await restoreLocalThumbnailPreference();
   await restoreNarrowColumns();
+  await restoreCollapsedSections();
+  await restoreTitlesOnly();
   await restoreSyncPreference();
+  await repository.migrate();
   const snapshot = await repository.load();
   adopt(snapshot); ready = true;
   const installedVersion = chrome.runtime.getManifest().version;

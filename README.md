@@ -1,4 +1,4 @@
-# nex.b · 2.0.8
+# nex.b · 2.1.1
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -8,6 +8,7 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 
 ## Beneficios
 
+- **Liberar memoria:** descarga las pestañas seleccionadas desde el Inventario; permanecen en la barra y se recargan al volver. No promete consumo cero.
 - **Menos pestañas duplicadas:** busca primero una pestaña coincidente y enfoca su ventana antes de abrir otra.
 - **Organización por proyecto:** Workspaces, secciones y subcategorías para separar trabajo, estudio y proyectos personales.
 - **Accesos reconocibles:** pega una captura como miniatura; el nombre y el estado quedan debajo, sin tapar la imagen.
@@ -20,7 +21,7 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 
 **Solo necesitas Google Chrome 123 o posterior y la carpeta de la extensión.** Desde nex.b 1.7.3 no hace falta instalar Python, ejecutar comandos en Terminal, copiar un ID ni instalar el asistente macOS.
 
-1. Abre [el repositorio de nex.b](https://github.com/Kilexmommm/Nex-b-Chrome-extension) y pulsa **Code → Download ZIP**.
+1. Descarga el ZIP de la versión elegida desde [Versiones publicadas](https://github.com/Kilexmommm/Nex-b-Chrome-extension/releases), o usa el ZIP 2.1.1 entregado junto a este código. La preparación local de una versión no implica su publicación.
 2. Descomprime el ZIP y guarda la carpeta en una ubicación permanente. Conserva dentro todos sus archivos y subcarpetas.
 3. Escribe `chrome://extensions` en la barra de direcciones de Chrome y activa **Modo de desarrollador**.
 4. Pulsa **Cargar descomprimida** y selecciona la carpeta que contiene `manifest.json`. Selecciona la carpeta principal, no `native-host` ni el ZIP.
@@ -64,6 +65,27 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 
 ## Últimas actualizaciones
 
+### Novedades 2.1.1
+
+- Reúne las mejoras de almacenamiento, memoria y privacidad de 2.1.0 con Diseño, Inventario y Side Panel.
+- Diseño: sombra desactivable y estilo Plano sin sombra, conservando los bordes elegidos y las preferencias al recargar.
+- Inventario: títulos de hasta 30 caracteres, nombre completo para buscar y URL en tooltip; conserva el indicador de pestañas en reposo.
+- Side Panel: secciones plegables, vista Solo títulos y selector/búsqueda legibles; apertura de una sección en una ventana nueva con grupo «Workspace · sección».
+- Pie: botón «Apóyame en Ko-fi» junto a Feedback y la versión.
+
+Consulta [novedades y validación de 2.1.1](docs/NOVEDADES-2.1.1.md). Antes de actualizar desde 2.0.x, exporta un ZIP y recarga la misma instalación sin desinstalarla.
+
+### Novedades 2.1.0
+
+- **Memoria de pestañas:** Inventario → Liberar memoria de seleccionadas. Omite activas, fijadas, audio, navegación y dominios protegidos en Configuración → General. Guarda formularios y editores antes de usarlo.
+- **Miniaturas separadas:** imágenes binarias por hash en IndexedDB y referencias pequeñas en la biblioteca. Migración de datos y respaldo anteriores; carga al acercarse a la pantalla y liberación al alejarse.
+- **Panel más ligero:** 40 tarjetas por bloque en cada sección, tamaño de miniatura guardado por dispositivo, ZIP y JSON procesados en un Worker. Abrir una sección conserva dormidas las pestañas que ya existen.
+- **Sincronización:** escrituras coordinadas entre paneles, reintentos espaciados y acotados, conservación de la copia anterior ante falta de cuota, combinación con revisión base y conflictos explícitos. Editar accesos conserva su historial de imagen en Drive.
+- **Privacidad:** accesos “Solo en este dispositivo”, imágenes remotas desactivadas por defecto y permisos de portapapeles/correo/captura masiva solicitados al utilizar esas funciones.
+- **Actualizaciones:** versiones publicadas y enlace de descarga, sin comandos remotos ejecutados desde la interfaz.
+
+**Antes de actualizar:** exporta un ZIP desde 2.0.8, cierra sus paneles y recarga la misma instalación. El formato local de imágenes de 2.1.0 no es legible por 2.0.x; para volver, usa el ZIP anterior. No desinstales la extensión. Consulta [cambios, validación y límites de 2.1.0](docs/NOVEDADES-2.1.0.md).
+
 ### Novedades 2.0.8
 
 - **Inventario más claro:** se cierra con una × arriba a la derecha (como Configuración), la casilla de cada pestaña va arriba a la izquierda junto al título y los títulos largos ocupan dos líneas sin salirse de la tarjeta.
@@ -96,14 +118,11 @@ La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está act
 ### Novedades 2.0.3
 
 - **Archivos locales en la vista Tags:** los accesos `file://` (HTML y carpetas del equipo) aparecen agrupados en «⌂ Archivos locales», el primer grupo de la vista Tags. Antes no salían porque no tienen dominio ni tags automáticos. La lupa también los filtra.
-- **Aviso grande de versión nueva:** cuando hay una versión más reciente en GitHub, nex.b abre un modal con la versión instalada y la nueva, los tres pasos para actualizar, «Copiar comando» y «Recargar nex.b». «Recordármelo mañana» (o Esc) lo pospone 24 horas para esa versión; una versión aún más nueva vuelve a avisar. No se abre encima de un formulario. La comprobación se hace cada 3 horas.
+- **Aviso grande de versión nueva (comportamiento de 2.0.8):** cuando hay una versión más reciente en GitHub, nex.b abre un modal con la versión instalada y la nueva, instrucciones para actualizar manualmente, el enlace a versiones publicadas y «Recargar nex.b». «Recordármelo mañana» (o Esc) lo pospone 24 horas para esa versión; una versión aún más nueva vuelve a avisar. No se abre encima de un formulario. La comprobación se hace cada 3 horas. En 2.1.0, el enlace lleva a la página de versiones y ya no ofrece copiar un comando de instalación.
 
 ### Novedades 2.0.2
 
-- **Instalar y actualizar con un comando (macOS y Linux):** pega en la Terminal
-  `curl -fsSL https://raw.githubusercontent.com/Kilexmommm/Nex-b-Chrome-extension/main/install.sh | bash`.
-  La primera vez instala nex.b en `~/nex.b` (cárgala una vez con «Cargar descomprimida»); después, el mismo comando la actualiza. Si la carpeta es un clon de Git, hace `git pull`. Tus datos viven en Chrome y no se tocan.
-- **Aviso de versión nueva:** nex.b consulta una vez al día la versión publicada y muestra «Copiar comando» y «Recargar nex.b». También está en Configuración → Datos/Respaldo.
+- Históricamente se ofrecía ejecutar el instalador remoto de `main` en Terminal. Ese método se retiró en 2.1.0: usa versiones publicadas. El instalador opcional ahora debe descargarse/revisarse antes y exige un SHA completo de commit.
 
 ### Novedades 2.0.1
 
@@ -330,13 +349,13 @@ La pestaña incluye las instrucciones para conectar Google Drive. La integració
 
 ## Guardado y privacidad
 
-Los enlaces y miniaturas quedan en chrome.storage.local. El guardado conserva una versión anterior y detecta cambios simultáneos entre paneles nuevos. Ante un conflicto, el formulario permanece abierto: copia lo necesario, cancela y vuelve a editar. ⚙ → Restaurar versión anterior permite recuperar el último estado previo.
+Los enlaces y referencias de imágenes quedan en chrome.storage.local; los bytes de las miniaturas están en IndexedDB, dentro de la misma extensión. El guardado conserva una versión anterior y detecta cambios simultáneos entre paneles nuevos. Ante un conflicto, el formulario permanece abierto: copia lo necesario, cancela y vuelve a editar. ⚙ → Restaurar versión anterior permite recuperar el último estado previo.
 
 Cambiar de Workspace no reescribe toda la biblioteca; la selección se recuerda durante esa pestaña.
 
 Las capturas pendientes usan almacenamiento de sesión, con un máximo de ocho borradores. Se descartan al guardar/cancelar; los vencidos se limpian en la siguiente alta o consulta del borrador. Caducan lógicamente a los 30 minutos y se pierden al recargar la extensión o terminar la sesión de Chrome.
 
-Las imágenes HTTPS se solicitan a sus servidores, sin enviar Referer; esos servidores pueden conocer tu IP y la URL solicitada. Para mayor privacidad y uso sin conexión, pega una imagen local. El código no añade analítica ni envía tus enlaces a un backend.
+Las imágenes HTTPS solo se solicitan si activas “Permitir imágenes remotas”, sin enviar Referer; esos servidores pueden conocer tu IP y la URL solicitada. Para mayor privacidad y uso sin conexión, pega una imagen local. El código no añade analítica. Chrome Sync envía los datos que aceptes sincronizar a tu cuenta de Chrome; los accesos “Solo en este dispositivo” quedan excluidos. ZIP y JSON sí incluyen esos accesos privados.
 
 ## Respaldo ZIP
 
@@ -362,8 +381,11 @@ Desinstalar borra el almacenamiento local de la extensión. Para reinstalar y re
 | `unlimitedStorage` | Almacenar miniaturas sin la cuota estándar de la extensión. |
 | `identity` | Solicitar el token OAuth de Google para Drive; Chrome gestiona el token y no se guarda en la extensión. |
 | `bookmarks` — opcional | Leer favoritos al solicitar una importación; el código no modifica los favoritos. |
-| `http://*/*`, `https://*/*` | Capturar imágenes faltantes en lote en la pestaña temporal iniciada por el usuario. |
-| `https://www.googleapis.com/` | Comunicar con Google Drive para subir y descargar miniaturas privadas. |
+| `<all_urls>` — opcional | Se pide al iniciar una captura masiva; no se concede al instalar. |
+| `clipboardRead` — opcional | Se pide al pulsar Pegar captura; Ctrl/⌘V funciona sin concederlo. |
+| `identity.email` — opcional | Se pide al consultar el correo de la cuenta de Chrome. |
+| `https://api.github.com/*` | Consultar versiones publicadas; sin ejecutar su código. |
+| `https://www.googleapis.com/*` | Comunicar con Google Drive para subir y descargar miniaturas privadas. |
 
 La captura masiva puede incluir información privada; revisa el resultado antes de compartir un respaldo. La extensión no inyecta scripts en las páginas.
 
@@ -374,7 +396,10 @@ La captura masiva puede incluir información privada; revisa el resultado antes 
 - src/storage.js: guardado coordinado y control de revisiones.
 - src/tabs.js: consulta actual y apertura/enfoque serializados.
 - src/images.js: reducción de imágenes y liberación de bitmap.
-- src/backup.js: ZIP local, integridad e importación.
+- src/backup.js, backup-client.js y backup-worker.js: ZIP/JSON fuera del hilo de interfaz.
+- src/image-store.js y image-view.js: imágenes binarias y ciclo de vida de miniaturas visibles.
+- src/memory.js: descarga manual de pestañas y exclusiones.
+- src/sync-controller.js y retry.js: coordinación, conflictos y reintentos de sincronización.
 - src/background.js: eventos MV3, menús y borradores temporales.
 - tests/: pruebas automáticas sin acceso a datos del navegador.
 - docs/AUDITORIA.md: hallazgos, decisiones y verificación pendiente.
@@ -383,7 +408,7 @@ La captura masiva puede incluir información privada; revisa el resultado antes 
 
 Con Node.js 20 o posterior ejecuta `npm test` en esta carpeta. Son pruebas de lógica, APIs simuladas y estructura; no equivalen a una prueba visual de Chrome.
 
-**Versión 1.6.0: pruebas automáticas de lógica, respaldo, sincronización, permisos y estructura aprobadas.**
+**Validación 2.1.0:** consulta el informe de la versión; las pruebas con APIs simuladas no certifican consumo de RAM ni OAuth real.
 
 Antes de usar esta versión como definitiva, completa la lista de pruebas manuales del informe. En el entorno de auditoría no fue posible arrancar el navegador de pruebas; no se modificó ni reinstaló la extensión del perfil personal.
 

@@ -2,13 +2,19 @@
   "manifest_version": 3,
   "name": "nex.b",
   "description": "Espacios de trabajo visuales con accesos, etiquetas y reutilización de pestañas.",
-  "version": "2.0.8",
+  "version": "2.1.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy9I5Nw5PiTA2VwDx0kfjDW7+JuwS8AVss+PxN6qsrfzhL966KQSi0t9jN2+h8tIBquUx2QX29J7Gc/wK9ZYRY0ucoWf7wo2JARX7wxvkykn32KcWMBFSzqDtrvVpLIXMRuHNOuBvWkenfjb6h04pYqYpAM0YF+kpsALSPnIVFFAaMEC57rLWFjBBdKVY8YbCmt7MOiqWNuCza/PePR2Fvd8W11Vu2IaHohFS1yTfehgJY2FvrO3A5ItLILoDBXHlWWeJZiAui8NGwPUqWMv7rb5QkNNaLnHW9tfVw2lw4wDxT6Adzqvrm8OhW1QJ2cIy1k8pH8T8DWEBenTx5cFeawIDAQAB",
   "oauth2": {
     "client_id": "1072291004977-kj4e2mskp59eunofuj6j5cjliqu83bom.apps.googleusercontent.com",
-    "scopes": ["https://www.googleapis.com/auth/drive.appdata"]
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.appdata"
+    ]
   },
-  "optional_permissions": ["bookmarks"],
+  "optional_permissions": [
+    "bookmarks",
+    "clipboardRead",
+    "identity.email"
+  ],
   "permissions": [
     "tabs",
     "tabGroups",
@@ -17,11 +23,12 @@
     "activeTab",
     "unlimitedStorage",
     "identity",
-    "identity.email",
-    "clipboardRead",
     "sidePanel"
   ],
-  "host_permissions": ["http://*/*", "https://*/*", "https://www.googleapis.com/"],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://api.github.com/*"
+  ],
   "icons": {
     "16": "icons/nex-b-16.png",
     "32": "icons/nex-b-32.png",
@@ -48,6 +55,9 @@
   },
   "minimum_chrome_version": "123",
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; connect-src 'self' https://www.googleapis.com https://raw.githubusercontent.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; frame-src 'none'; form-action 'none'"
-  }
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; connect-src 'self' https://www.googleapis.com https://api.github.com; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; frame-src 'none'; form-action 'none'"
+  },
+  "optional_host_permissions": [
+    "<all_urls>"
+  ]
 }

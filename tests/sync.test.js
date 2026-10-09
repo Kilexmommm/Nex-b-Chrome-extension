@@ -284,7 +284,7 @@ function quotaEnforcedArea(quotaBytes) {
   };
 }
 
-test('borra los fragmentos viejos cuando juntos exceden la cuota total', async () => {
+test('conserva la última revisión si actualizar excede la cuota total', async () => {
   const area = quotaEnforcedArea(100000);
   const store = createSyncStore(area);
   const data = fixture();
@@ -295,9 +295,10 @@ test('borra los fragmentos viejos cuando juntos exceden la cuota total', async (
   area.QUOTA_BYTES = Math.floor(singleSize * 1.5);
   const updated = structuredClone(data);
   updated.categories[0].accesses[0].title = 'y'.repeat(SYNC_CHUNK_BYTES);
-  await store.save(updated);
+  await assert.rejects(store.save(updated), /sin eliminar la copia anterior/);
   const loaded = await store.load();
-  assert.equal(loaded.data.categories[0].accesses[0].title, 'y'.repeat(SYNC_CHUNK_BYTES));
+  assert.equal(loaded.data.categories[0].accesses[0].title, 'x'.repeat(SYNC_CHUNK_BYTES));
+  assert.deepEqual(await area.get(null), first);
   const after = Object.entries(await area.get(null)).reduce((sum, [key, value]) => sum + key.length + JSON.stringify(value).length, 0);
   assert.ok(after <= area.QUOTA_BYTES);
 });

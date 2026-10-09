@@ -82,7 +82,7 @@ test('captura por lote usa acceso de host y conserva miniaturas existentes', () 
   assert.match(html, /id="captureAllImages"/);
   assert.doesNotMatch(app, /permissions\.request\(\{ origins: \['http:\/\/\*\/\*'/);
   assert.match(app, /!access\.thumbnail && \/\^https\?:\//);
-  assert.match(app, /chrome\.tabs\.captureVisibleTab/);
+  assert.match(app, /captureStableTab\(chrome\.tabs, tab\)/);
   assert.match(app, /chrome\.tabs\.remove\(temporary\.id\)/);
 });
 test('la captura masiva ofrece cancelar y respeta el límite de Chrome', () => {
@@ -98,11 +98,11 @@ test('la sincronización global recorre todas las secciones vinculadas y muestra
   assert.match(app, /unavailable\.push\(category\.name/);
   assert.match(html, /id="syncWorkspaceBookmarks"[^>]*>↻ Sincronizar favoritos importados/);
 });
-test('la actualización asistida abre el ZIP de GitHub y muestra la versión instalada', () => {
+test('la actualización asistida abre las versiones publicadas y muestra la versión instalada', () => {
   const app = read('src/app.js'), html = read('newtab.html');
   assert.match(html, /id="openUpdate"[^>]*>Actualizar desde GitHub/);
   assert.match(html, /id="extensionVersion"/);
-  assert.match(app, /const GITHUB_ARCHIVE_URL = 'https:\/\/github\.com\/Kilexmommm\/Nex-b-Chrome-extension\/archive\/refs\/heads\/main\.zip'/);
+  assert.match(app, /const GITHUB_ARCHIVE_URL = UPDATE_COMMAND/);
   assert.match(app, /chrome\.runtime\.getManifest\(\)\.version/);
   assert.match(app, /chrome\.tabs\.create\(\{ url: GITHUB_ARCHIVE_URL \}\)/);
   assert.match(html, /id="updateBanner"[^>]*hidden/);
@@ -131,8 +131,8 @@ test('Drive usa OAuth privado y la pestaña ofrece subida y descarga de imágene
   assert.deepEqual(manifest.oauth2.scopes, ['https://www.googleapis.com/auth/drive.appdata']);
   assert.ok(manifest.oauth2.client_id.endsWith('.apps.googleusercontent.com'));
   assert.ok(manifest.permissions.includes('identity'));
-  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
-  assert.match(app, /syncDriveImages\(data\)/);
+  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/*', 'https://api.github.com/*']);
+  assert.match(app, /syncDriveImages\(snapshot\.data, imageStore\)/);
   assert.match(drive, /appDataFolder/);
   assert.match(html, /id="syncDriveNow"/);
 });
@@ -334,10 +334,10 @@ test('manifest MV3: sin scripts remotos, recursos públicos ni evaluación diná
   const manifest = JSON.parse(read('manifest.json'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.background.type, 'module');
-  assert.deepEqual(manifest.permissions, ['tabs', 'tabGroups', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'identity.email', 'clipboardRead', 'sidePanel']);
-  assert.equal(manifest.optional_host_permissions, undefined);
-  assert.deepEqual(manifest.optional_permissions, ['bookmarks']);
-  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*', 'https://www.googleapis.com/']);
+  assert.deepEqual(manifest.permissions, ['tabs', 'tabGroups', 'storage', 'contextMenus', 'activeTab', 'unlimitedStorage', 'identity', 'sidePanel']);
+  assert.deepEqual(manifest.optional_host_permissions, ['<all_urls>']);
+  assert.deepEqual(manifest.optional_permissions, ['bookmarks', 'clipboardRead', 'identity.email']);
+  assert.deepEqual(manifest.host_permissions, ['https://www.googleapis.com/*', 'https://api.github.com/*']);
   assert.deepEqual(manifest.side_panel, { default_path: 'newtab.html' });
   for (const key of ['content_scripts', 'web_accessible_resources', 'externally_connectable']) assert.equal(manifest[key], undefined);
   assert.match(manifest.content_security_policy.extension_pages, /script-src 'self'; object-src 'none'/);

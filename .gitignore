@@ -6,3 +6,8 @@ node_modules/
 *.zip
 .keep
 coverage/
+
+# Paquetes locales y carpetas de entrega; no forman parte del código fuente.
+*.bundle
+nex-b-*/
+entrega-*/

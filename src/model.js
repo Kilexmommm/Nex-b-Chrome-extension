@@ -2,7 +2,7 @@ export const DEFAULT_DATA = {
     workspaces: [{ id: "general", name: "General", type: "principal" }],
     activeWorkspaceId: "general",
     categories: [{ id: "ypf", name: "General", workspaceId: "general", parentId: "", accesses: [] }],
-    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", titlePosition: "below", tagsPosition: "overlay", imageShade: true, showWorkspaceTabs: true },
+    settings: { themeId: "gris-nex", accentColor: "#4d8dff", backgroundColor: "#212121", backgroundImageUrl: "", backgroundPattern: "", thumbnailSize: "small", thumbnailHeight: 101, fontFamily: "system", cardStyle: "flat", cardBorder: "none", cardBorderColor: "#4a4a4a", cardSpacing: "normal", iconStyle: "minimal", titlePosition: "below", tagsPosition: "overlay", imageShade: true, thumbnailShadow: true, showWorkspaceTabs: true },
     autoTagRules: { "google.com": "Google", "mail.google.com": "Gmail", "drive.google.com": "Drive", "docs.google.com": "Docs", "sheets.google.com": "Sheets", "slides.google.com": "Slides", "figma.com": "Figma", "miro.com": "Miro", "notion.so": "Notion", "github.com": "GitHub", "github.io": "GitHub" }
 };
 export const THEME_PRESETS = {
@@ -19,6 +19,13 @@ export const THEME_PRESETS = {
 };
 export const LIMITS = Object.freeze({ image: 8 * 1024 * 1024, archive: 64 * 1024 * 1024, data: 80 * 1024 * 1024, accesses: 2000 });
 export const THUMBNAIL_HEIGHTS = Object.freeze({ small: 101, medium: 144, large: 187 });
+export function retainAccessMetadata(access, original) {
+    const result = { ...access };
+    for (const key of ['bookmarkId', 'bookmarkFolderId', 'bookmarkMissing', 'driveImageId', 'driveImageHash']) {
+        if (original && original[key] !== undefined) result[key] = original[key];
+    }
+    return result;
+}
 export function thumbnailHeightForSize(size, fallback) {
     return THUMBNAIL_HEIGHTS[size] ?? fallback;
 }
@@ -80,7 +87,8 @@ export function accessUrl(value) {
         return parsed.href;
     }
 }
-export function imageUrl(value = "") {
+export function imageUrl(value = "", allowLocal = false) {
+    if (allowLocal && /^nexb-image:[a-f0-9]{64}:\d{1,8}$/.test(value) && Number(value.split(":")[2]) <= LIMITS.image) return value;
     if (value === "")
         return "";
     if (typeof value !== "string")
@@ -209,7 +217,8 @@ export function normalizeData(stored = DEFAULT_DATA) {
                 return { id: uniqueId(a.id, accessIds), title: text(a.title, "Nombre de acceso", 300),
                     url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
-                    thumbnail: imageUrl(a.thumbnail ?? ""),
+                    thumbnail: imageUrl(a.thumbnail ?? "", true),
+                    ...(a.localOnly === true ? { localOnly: true } : {}),
                     ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}),
                     ...(driveImageId ? { driveImageId } : {}),
                     ...(driveImageHash ? { driveImageHash } : {}) };
@@ -238,10 +247,12 @@ export function normalizeData(stored = DEFAULT_DATA) {
     return { schemaVersion: 1, workspaces, categories,
         activeWorkspaceId: workspaceIds.has(stored.activeWorkspaceId) ? stored.activeWorkspaceId : workspaces[0].id,
         settings: { themeId, accentColor: s.accentColor, backgroundColor: s.backgroundColor,
-            backgroundImageUrl: imageUrl(s.backgroundImageUrl), backgroundPattern,
+            backgroundImageUrl: imageUrl(s.backgroundImageUrl, true),
+            remoteImagesEnabled: s.remoteImagesEnabled === true, backgroundPattern,
             captureEnabled: typeof s.captureEnabled === 'boolean' ? s.captureEnabled : true,
             showWorkspaceTabs: typeof s.showWorkspaceTabs === 'boolean' ? s.showWorkspaceTabs : true,
             imageShade: typeof s.imageShade === 'boolean' ? s.imageShade : true,
+            thumbnailShadow: typeof s.thumbnailShadow === 'boolean' ? s.thumbnailShadow : true,
             thumbnailSize, thumbnailHeight,
             fontFamily: enumValue(s.fontFamily, ["system", "rounded", "serif", "mono"], "Fuente"),
             cardStyle: enumValue(s.cardStyle, ["flat", "soft", "glass"], "Estilo de tarjeta"),
