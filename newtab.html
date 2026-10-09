@@ -20,18 +20,19 @@
         <button type="button" data-main-action="sync"><span class="menu-icon" aria-hidden="true">↻</span>Sincronizar</button>
         <button type="button" data-main-action="settings"><span class="menu-icon" aria-hidden="true">⚙</span>Configurar</button>
         <button type="button" data-main-action="tags"><span class="menu-icon" aria-hidden="true">#</span>Tags</button>
+        <button type="button" data-main-action="titlesOnly" aria-pressed="false"><span class="menu-icon" aria-hidden="true">☰</span>Solo títulos sin miniaturas</button>
         <li class="menu-separator" role="separator"></li>
         <li class="main-menu-label" role="presentation">Miniaturas por fila</li>
         <button type="button" data-narrow-columns="1" aria-pressed="true"><span class="menu-icon" aria-hidden="true">▢</span>1 por fila</button>
         <button type="button" data-narrow-columns="2" aria-pressed="false"><span class="menu-icon" aria-hidden="true">▢</span>2 por fila</button>
       </menu></div>
       </header>
-      <div id="updateBanner" class="update-banner" role="status" hidden><span id="updateBannerText"></span><button id="bannerCopyUpdate" type="button" class="button secondary">Copiar comando</button><button id="bannerReload" type="button" class="button secondary">Recargar nex.b</button><button id="bannerDismiss" type="button" class="button quiet" aria-label="Ocultar aviso de actualización" title="Ocultar">×</button></div>
+      <div id="updateBanner" class="update-banner" role="status" hidden><span id="updateBannerText"></span><button id="bannerCopyUpdate" type="button" class="button secondary">Copiar enlace de versiones</button><button id="bannerReload" type="button" class="button secondary">Recargar nex.b</button><button id="bannerDismiss" type="button" class="button quiet" aria-label="Ocultar aviso de actualización" title="Ocultar">×</button></div>
       <p id="appFeedback" class="feedback" role="status" hidden></p>
       <section id="workspace" aria-live="polite"></section>
       <p id="emptyState" class="empty" hidden>Agrega una categoría para empezar a organizar tus accesos.</p>
       <div class="bottom-actions"><button id="captureAllImages" class="button secondary capture-all-button" title="Capturar todas las imágenes que faltan" aria-label="Capturar todas las imágenes que faltan">Capturar imágenes faltantes</button><button id="cancelCapture" class="button secondary capture-all-button" title="Detener la captura masiva" aria-label="Detener la captura masiva" hidden>Cancelar captura</button><button id="newCategory" class="add-category-button" title="Nueva categoría" aria-label="Nueva categoría">+</button></div>
-      <footer class="signature"><span class="signature-author">By.kilex</span><span id="footerVersion" class="footer-version"></span><a id="footerFeedback" class="footer-feedback" href="https://github.com/Kilexmommm/Nex-b-Chrome-extension/issues" target="_blank" rel="noopener noreferrer">Feedback</a></footer>
+      <footer class="signature"><span class="signature-author">By.kilex</span><span id="footerVersion" class="footer-version"></span><a id="footerFeedback" class="footer-feedback" href="https://github.com/Kilexmommm/Nex-b-Chrome-extension/issues" target="_blank" rel="noopener noreferrer">Feedback</a><a id="footerKofi" class="footer-kofi" href="https://ko-fi.com/G5A528GFJQ" target="_blank" rel="noopener noreferrer">Apóyame en Ko-fi</a></footer>
     </main>
     <dialog id="categoryDialog"><form method="dialog" id="categoryForm" class="dialog-form">
       <h2>Nueva categoría</h2><label>Nombre<input id="categoryName" required maxlength="40" placeholder="Trabajo, Cliente, Personal" /></label>
@@ -62,6 +63,7 @@
       <label>Categoría<select id="accessCategory" required></select></label>
       <label>Tags <input id="accessTags" autocomplete="off" aria-controls="tagSuggestions" placeholder="cliente, urgente, diseño" /><small>Escribe para buscar tags existentes. Selecciona uno del listado o crea uno nuevo, separado por comas.</small></label>
       <div id="tagSuggestions" class="tag-suggestions" hidden></div>
+<label class="checkbox-label"><input id="accessLocalOnly" type="checkbox" /> Solo en este dispositivo</label><small>No envía este acceso a Chrome Sync ni su imagen a Drive. Si ya se había sincronizado, activa Sync para retirar el enlace; las imágenes antiguas de Drive y otros respaldos no se borran.</small>
       <label>¿Cómo reconocer una pestaña abierta?<select id="matchType"><option value="document">El mismo documento o página</option><option value="exact">La misma URL exacta</option><option value="domain">Cualquier página de este sitio</option></select></label>
       <small class="field-help">Esto evita abrir duplicados. Para Gmail, Drive o una aplicación completa, usa “Cualquier página de este sitio”.</small>
        <div id="pasteBox" class="paste-box" tabindex="0">Haz clic aquí y pega una captura<br /><small>⌘V / Ctrl+V</small></div>
@@ -107,15 +109,15 @@
     <dialog id="updateDialog" class="update-dialog" aria-labelledby="updateDialogTitle"><form method="dialog" class="dialog-form">
       <h2 id="updateDialogTitle">Hay una versión nueva de nex.b</h2>
       <p id="updateDialogVersions" class="update-versions"></p>
-      <ol class="update-steps"><li>Pulsa <strong>Copiar comando</strong>.</li><li>Abre la app <strong>Terminal</strong>, pega el comando y pulsa Intro.</li><li>Vuelve aquí y pulsa <strong>Recargar nex.b</strong>.</li></ol>
+      <ol class="update-steps"><li>Guarda un respaldo ZIP de tus datos.</li><li>Abre el enlace de versiones publicadas, descarga la elegida y reemplaza los archivos de la extensión.</li><li>Vuelve aquí y pulsa <strong>Recargar nex.b</strong>.</li></ol>
       <code id="updateDialogCommand" class="update-command"></code>
       <small>Tus Workspaces, accesos e imágenes se conservan: viven en Chrome, no en la carpeta de la extensión.</small>
       <p class="feedback" role="status" hidden></p>
-      <div class="dialog-actions"><button id="updateLater" type="button" class="button secondary">Recordármelo mañana</button><button id="dialogCopyUpdate" type="button" class="button secondary">Copiar comando</button><button id="dialogReload" type="button" class="button">Recargar nex.b</button></div>
+      <div class="dialog-actions"><button id="updateLater" type="button" class="button secondary">Recordármelo mañana</button><button id="dialogCopyUpdate" type="button" class="button secondary">Copiar enlace de versiones</button><button id="dialogReload" type="button" class="button">Recargar nex.b</button></div>
     </form></dialog>
     <dialog id="syncChoiceDialog"><form method="dialog" id="syncChoiceForm" class="dialog-form">
-      <h2>Primera sincronización</h2>
-      <p class="help">Ya hay datos guardados en la nube y en este equipo. Elige qué conservar para no perder nada.</p>
+      <h2>Elegir datos para sincronizar</h2>
+      <p class="help">Ya hay datos guardados en la nube y en este equipo. Usar un lado reemplaza al otro. Combinar conserva los elementos de ambos y puede recuperar elementos borrados; en conflictos conserva los valores locales. Exporta un ZIP si necesitas guardar ambas versiones.</p>
       <div class="dialog-actions"><button id="syncChoiceLocal" type="button" class="button secondary">Usar los de este equipo</button><button id="syncChoiceCloud" type="button" class="button secondary">Usar los de la nube</button><button id="syncChoiceMerge" type="button" class="button">Combinar ambos</button></div>
     </form></dialog>
     <dialog id="settingsDialog"><form method="dialog" id="settingsForm" class="dialog-form settings-form">
@@ -132,7 +134,7 @@
           <section id="settingsGeneralPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsGeneralTab">
             <label class="checkbox-label"><input id="captureEnabled" type="checkbox" /> Capturar la página al agregar un acceso</label>
             <small>La captura puede incluir información privada. Puedes revisarla o quitarla antes de guardar.</small>
-            <label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
+            <label class="checkbox-label"><input id="remoteImagesEnabled" type="checkbox" /> Permitir imágenes remotas</label><small>Al mostrarlas, sus servidores reciben tu IP y la dirección solicitada. Las imágenes locales no requieren esta opción.</small><label>Sitios protegidos al liberar memoria<textarea id="memoryExcludedHosts" rows="3" placeholder="docs.google.com&#10;figma.com"></textarea><small>Un dominio por línea. Incluye sus subdominios. No se descargan automáticamente pestañas de memoria.</small></label><label>Tags automáticos por URL<textarea id="settingsTagRules" rows="7" spellcheck="false" placeholder="mail.google.com = Gmail"></textarea><small>Una regla por línea: <code>dominio.com = Tag</code>.</small></label>
           </section>
           <section id="settingsSyncPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsSyncTab" hidden>
         <h3>Sincronizar Workspaces</h3>
@@ -162,7 +164,7 @@
           <section id="settingsDesignPanel" class="settings-panel" role="tabpanel" aria-labelledby="settingsDesignTab" hidden>
         <div class="setting-grid"><label>Color principal<input id="accentColor" type="color" /></label><label>Color de fondo<input id="backgroundColor" type="color" /></label></div>
         <label>Imagen de fondo (URL)<input id="backgroundImageUrl" type="url" placeholder="https://.../fondo.jpg" /></label>
-        <label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option><option value="custom">Personalizado</option></select></label>
+        <button id="removeBackground" type="button" class="button secondary">Quitar imagen de fondo</button><label>Alto de miniaturas<select id="thumbnailSize"><option value="small">Bajo · −30%</option><option value="medium">Mediano</option><option value="large">Alto · +30%</option><option value="custom">Personalizado</option></select></label>
         <section class="appearance-editor"><p>Diseño de interfaz</p><small>Personaliza la apariencia sin escribir código. Las miniaturas nuevas no llevan borde por defecto.</small>
         <div class="setting-grid"><label>Fuente<select id="fontFamily"><option value="system">Sistema</option><option value="rounded">Redondeada</option><option value="serif">Serif</option><option value="mono">Monoespaciada</option></select></label><label>Estilo de tarjeta<select id="cardStyle"><option value="flat">Plano</option><option value="soft">Suave</option><option value="glass">Cristal</option></select></label></div>
         <div class="setting-grid"><label>Borde de tarjetas<select id="cardBorder"><option value="none">Sin borde</option><option value="soft">Suave</option><option value="strong">Marcado</option></select></label><label>Color del borde<input id="cardBorderColor" type="color" /></label></div>
@@ -170,6 +172,7 @@
         <div class="setting-grid"><label>Título de la miniatura<select id="titlePosition"><option value="below">Debajo de la imagen</option><option value="above">Arriba de la imagen</option></select></label><label>Etiquetas de la miniatura<select id="tagsPosition"><option value="overlay">Abajo, sobre la imagen</option><option value="above">Arriba a la izquierda, sobre la imagen</option></select></label></div>
         <label class="checkbox-label"><input id="showWorkspaceTabs" type="checkbox" checked /> Mostrar pestañas de Workspaces</label>
         <label class="checkbox-label"><input id="imageShade" type="checkbox" checked /> Degradado oscuro sobre la imagen</label>
+        <label class="checkbox-label"><input id="thumbnailShadow" type="checkbox" checked /> Sombra en las miniaturas</label>
         </section>
         <section class="preset-section"><p>Estilos</p><small>Seleccionar un estilo completa sus colores y fondo. Pulsa Guardar configuración para aplicarlo.</small><div id="stylePresets" class="style-presets"></div></section>
           </section>
@@ -179,10 +182,10 @@
               <button id="syncWorkspaceBookmarks" type="button" class="button secondary">↻ Sincronizar favoritos importados</button>
               <small>Sincroniza todas las secciones vinculadas, aunque pertenezcan a otro Workspace. Chrome pedirá permiso al usar esta opción; nex.b solo lee tus favoritos.</small>
               <p>Actualizar nex.b</p>
-              <small>Versión instalada: <strong id="extensionVersion"></strong><span id="updateAvailable"></span>. En macOS o Linux, pega este comando en la Terminal (la primera vez instala nex.b en <code>~/nex.b</code>; después lo actualiza). Luego pulsa «Recargar nex.b». Tus datos no se tocan.</small>
+              <small>Versión instalada: <strong id="extensionVersion"></strong><span id="updateAvailable"></span>. Guarda un respaldo ZIP y descarga una versión publicada desde este enlace. Reemplaza los archivos de la extensión y después recarga nex.b.</small>
               <code id="updateCommand" class="update-command"></code>
-              <div class="json-actions"><button id="copyUpdateCommand" type="button" class="button secondary">Copiar comando</button><button id="reloadExtension" type="button" class="button secondary">Recargar nex.b</button><button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button></div>
-              <small>«Actualizar desde GitHub» descarga el ZIP (por ejemplo, en Windows): reemplaza la carpeta y pulsa «Recargar nex.b».</small>
+              <div class="json-actions"><button id="copyUpdateCommand" type="button" class="button secondary">Copiar enlace de versiones</button><button id="reloadExtension" type="button" class="button secondary">Recargar nex.b</button><button id="openUpdate" type="button" class="button secondary">Actualizar desde GitHub</button></div>
+              <small>«Actualizar desde GitHub» abre las versiones publicadas. No ejecuta comandos en tu equipo.</small>
               <button id="openLocalSettings" type="button" class="button secondary">Configurar archivos locales</button>
               <small>Opcional: para abrir HTML y carpetas en el navegador, activa «Permitir acceso a URLs de archivo» en los detalles de nex.b. No necesitas instalar nada adicional. Los enlaces web funcionan sin este paso.</small>
               <button id="openSidePanel" type="button" class="button secondary">Abrir Side panel</button>
@@ -212,13 +215,13 @@
           <button id="inventorySelectAll" type="button" class="button secondary">Seleccionar visibles</button>
           <button id="inventoryConsolidate" type="button" class="button secondary">Reunir en una ventana</button>
         </div>
-        <div id="inventoryList" class="inventory-list"></div>
+        <small>Las pestañas en reposo siguen abiertas y se recargan al seleccionarlas. Guarda formularios y editores antes de liberar memoria.</small><div id="inventoryList" class="inventory-list"></div>
         <div class="inventory-add">
           <select id="inventoryWorkspace" aria-label="Workspace de destino"></select>
           <select id="inventoryCategory" aria-label="Categoría de destino"></select>
           <button id="inventoryAddToCategory" type="button" class="button secondary">Agregar seleccionadas</button>
         </div>
-        <div class="inventory-actions"><button id="inventoryCloseSelected" type="button" class="button">Cerrar seleccionadas</button></div>
+        <div class="inventory-actions"><button id="inventoryReleaseMemory" type="button" class="button secondary">Liberar memoria de seleccionadas</button><button id="inventoryCloseSelected" type="button" class="button">Cerrar seleccionadas</button></div>
       </section>
       <section id="inventoryDupPanel" role="tabpanel" aria-labelledby="inventoryDupTab" hidden>
         <p id="inventoryDupSummary" class="help"></p>

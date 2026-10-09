@@ -2,6 +2,16 @@ export const MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND = 2;
 export const CAPTURE_PAINT_DELAY_MS = 600;
 export const CAPTURE_BATCH_SIZE = 5;
 
+export async function captureStableTab(api, tab) {
+  const stable = current => current?.id === tab.id && current.url === tab.url && !current.pendingUrl;
+  const [before] = await api.query({ active: true, windowId: tab.windowId });
+  if (!stable(before)) throw new Error('La pestaña de captura cambió.');
+  const image = await api.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 75 });
+  const [after] = await api.query({ active: true, windowId: tab.windowId });
+  if (!stable(after)) throw new Error('La pestaña cambió durante la captura.');
+  return image;
+}
+
 export function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

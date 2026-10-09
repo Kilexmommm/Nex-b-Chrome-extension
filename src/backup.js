@@ -189,5 +189,7 @@ export function readStoredZip(bytes) {
     }
     if (imported.settings)
         imported.settings.backgroundImageUrl = restore(imported.settings.backgroundImageUrl);
+    const values = [imported.settings?.backgroundImageUrl, ...imported.categories.flatMap(c => c.accesses.map(a => a.thumbnail))];
+    if (values.some(value => typeof value === 'string' && value.startsWith('nexb-image:'))) throw new Error('El ZIP contiene referencias locales sin sus imágenes.');
     return normalizeData(imported);
 }

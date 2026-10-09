@@ -1,5 +1,6 @@
 import { webUrl } from './model.js';
 import { resizeImage } from './images.js';
+import { captureStableTab } from './capture.js';
 import { validateRecapture, recaptureKey, RECAPTURE_TTL } from './recapture.js';
 
 const PAGE = 'workspace-add-page';
@@ -34,11 +35,7 @@ async function capture(tab, manual = false) {
   const { captureEnabled = true } = await chrome.storage.local.get('captureEnabled');
   if (!captureEnabled && !manual) return { thumbnail: '', notice: 'Captura automática desactivada. Puedes pegar una imagen.' };
   try {
-    const [before] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-    if (before?.id !== tab.id || before.url !== tab.url) throw new Error('La pestaña cambió.');
-    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 75 });
-    const [after] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-    if (after?.id !== tab.id || after.url !== tab.url) throw new Error('La pestaña cambió.');
+    const dataUrl = await captureStableTab(chrome.tabs, tab);
     const bytes = Uint8Array.from(atob(dataUrl.split(',')[1]), c => c.charCodeAt(0));
     const thumbnail = await resizeImage(new Blob([bytes], { type: 'image/jpeg' }));
     if (thumbnail.length > 700000) throw new Error('Captura demasiado grande.');

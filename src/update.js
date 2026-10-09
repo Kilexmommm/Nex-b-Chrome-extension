@@ -1,5 +1,5 @@
-export const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/Kilexmommm/Nex-b-Chrome-extension/main/manifest.json';
-export const UPDATE_COMMAND = 'curl -fsSL https://raw.githubusercontent.com/Kilexmommm/Nex-b-Chrome-extension/main/install.sh | bash';
+export const UPDATE_MANIFEST_URL = 'https://api.github.com/repos/Kilexmommm/Nex-b-Chrome-extension/releases/latest';
+export const UPDATE_COMMAND = 'https://github.com/Kilexmommm/Nex-b-Chrome-extension/releases';
 export const UPDATE_CHECK_KEY = 'nexbUpdateCheck';
 export const UPDATE_CHECK_INTERVAL = 3 * 60 * 60 * 1000;
 export const UPDATE_SNOOZE_KEY = 'nexbUpdateSnooze';
@@ -23,19 +23,20 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-// Consulta como mucho cada 3 horas la versión publicada en main. Devuelve la
+// Consulta como mucho cada 3 horas la versión publicada como release. Devuelve la
 // versión nueva o '' si no hay; un fallo de red nunca interrumpe la app.
 export async function checkForUpdate(current, { storage, fetch: request = fetch, now = Date.now() } = {}) {
   let cached = (await storage.get(UPDATE_CHECK_KEY))[UPDATE_CHECK_KEY];
   if (!cached || typeof cached.checkedAt !== 'number' || now - cached.checkedAt >= UPDATE_CHECK_INTERVAL || cached.checkedAt > now) {
     try {
-      const response = await request(UPDATE_MANIFEST_URL, { cache: 'no-store' });
-      if (!response.ok) return '';
-      const latest = String((await response.json()).version || '');
-      if (!/^\d+(\.\d+){0,3}$/.test(latest)) return '';
+      const response = await request(UPDATE_MANIFEST_URL, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      if (!response.ok) { await storage.set({ [UPDATE_CHECK_KEY]: { checkedAt: now, latest: current } }); return ''; }
+      const latest = String((await response.json()).tag_name || '').replace(/^v/, '');
+      if (!/^\d+(\.\d+){0,3}$/.test(latest)) { await storage.set({ [UPDATE_CHECK_KEY]: { checkedAt: now, latest: current } }); return ''; }
       cached = { checkedAt: now, latest };
       await storage.set({ [UPDATE_CHECK_KEY]: cached });
     } catch {
+      await storage.set({ [UPDATE_CHECK_KEY]: { checkedAt: now, latest: current } }).catch(() => {});
       return '';
     }
   }

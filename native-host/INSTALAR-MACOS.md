@@ -1,12 +1,6 @@
 # Instalar nex.b y abrir archivos locales en macOS
 
-## Corrección del asistente anterior: «Native host has exited»
-
-Para versiones que usan Native Messaging para abrir Finder, descarga el [ZIP del repositorio](https://github.com/Kilexmommm/Nex-b-Chrome-extension/archive/refs/heads/main.zip), descomprímelo y ejecuta `zsh native-host/install-macos.sh` desde la carpeta del proyecto. Introduce el ID de esa extensión y recárgala. Requiere `/usr/bin/python3` disponible.
-
-El instalador copia el host y su lanzador a `~/Library/Application Support/nex.b/NativeHost/`, registra `com.kilex.nex_b` para un único ID y respalda el manifiesto anterior con extensión `.bak`. El lanzador usa Python aislado (`-I -u`), fija el directorio de trabajo y registra errores en `startup-error.log` dentro de esa carpeta. stdout queda reservado al protocolo de Chrome.
-
-El usuario informó que esta instalación resolvió la apertura de carpetas en Finder. La restricción de ejecución desde Documentos es una causa probable, no confirmada con registros del sistema. Este cambio del instalador no activa Finder en la versión actual, que abre rutas locales dentro de Chrome.
+La versión 2.1.0 abre rutas locales dentro de Chrome. Los scripts del antiguo asistente se conservan como historial y no forman parte de la instalación actual.
 
 **Desde nex.b 1.7.3 no necesitas instalar el asistente macOS.** No hace falta Python, Terminal, ejecutar `install-macos.sh` ni copiar el ID de la extensión. Esta página se conserva en su dirección original para que las guías antiguas lleven a las instrucciones actuales.
 

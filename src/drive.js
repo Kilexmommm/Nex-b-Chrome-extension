@@ -1,4 +1,5 @@
 import { normalizeData } from './model.js';
+import { isImageRef } from './image-store.js';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -28,7 +29,7 @@ async function authToken(interactive = true) {
 }
 
 async function request(url, token, options = {}, retry = true) {
-  const response = await fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
+  const response = await fetch(url, { signal: AbortSignal.timeout(60000), ...options, headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token } });
   if (response.status === 401 && retry) {
     await chrome.identity.removeCachedAuthToken({ token });
     return request(url, await authToken(true), options, false);
@@ -94,14 +95,27 @@ async function uploadFile(token, existingId, name, blob, mimeType, hash) {
 
 async function downloadFile(token, id) {
   const response = await request(DRIVE_API + '/files/' + encodeURIComponent(id) + '?alt=media', token);
-  return blobDataUrl(await response.blob());
+  const declared = Number(response.headers.get('content-length'));
+  if (declared > MAX_IMAGE_BYTES) throw new Error('Google Drive devolvió una imagen mayor de 8 MB.');
+  const reader = response.body.getReader(), chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_IMAGE_BYTES) { await reader.cancel(); throw new Error('Google Drive devolvió una imagen mayor de 8 MB.'); }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  return blobDataUrl(new Blob(chunks, { type: response.headers.get('content-type')?.split(';')[0] || '' }));
 }
 
 async function deleteFile(token, id) {
   await request(DRIVE_API + '/files/' + encodeURIComponent(id), token, { method: 'DELETE' });
 }
 
-export async function syncDriveImages(data) {
+export async function syncDriveImages(data, images = null) {
   const token = await authToken(true);
   const files = await listFiles(token);
   const byName = new Map(files.map(file => [file.name, file]));
@@ -110,18 +124,20 @@ export async function syncDriveImages(data) {
   const errors = [];
   for (const category of candidate.categories) {
     for (const access of category.accesses) {
+      if (access.localOnly) { skipped++; continue; }
       const name = 'nexb-image-' + access.id;
       try {
-        const local = dataUrlBlob(access.thumbnail);
+        const blob = isImageRef(access.thumbnail) && images ? await images.get(access.thumbnail) : null;
+        const local = blob ? { blob, mimeType: blob.type } : dataUrlBlob(access.thumbnail);
         const existing = byName.get(name) || (access.driveImageId ? files.find(file => file.id === access.driveImageId) : null);
         if (local) {
-          const localHash = await imageHash(local.blob);
+          const localHash = isImageRef(access.thumbnail) ? access.thumbnail.split(':')[1] : await imageHash(local.blob);
           const sameAsLocal = access.driveImageHash && access.driveImageHash === localHash;
           const remoteHash = existing?.appProperties?.nexbHash || '';
           if (existing && !access.driveImageHash) {
             access.thumbnail = await downloadFile(token, existing.id);
             const downloadedImage = dataUrlBlob(access.thumbnail);
-            if (downloadedImage) access.driveImageHash = remoteHash || await imageHash(downloadedImage.blob);
+            if (downloadedImage) access.driveImageHash = await imageHash(downloadedImage.blob);
             access.driveImageId = existing.id;
             downloaded++;
             continue;
@@ -132,7 +148,7 @@ export async function syncDriveImages(data) {
           if (sameAsLocal && existing) {
             if (remoteHash && remoteHash !== localHash) {
               access.thumbnail = await downloadFile(token, existing.id);
-              access.driveImageHash = remoteHash;
+              access.driveImageHash = await imageHash(dataUrlBlob(access.thumbnail).blob);
               downloaded++;
             } else unchanged++;
             continue;

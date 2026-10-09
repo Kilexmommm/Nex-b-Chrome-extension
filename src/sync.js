@@ -5,7 +5,8 @@ export const SYNC_CHUNK_PREFIX = 'nexb.sync.chunk.';
 export const SYNC_CHUNK_BYTES = 6000;
 // La copia remota se puede leer pero no es válida (fragmentos mezclados, suma de
 // control distinta o datos que no pasan la validación). La local es la fiable.
-export class SyncCorruptError extends Error {}
+export class SyncCorruptError extends Error { name = 'SyncCorruptError'; }
+export class SyncQuotaError extends Error { name = 'SyncQuotaError'; }
 
 export const SYNC_QUOTA = Object.freeze({
   QUOTA_BYTES: 102400,
@@ -48,7 +49,7 @@ export function projectSyncData(data) {
       workspaceId: category.workspaceId,
       parentId: category.parentId,
       ...(category.bookmarkFolderId ? { bookmarkFolderId: category.bookmarkFolderId, bookmarkFolderTitle: category.bookmarkFolderTitle || '' } : {}),
-      accesses: category.accesses.map(access => {
+      accesses: category.accesses.filter(access => !access.localOnly).map(access => {
         const { thumbnail, bookmarkMissing, ...metadata } = access;
         return metadata;
       })
@@ -62,6 +63,7 @@ export function projectSyncData(data) {
 function keepLocalLayout(settings, localSettings) {
   settings.thumbnailSize = localSettings.thumbnailSize;
   settings.thumbnailHeight = localSettings.thumbnailHeight;
+  settings.remoteImagesEnabled = localSettings.remoteImagesEnabled;
 }
 
 function mergeById(localList, remoteList, preferLocal) {
@@ -127,6 +129,27 @@ export function mergeThreeWay(local, remote, { preferLocal = false } = {}) {
   });
 }
 
+// Preserve private accesses even when their public workspace/category was removed remotely.
+function preserveLocalOnly(local, remote) {
+  const privateIds = new Set(local.categories.flatMap(c => c.accesses.filter(a => a.localOnly).map(a => a.id)));
+  for (const category of remote.categories) category.accesses = category.accesses.filter(a => !privateIds.has(a.id));
+  for (const original of local.categories) {
+    const privateAccesses = original.accesses.filter(a => a.localOnly);
+    if (!privateAccesses.length) continue;
+    let target = remote.categories.find(c => c.id === original.id);
+    if (!target) {
+      if (!remote.workspaces.some(w => w.id === original.workspaceId)) remote.workspaces.push({ ...local.workspaces.find(w => w.id === original.workspaceId) });
+      const parent = local.categories.find(c => c.id === original.parentId);
+      if (parent && !remote.categories.some(c => c.id === parent.id)) remote.categories.push({ ...parent, accesses: [] });
+      const validParent = remote.categories.find(c => c.id === original.parentId && c.workspaceId === original.workspaceId && !c.parentId);
+      target = { ...original, parentId: validParent?.id || '', accesses: [] };
+      remote.categories.push(target);
+    }
+    target.accesses.push(...privateAccesses.map(a => ({ ...a })));
+  }
+  return remote;
+}
+
 // Reconstruye la biblioteca completa desde la proyección remota, conservando las
 // miniaturas locales que ya existan para los mismos accesos, el Workspace activo
 // y la imagen de fondo (que no viajan por sync). Se usa al elegir "usar los de la
@@ -141,7 +164,7 @@ export function applyRemoteData(local, remote) {
   full.settings.backgroundImageUrl = local.settings.backgroundImageUrl;
   keepLocalLayout(full.settings, local.settings);
   full.activeWorkspaceId = local.activeWorkspaceId;
-  return normalizeData(full);
+  return normalizeData(preserveLocalOnly(local, full));
 }
 
 // Decide la acción de syncNow sin tocar el DOM: 'upload' (subir local), 'apply'
@@ -174,46 +197,46 @@ function valuesSize(values) {
 export function assertWithinQuota(values, area) {
   const limits = quotaLimits(area);
   const entries = Object.entries(values);
-  if (entries.length > limits.maxItems) throw new Error('Demasiados elementos para Chrome Sync. Usa el respaldo ZIP.');
+  if (entries.length > limits.maxItems) throw new SyncQuotaError('Demasiados elementos para Chrome Sync. Usa el respaldo ZIP.');
   let total = 0;
   for (const [key, value] of entries) {
     const size = itemSize(key, value);
-    if (size > limits.perItem) throw new Error('Un fragmento supera el límite de ' + Math.round(limits.perItem / 1024) + ' KB por elemento de Chrome Sync. Usa el respaldo ZIP.');
+    if (size > limits.perItem) throw new SyncQuotaError('Un fragmento supera el límite de ' + Math.round(limits.perItem / 1024) + ' KB por elemento de Chrome Sync. Usa el respaldo ZIP.');
     total += size;
   }
-  if (total > limits.bytes) throw new Error('La biblioteca es demasiado grande para Chrome Sync (' + Math.ceil(total / 1024) + ' KB de ' + Math.round(limits.bytes / 1024) + ' KB). Usa el respaldo ZIP.');
+  if (total > limits.bytes) throw new SyncQuotaError('La biblioteca es demasiado grande para Chrome Sync (' + Math.ceil(total / 1024) + ' KB de ' + Math.round(limits.bytes / 1024) + ' KB). Usa el respaldo ZIP.');
   return total;
 }
 
-export function createSyncStore(area) {
+export function createSyncStore(area, locks = globalThis.navigator?.locks) {
+  const serialize = action => locks ? locks.request('nex-b-sync-store', action) : action();
   const chunkKey = (revision, index) => SYNC_CHUNK_PREFIX + revision + '.' + index;
-  async function removeOrphanChunks(keepRevision) {
-    const all = await area.get(null);
-    const orphans = Object.keys(all).filter(key => key.startsWith(SYNC_CHUNK_PREFIX) && !key.startsWith(SYNC_CHUNK_PREFIX + keepRevision + '.'));
-    if (orphans.length) await area.remove(orphans);
-  }
   return {
-    async save(data) {
+    async save(data, { parentRevision = null } = {}) { return serialize(async () => {
       const encoded = base64Encode(JSON.stringify(projectSyncData(data)));
       const revision = String(Date.now()) + '-' + Math.random().toString(36).slice(2);
       const chunks = [];
       for (let offset = 0; offset < encoded.length; offset += SYNC_CHUNK_BYTES)
         chunks.push(encoded.slice(offset, offset + SYNC_CHUNK_BYTES));
-      const values = { [SYNC_MANIFEST_KEY]: { schemaVersion: 1, count: chunks.length, revision, length: encoded.length, checksum: checksum(encoded) } };
+      const values = { [SYNC_MANIFEST_KEY]: { schemaVersion: 1, count: chunks.length, revision, length: encoded.length, checksum: checksum(encoded), ...(parentRevision !== null ? { parentRevision } : {}) } };
       chunks.forEach((chunk, index) => { values[chunkKey(revision, index)] = chunk; });
       assertWithinQuota(values, area);
-      // La cuota se mide sobre el estado total: si los fragmentos nuevos caben solos
-      // pero no junto con los de la revisión anterior, se borran primero (y se acepta
-      // la ventana breve en que load() reportará "Faltan datos sincronizados").
+      // Keep the previous generation intact until the replacement is durable.
       const existing = await area.get(null);
       const retained = Object.keys(existing)
         .filter(key => !(key in values))
         .reduce((sum, key) => sum + itemSize(key, existing[key]), 0);
-      if (valuesSize(values) + retained > quotaLimits(area).bytes) await removeOrphanChunks(revision);
+      if (valuesSize(values) + retained > quotaLimits(area).bytes) throw new SyncQuotaError('No hay espacio para actualizar Sync sin eliminar la copia anterior. Usa el ZIP o reduce la biblioteca.');
       await area.set(values);
-      await removeOrphanChunks(revision);
+      // Only retire generations observed before this write. Another device may
+      // have published newer chunks meanwhile; never collect those as orphans.
+      const current = (await area.get(SYNC_MANIFEST_KEY))[SYNC_MANIFEST_KEY];
+      if (current?.revision === revision) {
+        const oldKeys = Object.keys(existing).filter(key => key.startsWith(SYNC_CHUNK_PREFIX) && !(key in values));
+        if (oldKeys.length) await area.remove(oldKeys);
+      }
       return { revision, bytes: encoded.length };
-    },
+    }); },
     async load() {
       const manifest = (await area.get(SYNC_MANIFEST_KEY))[SYNC_MANIFEST_KEY];
       if (!manifest) return null;
@@ -228,7 +251,7 @@ export function createSyncStore(area) {
       const encoded = keys.map(key => stored[key]).join('');
       if ((Number.isInteger(manifest.length) && manifest.length !== encoded.length) || (Number.isInteger(manifest.checksum) && manifest.checksum !== checksum(encoded)))
         throw new SyncCorruptError('Los datos sincronizados están dañados; se conserva la copia local.');
-      try { return { revision: manifest.revision, data: JSON.parse(base64Decode(encoded)) }; }
+      try { return { revision: manifest.revision, parentRevision: manifest.parentRevision, data: JSON.parse(base64Decode(encoded)) }; }
       catch { throw new SyncCorruptError('Los datos sincronizados están dañados; se conserva la copia local.'); }
     }
   };
