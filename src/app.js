@@ -587,6 +587,33 @@ function renderTagView() {
   }
   appendGroups();
 }
+function sectionActionsMenu(actions, category) {
+  const menu = node('div', 'main-menu section-menu');
+  menu.id = 'section-menu-' + category.id;
+  menu.setAttribute('popover', 'auto');
+  menu.setAttribute('aria-label', 'Acciones de ' + category.name);
+  for (const control of [...actions.children]) {
+    control.textContent = control.getAttribute('aria-label');
+    menu.append(control);
+  }
+  const toggle = button('⋮', 'Acciones de ' + category.name, () => {
+    if (menu.matches(':popover-open')) { menu.hidePopover(); return; }
+    menu.showPopover();
+    const bounds = toggle.getBoundingClientRect();
+    menu.style.top = Math.max(8, Math.min(bounds.bottom + 4, window.innerHeight - menu.offsetHeight - 8)) + 'px';
+    menu.style.left = Math.max(8, Math.min(bounds.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.querySelector('button:not(:disabled)')?.focus();
+  }, 'button quiet category-icon section-actions-toggle');
+  toggle.setAttribute('aria-haspopup', 'true');
+  toggle.setAttribute('aria-controls', menu.id);
+  toggle.setAttribute('aria-expanded', 'false');
+  menu.addEventListener('toggle', event => toggle.setAttribute('aria-expanded', String(event.newState === 'open')));
+  menu.addEventListener('click', event => { if (event.target.closest('button') && menu.matches(':popover-open')) menu.hidePopover(); });
+  menu.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { menu.hidePopover(); toggle.focus(); }
+  });
+  return { toggle, menu };
+}
 function renderCategory(category, subcategory, accesses = category.accesses) {
   const section = node('section', 'category' + (subcategory ? ' subcategory' : ''));
   const heading = node('div', 'category-heading');
@@ -607,7 +634,11 @@ function renderCategory(category, subcategory, accesses = category.accesses) {
   const collapsed = collapsedSections.has(category.id);
   const collapseToggle = button(collapsed ? '▸' : '▾', (collapsed ? 'Expandir' : 'Contraer') + ' sección ' + category.name, () => setSectionCollapsed(category.id, !collapsedSections.has(category.id)), 'button quiet category-icon category-collapse');
   collapseToggle.setAttribute('aria-expanded', String(!collapsed));
-  heading.append(collapseToggle, node('h2', '', category.name), accessCount(accesses.length), actions);
+  heading.append(collapseToggle, node('h2', '', category.name), accessCount(accesses.length));
+  if (narrowMedia.matches) {
+    const { toggle, menu } = sectionActionsMenu(actions, category);
+    heading.append(toggle, menu);
+  } else heading.append(actions);
   const cards = node('div', 'cards');
   let shown = 0;
   const more = button('Mostrar más', 'Mostrar otros 40 accesos', appendPage, 'button secondary');

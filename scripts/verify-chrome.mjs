@@ -1,8 +1,9 @@
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 const endpoint = process.env.NEXB_CDP_ENDPOINT || 'http://127.0.0.1:9228';
 const extensionPath = resolve(new URL('..', import.meta.url).pathname);
+const manifest = JSON.parse(await readFile(resolve(extensionPath, 'manifest.json'), 'utf8'));
 class CDP {
   constructor(url) { this.socket = new WebSocket(url); this.pending = new Map(); this.events = []; this.id = 0; this.socket.addEventListener('message', event => { const msg = JSON.parse(event.data); if (msg.id) { const task = this.pending.get(msg.id); this.pending.delete(msg.id); msg.error ? task?.reject(new Error(JSON.stringify(msg.error))) : task?.resolve(msg.result); } else this.events.push(msg); }); }
   async ready() { if (this.socket.readyState === 1) return; await new Promise((resolve, reject) => { this.socket.addEventListener('open', resolve, { once: true }); this.socket.addEventListener('error', reject, { once: true }); }); }
@@ -30,8 +31,9 @@ try {
   browser = await connect(info.webSocketDebuggerUrl);
   const { id } = await browser.send('Extensions.loadUnpacked', { path: extensionPath });
   const client = await page(browser, `chrome-extension://${id}/newtab.html`);
-  await wait(client, "document.getElementById('footerVersion')?.textContent === 'v2.1.1'");
+  await wait(client, `document.getElementById('footerVersion')?.textContent === ${JSON.stringify('v' + manifest.version)}`);
   assert.equal(await client.evaluate("document.getElementById('footerKofi').href"), 'https://ko-fi.com/G5A528GFJQ'); checks.push('carga real, versión y Ko-fi');
+  await client.evaluate("chrome.tabs.query({}).then(tabs=>Promise.all(tabs.filter(tab=>tab.url?.startsWith('http://127.0.0.1:9228/')).map(tab=>chrome.tabs.remove(tab.id))))");
   const fixture = await client.evaluate(`(async () => { const {normalizeData}=await import('./src/model.js'); const data=normalizeData(); data.categories[0].accesses=Array.from({length:45}, (_,i)=>({id:'test-'+i,title:'Recurso de prueba '+i,url:'https://example.com/'+i,tags:[],matchType:'exact',thumbnail:${JSON.stringify(png)}})); return data; })()`);
   await client.evaluate(`chrome.storage.local.clear().then(()=>chrome.storage.local.set({workspaceData:${JSON.stringify(fixture)},workspaceDataBackup:${JSON.stringify(fixture)},workspaceRevision:5}))`);
   await client.send('Page.reload');
@@ -59,7 +61,7 @@ try {
   assert.ok(!permissions.permissions.includes('clipboardRead')); assert.ok(!permissions.permissions.includes('identity.email')); checks.push('permisos opcionales ausentes en instalación limpia');
   await client.evaluate("document.getElementById('mainMenuToggle').click(); document.querySelector('[data-main-action=titlesOnly]').click(); document.getElementById('searchToggle').click()");
   const narrow = await client.evaluate("({picker:document.getElementById('workspacePicker').getBoundingClientRect().width,search:document.getElementById('accessSearch').getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth})");
-  assert.ok(narrow.picker >= 200); assert.ok(narrow.search >= 200); assert.equal(narrow.overflow, false); checks.push('selector y búsqueda legibles sin desbordamiento a 360px');
+  assert.ok(narrow.picker >= 180); assert.ok(narrow.search >= 200); assert.equal(narrow.overflow, false); checks.push('selector y búsqueda legibles sin desbordamiento a 360px');
   const inventoryUrl = endpoint + '/json/version?inventory=' + Date.now();
   const inventoryPage = await page(browser, inventoryUrl);
   await wait(inventoryPage, "document.readyState === 'complete'");
@@ -72,7 +74,31 @@ try {
   await client.evaluate("document.getElementById('inventoryDialog').close()");
   const grouping = await client.evaluate("(async()=>{const {openSectionInNewWindow}=await import('./src/tabs.js'); const result=await openSectionInNewWindow([{url:'https://example.com/one'},{url:'https://example.com/two'}],'Prueba · Recursos',chrome,navigator.locks);const group=await chrome.tabGroups.get(result.groupId);const tabs=await chrome.tabs.query({windowId:result.windowId});await chrome.windows.remove(result.windowId);return {result,title:group.title,count:tabs.length};})()");
   assert.equal(grouping.result.grouped, true); assert.equal(grouping.result.titled, true); assert.equal(grouping.title, 'Prueba · Recursos'); assert.equal(grouping.count, 2); checks.push('ventana y grupo nativos reales con título Workspace · sección');
+  const compact = await client.evaluate("(()=>{const rect=id=>document.getElementById(id).getBoundingClientRect();const picker=rect('workspacePicker'),search=rect('searchToggle'),menu=rect('mainMenuToggle');return {pickerY:picker.top,searchY:search.top,menuY:menu.top,title:getComputedStyle(document.querySelector('.category-heading h2')).fontSize,plus:rect('newCategory').width,add:document.querySelector('.add-card').getBoundingClientRect().width,capture:getComputedStyle(document.getElementById('captureAllImages')).display,version:getComputedStyle(document.getElementById('footerVersion')).display,feedback:getComputedStyle(document.getElementById('footerFeedback')).display,kofi:getComputedStyle(document.getElementById('footerKofi')).display,author:getComputedStyle(document.querySelector('.signature-author')).display,toolbar:!!document.querySelector('.category-actions'),sectionToggle:!!document.querySelector('.section-actions-toggle')};})()");
+  assert.ok(Math.abs(compact.pickerY-compact.menuY)<=2); assert.ok(Math.abs(compact.searchY-compact.menuY)<=2);
+  assert.equal(compact.title,'14px'); assert.equal(compact.plus,28); assert.equal(compact.add,28);
+  for(const name of ['capture','version','feedback','kofi']) assert.equal(compact[name],'none');
+  assert.notEqual(compact.author,'none'); assert.equal(compact.toolbar,false); assert.equal(compact.sectionToggle,true);
+  await client.evaluate("document.querySelector('.section-actions-toggle').click()");
+  await wait(client, "document.querySelector('.section-menu').matches(':popover-open')");
+  const menuBounds = await client.evaluate("(()=>{const r=document.querySelector('.section-menu').getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight};})()");
+  assert.ok(menuBounds.left>=0&&menuBounds.right<=menuBounds.width&&menuBounds.top>=0&&menuBounds.bottom<=menuBounds.height);
+  await client.evaluate("Array.from(document.querySelectorAll('.section-menu button')).find(button=>button.textContent==='Nuevo acceso').click()");
+  await wait(client, "document.getElementById('accessDialog').open");
+  assert.equal(await client.evaluate("document.querySelector('.section-menu').matches(':popover-open')"),false);
+  await client.evaluate("document.querySelector('#accessDialog [data-cancel]').click()");
+  checks.push('Side Panel compacto: navegación en una fila, sección 14px, + 28px, captura y enlaces del pie ocultos; menú de sección abre Nuevo acceso');
+  await client.send('Page.bringToFront');
+  await client.send('Emulation.setDeviceMetricsOverride', {width:1200,height:800,deviceScaleFactor:1,mobile:false});
+  await new Promise(resolve=>setTimeout(resolve,500));
+  await wait(client, "!!document.querySelector('.category-actions') && document.documentElement.dataset.narrow==='false'");
+  const desktop = await client.evaluate("({capture:getComputedStyle(document.getElementById('captureAllImages')).display,kofi:getComputedStyle(document.getElementById('footerKofi')).display,title:getComputedStyle(document.querySelector('.category-heading h2')).fontSize})");
+  assert.notEqual(desktop.capture,'none'); assert.notEqual(desktop.kofi,'none'); assert.equal(desktop.title,'20px');
+  checks.push('escritorio conserva herramientas, captura, título 20px y enlaces del pie');
+  await client.send('Emulation.setDeviceMetricsOverride', {width:360,height:800,deviceScaleFactor:1,mobile:false});
+  await client.evaluate(`(async()=>{const {createRepository}=await import('./src/storage.js');const {createImageStore}=await import('./src/image-store.js');const repo=createRepository(chrome.storage.local,navigator.locks,createImageStore());const snapshot=await repo.load();snapshot.data.workspaces[0].name='YAMILE';snapshot.data.categories[0].accesses=snapshot.data.categories[0].accesses.slice(0,4);await repo.save(snapshot.data,snapshot.revision);await chrome.storage.local.set({'nexb.titlesOnly':true});})()`);
+  await client.send('Page.reload'); await wait(client,"document.querySelectorAll('.card').length===4 && document.documentElement.dataset.titlesOnly==='true'");
   const errors = client.events.filter(event => event.method === 'Runtime.exceptionThrown'); assert.equal(errors.length, 0, JSON.stringify(errors));
-  await client.send('Page.captureScreenshot').then(result => writeFile('/tmp/nexb-211-panel.png', Buffer.from(result.data, 'base64')));
+  await client.send('Page.captureScreenshot').then(result => writeFile('/tmp/nexb-212-panel.png', Buffer.from(result.data, 'base64')));
   console.log(JSON.stringify({ browser: info.Browser, extensionId: id, checks, exceptions: errors.length }, null, 2));
 } finally { for (const client of sockets) client.close(); }

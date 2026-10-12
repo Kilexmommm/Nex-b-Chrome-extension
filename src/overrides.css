@@ -415,3 +415,24 @@ html:not([data-tags-position="above"]) .thumb.has-file-path .card-overlay { padd
 #inventoryDialog .inventory-row-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-width: 0; white-space: normal; overflow: hidden; overflow-wrap: anywhere; line-height: 1.35; }
 #inventoryDialog .dup-group { min-width: 0; overflow: hidden; }
 #inventoryDialog .dup-copy { margin-left: 28px; overflow-wrap: anywhere; }
+
+/* Side Panel compacto: navegación en una fila y herramientas de sección en ⋮. */
+html[data-narrow="true"] .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 6px; margin-bottom: 21px; }
+html[data-narrow="true"] .workspace-row { min-width: 0; width: 100%; margin: 0; padding: 0; gap: 6px; }
+html[data-narrow="true"] .top-actions { order: initial; width: auto; margin: 0; flex-wrap: nowrap; }
+html[data-narrow="true"] #mainMenuToggle { width: 30px; min-width: 30px; min-height: 34px; padding: 5px; }
+html[data-narrow="true"] .workspace-picker { flex: 1 1 0; }
+html[data-narrow="true"] .search-toggle { flex: 0 0 30px; min-height: 34px; padding: 6px; }
+html[data-narrow="true"] .category { margin-top: 15px; margin-bottom: 21px; }
+html[data-narrow="true"] .category-heading { flex-wrap: nowrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+html[data-narrow="true"] .category-heading h2 { font-size: 14px; margin: 0; }
+html[data-narrow="true"] .category-heading .count { font-size: 10px; }
+html[data-narrow="true"] .section-actions-toggle { margin-left: auto; flex: 0 0 28px; padding: 5px; }
+.section-menu[popover] { position: fixed; inset: auto; margin: 0; width: 250px; min-width: 0; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; }
+.section-menu[popover]:not(:popover-open) { display: none; }
+.section-menu button { white-space: normal; }
+html[data-narrow="true"] :is(.cards > .add-card, .add-category-button) { width: 28px; height: 28px; padding: 0; font-size: 19px; }
+html[data-narrow="true"] #captureAllImages { display: none; }
+html[data-narrow="true"] .bottom-actions { margin: 4px 0 14px; }
+html[data-narrow="true"] .signature { margin-top: 20px; padding-top: 8px; }
+html[data-narrow="true"] .signature > :not(.signature-author) { display: none; }
