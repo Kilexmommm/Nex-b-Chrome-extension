@@ -21,7 +21,7 @@ export const LIMITS = Object.freeze({ image: 8 * 1024 * 1024, archive: 64 * 1024
 export const THUMBNAIL_HEIGHTS = Object.freeze({ small: 101, medium: 144, large: 187 });
 export function retainAccessMetadata(access, original) {
     const result = { ...access };
-    for (const key of ['bookmarkId', 'bookmarkFolderId', 'bookmarkMissing', 'driveImageId', 'driveImageHash']) {
+    for (const key of ['bookmarkId', 'bookmarkFolderId', 'bookmarkMissing', 'driveImageId', 'driveImageHash', 'pinned']) {
         if (original && original[key] !== undefined) result[key] = original[key];
     }
     return result;
@@ -218,6 +218,7 @@ export function normalizeData(stored = DEFAULT_DATA) {
                     url: accessUrl(a.url), matchType: enumValue(a.matchType ?? "document", ["document", "exact", "domain"], "Detección"),
                     tags: [...new Set(list(a.tags ?? [], "Tags", 50).map(t => text(t, "Tag", 80)))],
                     thumbnail: imageUrl(a.thumbnail ?? "", true),
+                    ...(a.pinned === true ? { pinned: true } : {}),
                     ...(a.localOnly === true ? { localOnly: true } : {}),
                     ...(bookmarkId && accessBookmarkFolderId ? { bookmarkId, bookmarkFolderId: accessBookmarkFolderId, bookmarkMissing: Boolean(a.bookmarkMissing) } : {}),
                     ...(driveImageId ? { driveImageId } : {}),

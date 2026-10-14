@@ -436,3 +436,14 @@ html[data-narrow="true"] #captureAllImages { display: none; }
 html[data-narrow="true"] .bottom-actions { margin: 4px 0 14px; }
 html[data-narrow="true"] .signature { margin-top: 20px; padding-top: 8px; }
 html[data-narrow="true"] .signature > :not(.signature-author) { display: none; }
+
+/* Cierre uniforme, fijados y selección de ventanas por Workspace. */
+.dialog-form { position: relative; }
+.dialog-form > h2 { padding-right: 36px; }
+.workspace-window-list { max-height: 50vh; overflow-y: auto; }
+.dialog-form .workspace-window-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.dialog-form .workspace-window-row input { flex: 0 0 18px; width: 18px; margin: 0; }
+.card-pin { flex: 0 0 22px; width: 22px; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1.2; }
+.card-pin[aria-pressed="true"] { color: var(--accent-color); }
+.card-pin:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+html[data-narrow="true"] .top-actions > #openInWindows { display: none; }

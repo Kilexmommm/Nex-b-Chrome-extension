@@ -1,4 +1,4 @@
-# nex.b · 2.1.2
+# nex.b · 2.2.0
 
 ![Icono de nex.b](icons/nex-b-128.png)
 
@@ -21,7 +21,7 @@ Chrome 123+ · Manifest V3 · Sin compilación · **By.kilex**
 
 **Solo necesitas Google Chrome 123 o posterior y la carpeta de la extensión.** Desde nex.b 1.7.3 no hace falta instalar Python, ejecutar comandos en Terminal, copiar un ID ni instalar el asistente macOS.
 
-1. Descarga el ZIP de la versión elegida desde [Versiones publicadas](https://github.com/Kilexmommm/Nex-b-Chrome-extension/releases), o usa el ZIP 2.1.2 entregado junto a este código. La preparación local de una versión no implica su publicación.
+1. Descarga el ZIP de la versión elegida desde [Versiones publicadas](https://github.com/Kilexmommm/Nex-b-Chrome-extension/releases), o usa el ZIP 2.2.0 entregado junto a este código. La preparación local de una versión no implica su publicación.
 2. Descomprime el ZIP y guarda la carpeta en una ubicación permanente. Conserva dentro todos sus archivos y subcarpetas.
 3. Escribe `chrome://extensions` en la barra de direcciones de Chrome y activa **Modo de desarrollador**.
 4. Pulsa **Cargar descomprimida** y selecciona la carpeta que contiene `manifest.json`. Selecciona la carpeta principal, no `native-host` ni el ZIP.
@@ -64,6 +64,14 @@ Al instalar nex.b en otro equipo o perfil de Chrome, comprueba de nuevo esta opc
 La [guía de archivos locales](native-host/INSTALAR-MACOS.md) también está actualizada para quienes lleguen desde el antiguo enlace de instalación del asistente.
 
 ## Últimas actualizaciones
+
+### Novedades 2.2.0
+
+- Cierre uniforme de todos los diálogos con × y clic fuera; evita cerrar durante el guardado o una operación del diálogo.
+- Abrir Workspaces elegidos en ventanas separadas y grupos nativos, desde la barra de escritorio o ⋮ del Side Panel.
+- Estrellas para fijar accesos y sección ★ Fijados por Workspace; conserva su ubicación, búsqueda, respaldo y sincronización.
+
+Detalle, actualización y validación: [novedades 2.2.0](docs/NOVEDADES-2.2.0.md).
 
 ### Novedades 2.1.2
 

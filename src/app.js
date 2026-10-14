@@ -1,3 +1,6 @@
+import { bindDialogDismiss } from './dialogs.js';
+import { pinnedAccesses, togglePinned } from './pins.js';
+import { workspaceWindowGroups, openWorkspaceWindows } from './workspace-windows.js';
 import { proposeTabGroups, planGroupActions, groupingSummary } from './grouping.js';
 import { DEFAULT_DATA, THEME_PRESETS, domainOf, normalizeData, normalizeNarrowColumns, validateRules, imageUrl, LIMITS, webUrl, accessUrl, duplicateTabGroups, tabKey, matchOrigin, documentMatchKey, thumbnailHeightForSize, borderColorOverride, filePathLabel, retainAccessMetadata } from './model.js';
 import { createRepository } from './storage.js';
@@ -28,6 +31,7 @@ const syncStore = createSyncStore(chrome.storage.sync);
 const syncController = createSyncController({ repository, store: syncStore, area: chrome.storage.local, locks: navigator.locks });
 let data = normalizeData(DEFAULT_DATA), revision = 0;
 let viewMode = 'workspace', pastedImage = '', pasteGeneration = 0, imageBusy = false;
+let windowsBusy = false;
 let saving = false, reloadPending = false, ready = false, pendingKey = '';
 let openIndex = { exact: new Set(), domain: new Set(), document: new Set() };
 let cardStatuses = [], tagCache = new Map();
@@ -510,6 +514,7 @@ function render() {
   else {
     const categories = currentCategories();
     const visible = category => category.accesses.filter(matchesSearch);
+    renderPinned();
     let shown = 0;
     for (const category of categories.filter(c => !c.parentId)) {
       const children = categories.filter(c => c.parentId === category.id).map(child => [child, visible(child)]);
@@ -587,6 +592,23 @@ function renderTagView() {
   }
   appendGroups();
 }
+function renderPinned() {
+  const items = pinnedAccesses(data, currentWorkspace().id).filter(({ access }) => matchesSearch(access));
+  if (!items.length) return;
+  const section = node('section', 'category pinned-section');
+  const heading = node('div', 'category-heading');
+  heading.append(node('h2', '', '★ Fijados'), accessCount(items.length));
+  const cards = node('div', 'cards');
+  let shown = 0;
+  const more = button('Mostrar más', 'Mostrar otros 40 fijados', appendPage, 'button secondary');
+  function appendPage() {
+    more.remove();
+    items.slice(shown, shown + 40).forEach(({ access, categoryId }) => cards.append(makeCard(access, categoryId, true)));
+    shown += 40;
+    if (shown < items.length) cards.append(more);
+  }
+  appendPage(); section.append(heading, cards); $('workspace').append(section);
+}
 function sectionActionsMenu(actions, category) {
   const menu = node('div', 'main-menu section-menu');
   menu.id = 'section-menu-' + category.id;
@@ -656,12 +678,12 @@ function renderCategory(category, subcategory, accesses = category.accesses) {
   section.append(heading, cards);
   $('workspace').append(section);
 }
-function makeCard(access, categoryId) {
+function makeCard(access, categoryId, inPinned = false) {
   const card = node('article', 'card');
   const open = button('', 'Abrir o enfocar: ' + access.title, () => openAccess(access), 'card-open');
   const thumb = node('div', 'thumb');
   thumb.title = access.url;
-  thumb.draggable = viewMode === 'workspace';
+  thumb.draggable = viewMode === 'workspace' && !inPinned;
   if (access.thumbnail) {
     thumb.classList.add('has-thumbnail');
     const img = node('img', 'thumbnail-image'); imageView.set(img, access.thumbnail); img.alt = ''; img.title = access.url;
@@ -701,29 +723,32 @@ function makeCard(access, categoryId) {
     await refreshDuplicates(tabKey(access.url));
   }, 'card-duplicates');
   duplicateBadge.hidden = true;
+  const pin = button(access.pinned ? '★' : '☆', access.pinned ? 'Desfijar ' + access.title : 'Fijar ' + access.title, () => commit(togglePinned(data, access.id)), 'card-pin');
+  pin.setAttribute('aria-pressed', String(access.pinned === true));
   footer.append(status, title);
+  footer.append(pin);
   footer.append(duplicateBadge);
   open.append(thumb);
   cardStatuses.push({ access, status, duplicateBadge });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
   card.append(open, footer, edit);
   thumb.ondragstart = event => {
-    if (viewMode !== 'workspace') return;
+    if (viewMode !== 'workspace' || inPinned) { event.preventDefault(); return; }
     draggedAccess = { categoryId, accessId: access.id };
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', access.id);
     card.classList.add('dragging');
   };
-  thumb.onpointerdown = () => { if (viewMode === 'workspace') card.classList.add('holding-thumbnail'); };
+  thumb.onpointerdown = () => { if (viewMode === 'workspace' && !inPinned) card.classList.add('holding-thumbnail'); };
   thumb.onpointerup = thumb.onpointercancel = () => card.classList.remove('holding-thumbnail');
   thumb.ondragend = () => { draggedAccess = null; document.querySelectorAll('.card.drag-over, .card.dragging, .card.holding-thumbnail').forEach(item => item.classList.remove('drag-over', 'dragging', 'holding-thumbnail')); };
   card.ondragover = event => {
-    if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
+    if (inPinned || !draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
     event.preventDefault(); event.dataTransfer.dropEffect = 'move'; card.classList.add('drag-over');
   };
   card.ondragleave = () => card.classList.remove('drag-over');
   card.ondrop = event => {
-    if (!draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
+    if (inPinned || !draggedAccess || draggedAccess.categoryId !== categoryId || draggedAccess.accessId === access.id) return;
     event.preventDefault();
     const after = event.clientX > card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2;
     run(() => moveAccessToPosition(categoryId, draggedAccess.accessId, access.id, after));
@@ -1351,16 +1376,13 @@ document.querySelectorAll('dialog').forEach(dialog => {
   const feedback = node('p', 'feedback'); feedback.hidden = true; feedback.setAttribute('role', 'status');
   dialog.querySelector('h2').after(feedback);
   dialog.setAttribute('aria-label', dialog.querySelector('h2').textContent);
-  dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  bindDialogDismiss(dialog, () => ({ saving, recaptureBusy, bookmarkBusy, imageBusy, windowsBusy }), dialog.id === 'updateDialog' ? () => run(snoozeUpdate) : undefined);
   dialog.addEventListener('close', () => {
     if (dialog.id === 'inventoryDialog') { imageView.clear($('inventoryList')); $('inventoryList').replaceChildren(); $('inventoryDupList').replaceChildren(); $('inventoryGroupList').replaceChildren(); }
     if (dialog.id === 'accessDialog') { pasteGeneration++; imageBusy = false; pastedImage = ''; showPreview(); run(clearPending); }
     if (reloadPending) run(reload);
     if (syncEnabled) scheduleSync();
   });
-});
-document.querySelectorAll('[data-cancel]').forEach(b => {
-  b.onclick = () => { if (!saving) b.closest('dialog').close(); };
 });
 document.addEventListener('click', event => {
   hideCardMenu();
@@ -1370,6 +1392,33 @@ document.addEventListener('click', event => {
   }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideCardMenu(); closeMainMenu(true); } });
+onClick('openInWindows', () => {
+  const list = $('windowsList'); list.replaceChildren();
+  for (const group of workspaceWindowGroups(data)) {
+    const row = node('label', 'workspace-window-row');
+    const checkbox = node('input'); checkbox.type = 'checkbox';
+    checkbox.dataset.workspaceId = group.id; checkbox.checked = group.count > 0; checkbox.disabled = group.count === 0;
+    row.append(checkbox, node('span', '', group.name + ' · ' + group.count + ' accesos'));
+    list.append(row);
+  }
+  $('openWindowsSubmit').disabled = !list.querySelector('input:checked');
+  openDialog('windowsDialog');
+});
+$('windowsList').onchange = () => { $('openWindowsSubmit').disabled = !$('windowsList').querySelector('input:checked'); };
+onClick('openWindowsSubmit', async () => {
+  if (windowsBusy) return;
+  const selected = [...$('windowsList').querySelectorAll('input:checked')].map(input => input.dataset.workspaceId);
+  if (!selected.length) return;
+  windowsBusy = true;
+  $('windowsList').querySelectorAll('input').forEach(input => input.disabled = true);
+  try {
+    const results = await openWorkspaceWindows(data, selected, chrome, navigator.locks);
+    const messages = results.map(result => result.name + ': ' + result.opened + ' enlaces abiertos' + (result.failed ? ', ' + result.failed + ' omitidos o fallidos' : '') + (result.opened && (!result.grouped || !result.titled) ? ', grupo o título incompleto' : ''));
+    const failed = results.some(result => result.failed || (result.opened && (!result.grouped || !result.titled)));
+    $('windowsDialog').close();
+    scheduleTabRefresh(); showMessage(messages.join('. ') || 'No hay enlaces compatibles.', failed);
+  } finally { windowsBusy = false; }
+});
 onClick('mainMenuToggle', () => {
   const menu = $('mainMenu');
   const open = menu.hidden;
@@ -1377,7 +1426,7 @@ onClick('mainMenuToggle', () => {
   $('mainMenuToggle').setAttribute('aria-expanded', String(open));
   if (open) menu.querySelector('button')?.focus();
 });
-const MAIN_MENU_TARGETS = { edit: 'editWorkspace', new: 'newWorkspace', thumbnail: 'thumbnailSizeToggle', inventory: 'openInventory', settings: 'openSettings', tags: 'tagRules' };
+const MAIN_MENU_TARGETS = { edit: 'editWorkspace', new: 'newWorkspace', thumbnail: 'thumbnailSizeToggle', inventory: 'openInventory', settings: 'openSettings', tags: 'tagRules', windows: 'openInWindows' };
 document.querySelectorAll('[data-main-action]').forEach(item => {
   item.onclick = () => run(async () => {
     const action = item.dataset.mainAction;
@@ -1754,12 +1803,14 @@ async function updateSyncAccount() {
 function askFirstSync() {
   const dialog = $('syncChoiceDialog');
   return new Promise(resolve => {
-    const cancel = () => choose(null);
-    const choose = value => { dialog.removeEventListener('cancel', cancel); dialog.close(); resolve(value); };
+    const cancel = event => { if (!event.defaultPrevented) choose(null); };
+    const closed = () => choose(null);
+    const choose = value => { dialog.removeEventListener('cancel', cancel); dialog.removeEventListener('close', closed); dialog.close(); resolve(value); };
     $('syncChoiceLocal').onclick = () => choose('local');
     $('syncChoiceCloud').onclick = () => choose('cloud');
     $('syncChoiceMerge').onclick = () => choose('merge');
-    dialog.addEventListener('cancel', cancel, { once: true });
+    dialog.addEventListener('cancel', cancel);
+    dialog.addEventListener('close', closed, { once: true });
     dialog.showModal();
   });
 }
