@@ -1,4 +1,5 @@
 import { bindDialogDismiss } from './dialogs.js';
+import { setIcon } from './icons.js';
 import { pinnedAccesses, togglePinned } from './pins.js';
 import { workspaceWindowGroups, openWorkspaceWindows } from './workspace-windows.js';
 import { proposeTabGroups, planGroupActions, groupingSummary } from './grouping.js';
@@ -119,6 +120,10 @@ function button(text, label, action, className = 'button secondary') {
   element.title = label;
   element.setAttribute('aria-label', label);
   element.onclick = () => run(action);
+  if (text.startsWith('icon:')) {
+    const [name, state] = text.slice(5).split(':');
+    setIcon(element, name, state === 'filled');
+  }
   return element;
 }
 function showMessage(message, error = false) {
@@ -618,7 +623,7 @@ function sectionActionsMenu(actions, category) {
     control.textContent = control.getAttribute('aria-label');
     menu.append(control);
   }
-  const toggle = button('⋮', 'Acciones de ' + category.name, () => {
+  const toggle = button('icon:more', 'Acciones de ' + category.name, () => {
     if (menu.matches(':popover-open')) { menu.hidePopover(); return; }
     menu.showPopover();
     const bounds = toggle.getBoundingClientRect();
@@ -640,21 +645,21 @@ function renderCategory(category, subcategory, accesses = category.accesses) {
   const section = node('section', 'category' + (subcategory ? ' subcategory' : ''));
   const heading = node('div', 'category-heading');
   const actions = node('div', 'category-actions');
-  actions.append(button('+', 'Nuevo acceso', () => openAccessDialog(category.id), 'button quiet category-icon'),
-    button('⧉', 'Abrir todas las ventanas de esta sección', () => openCategoryAccesses(category), 'button quiet category-icon'),
-    button('⊞', 'Abrir esta sección en una ventana nueva con grupo', () => openCategoryInNewWindow(category), 'button quiet category-icon'),
-    button('✎', 'Editar categoría', () => renameCategory(category), 'button quiet category-icon'),
-    button('⇥', 'Mover sección a otro Workspace', () => openMoveSectionDialog(category), 'button quiet category-icon'));
-  if (category.bookmarkFolderId) actions.append(button('↻', 'Sincronizar sección con Favoritos de Chrome', () => syncCategoryBookmarks(category), 'button quiet category-icon'));
+  actions.append(button('icon:plus', 'Nuevo acceso', () => openAccessDialog(category.id), 'button quiet category-icon'),
+    button('icon:external', 'Abrir todas las ventanas de esta sección', () => openCategoryAccesses(category), 'button quiet category-icon'),
+    button('icon:windows', 'Abrir esta sección en una ventana nueva con grupo', () => openCategoryInNewWindow(category), 'button quiet category-icon'),
+    button('icon:edit', 'Editar categoría', () => renameCategory(category), 'button quiet category-icon'),
+    button('icon:move', 'Mover sección a otro Workspace', () => openMoveSectionDialog(category), 'button quiet category-icon'));
+  if (category.bookmarkFolderId) actions.append(button('icon:sync', 'Sincronizar sección con Favoritos de Chrome', () => syncCategoryBookmarks(category), 'button quiet category-icon'));
   const siblings = sectionSiblings(data, category);
   const position = siblings.findIndex(c => c.id === category.id);
-  for (const [label, title, direction] of [['↑', 'Subir sección', -1], ['↓', 'Bajar sección', 1]]) {
+  for (const [label, title, direction] of [['icon:up', 'Subir sección', -1], ['icon:down', 'Bajar sección', 1]]) {
     const control = button(label, title, () => commit(reorderSection(data, category.id, direction)), 'button quiet category-icon');
     control.disabled = position + direction < 0 || position + direction >= siblings.length;
     actions.append(control);
   }
   const collapsed = collapsedSections.has(category.id);
-  const collapseToggle = button(collapsed ? '▸' : '▾', (collapsed ? 'Expandir' : 'Contraer') + ' sección ' + category.name, () => setSectionCollapsed(category.id, !collapsedSections.has(category.id)), 'button quiet category-icon category-collapse');
+  const collapseToggle = button(collapsed ? 'icon:chevronRight' : 'icon:chevronDown', (collapsed ? 'Expandir' : 'Contraer') + ' sección ' + category.name, () => setSectionCollapsed(category.id, !collapsedSections.has(category.id)), 'button quiet category-icon category-collapse');
   collapseToggle.setAttribute('aria-expanded', String(!collapsed));
   heading.append(collapseToggle, node('h2', '', category.name), accessCount(accesses.length));
   if (narrowMedia.matches) {
@@ -723,14 +728,14 @@ function makeCard(access, categoryId, inPinned = false) {
     await refreshDuplicates(tabKey(access.url));
   }, 'card-duplicates');
   duplicateBadge.hidden = true;
-  const pin = button(access.pinned ? '★' : '☆', access.pinned ? 'Desfijar ' + access.title : 'Fijar ' + access.title, () => commit(togglePinned(data, access.id)), 'card-pin');
+  const pin = button(access.pinned ? 'icon:star:filled' : 'icon:star', access.pinned ? 'Desfijar ' + access.title : 'Fijar ' + access.title, () => commit(togglePinned(data, access.id)), 'card-pin');
   pin.setAttribute('aria-pressed', String(access.pinned === true));
   footer.append(status, title);
   footer.append(pin);
   footer.append(duplicateBadge);
   open.append(thumb);
   cardStatuses.push({ access, status, duplicateBadge });
-  const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
+  const edit = button('icon:edit', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
   card.append(open, footer, edit);
   thumb.ondragstart = event => {
     if (viewMode !== 'workspace' || inPinned) { event.preventDefault(); return; }

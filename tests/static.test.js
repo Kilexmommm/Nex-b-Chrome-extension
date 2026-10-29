@@ -73,7 +73,7 @@ test('el indicador abierto y la reutilización comparten la misma identidad de d
 test('cada sección ofrece abrir todas sus ventanas sin duplicar', () => {
   const app = read('src/app.js'), tabs = read('src/tabs.js');
   assert.match(app, /openOrFocusMany\(category\.accesses, chrome, navigator\.locks\)/);
-  assert.match(app, /button\('⧉', 'Abrir todas las ventanas de esta sección'/);
+  assert.match(app, /button\('icon:external', 'Abrir todas las ventanas de esta sección'/);
   assert.match(app, /openCategoryAccesses/);
   assert.match(tabs, /export async function openOrFocusMany/);
 });
@@ -180,9 +180,9 @@ test('el encabezado ocupa el ancho disponible y ordena sus acciones con un icono
   assert.ok(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1])));
   assert.ok(actions.indexOf('id="thumbnailSizeMenu"') > actions.indexOf('id="thumbnailSizeToggle"'));
   assert.doesNotMatch(actions, /id="openInventory"[^>]*>☰/);
-  assert.match(actions, /id="openInventory"[^>]*>[\s\S]*class="inventory-icon"/);
+  assert.match(actions, /id="openInventory"[^>]*>[\s\S]*class="ui-icon"/);
   assert.match(css, /\.shell \{[^}]*width:100%/);
-  assert.match(css, /\.inventory-icon \{[^}]*width:20px/);
+  assert.match(readFileSync(new URL('../src/overrides.css', import.meta.url), 'utf8'), /\.ui-icon \{[^}]*width: 16px/);
 });
 test('miniaturas se pueden ordenar al arrastrar dentro de su sección', () => {
   const app = read('src/app.js'), css = read('src/overrides.css');

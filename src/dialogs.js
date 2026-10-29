@@ -9,7 +9,7 @@ export function bindDialogDismiss(dialog, state, onDismiss = () => dialog.close(
   let close = dialog.querySelector('.dialog-close');
   if (!close) {
     close = dialog.ownerDocument.createElement('button');
-    close.type = 'button'; close.className = 'dialog-close'; close.textContent = '×';
+    close.type = 'button'; close.className = 'dialog-close'; close.innerHTML = '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
     close.setAttribute('data-cancel', '');
     close.setAttribute('aria-label', 'Cerrar ' + dialog.querySelector('h2').textContent);
     form.prepend(close);

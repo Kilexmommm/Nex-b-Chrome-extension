@@ -1,0 +1,21 @@
+{
+  "name": "nexb-video-tour",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:en": "remotion render src/index.ts Tour-EN out/nexb-tour-en.mp4",
+    "render:es": "remotion render src/index.ts Tour-ES out/nexb-tour-es.mp4",
+    "render": "npm run render:en && npm run render:es"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.250",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.250"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.3",
+    "typescript": "5.5.4"
+  }
+}
