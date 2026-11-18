@@ -282,8 +282,11 @@ test('paletas de miniaturas y bordes coordinadas; editar discreto y accesible', 
     assert.match(palette, /--tile-border:/);
     assert.match(palette, /--tile-ink:/);
   }
-  assert.match(css, /\.card-edit \{[^}]*opacity: \.65/);
+  assert.match(css, /\.card-edit \{[^}]*opacity: 0/);
+  assert.match(css, /\.card-edit \{[^}]*pointer-events: none/);
   assert.match(css, /\.card:focus-within \.card-edit \{ opacity: 1/);
+  assert.match(css, /\.card:hover \.card-edit[^{]*\{[^}]*pointer-events: auto/);
+  assert.match(css, /@media \(hover: none\) \{ \.card-edit \{ opacity: \.9; pointer-events: auto; \} \}/);
   assert.match(css, /@media \(hover: none\)/);
   assert.match(css, /\.thumb:not\(\.has-thumbnail\) \.card-overlay \{ background: none/);
   assert.match(app, /thumb.classList.add\('has-thumbnail'\)/);

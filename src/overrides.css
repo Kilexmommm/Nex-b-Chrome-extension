@@ -31,12 +31,12 @@ body { min-height: 100vh; }
 .card-open { display: block; width: 100%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; }
 .thumbnail-image { display: block; width: 100%; height: 100%; object-fit: cover; min-height: 0; }
 .image-error { position: absolute; top: 38%; }
-.card-edit { position: absolute; right: 8px; top: 9px; border: 1px solid #ffffff30; border-radius: 5px; background: #10182066; color: #fff; padding: 4px 7px; cursor: pointer; opacity: .65; backdrop-filter: blur(4px); transition: opacity .15s, background .15s; }
+.card-edit { position: absolute; right: 8px; top: 9px; border: 1px solid #ffffff30; border-radius: 5px; background: #10182066; color: #fff; padding: 4px 7px; cursor: pointer; opacity: 0; pointer-events: none; backdrop-filter: blur(4px); transition: opacity .15s, background .15s; }
 .light-theme .card-edit { background: #fffaf080; border-color: #514a3e30; color: #302d28; }
-.card:hover .card-edit, .card:focus-within .card-edit { opacity: 1; }
+.card:hover .card-edit, .card:focus-within .card-edit { opacity: 1; pointer-events: auto; }
 .card-edit:hover, .card-edit:focus-visible { background: #101820cc; color: #fff; }
 .light-theme .card-edit:hover, .light-theme .card-edit:focus-visible { background: #fffaf0e6; color: #302d28; }
-@media (hover: none) { .card-edit { opacity: .9; } }
+@media (hover: none) { .card-edit { opacity: .9; pointer-events: auto; } }
 @media (prefers-reduced-motion: reduce) { .card-edit { transition: none; } }
 .status { pointer-events: none; }
 .card-footer { display: flex; align-items: flex-start; gap: 9px; padding: 10px 2px; background: transparent; color: #eef2ff; }
