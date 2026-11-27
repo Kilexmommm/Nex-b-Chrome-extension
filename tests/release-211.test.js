@@ -83,9 +83,9 @@ test('sombra, colores y borde persisten tras guardar y volver a cargar y en un r
   assert.equal(normalizeData().settings.thumbnailShadow, true);
 });
 function preferences(area) {
-  const pressed = {}, context = vm.createContext({ chrome: { storage: { local: area } }, document: { documentElement: { dataset: {} }, querySelectorAll: () => [{ setAttribute: (name, value) => { pressed[name] = value; } }] }, render: () => {} });
+  const pressed = {}, context = vm.createContext({ chrome: { storage: { local: area } }, document: { documentElement: { dataset: {} }, querySelectorAll: selector => selector.includes('titlesOnly') ? [{ setAttribute: (name, value) => { pressed[name] = value; } }] : [] }, render: () => {} });
   const source = app.slice(app.indexOf('async function restoreCollapsedSections()'), app.indexOf('function closeMainMenu('));
-  vm.runInContext('let collapsedSections = new Set(); let titlesOnly = false;\n' + source, context);
+  vm.runInContext('let collapsedSections = new Set(); let titlesOnly = false, compactView = false;\n' + source, context);
   return { context, pressed, run: source => vm.runInContext(source, context) };
 }
 test('solo títulos y secciones plegadas se recuperan al reabrir y permanecen fuera de la biblioteca sincronizada', async () => {
@@ -116,4 +116,25 @@ test('inventario limita el título conservando el nombre completo para buscar y 
   assert.equal(shorten('x'.repeat(50)), 'x'.repeat(29) + '…');
   assert.equal(shorten(''), 'Pestaña sin título');
   assert.equal(shorten('😀'.repeat(40)), '😀'.repeat(29) + '…');
+});
+
+test('vista compacta persiste localmente y alterna con miniaturas y Solo títulos sin tocar biblioteca', async () => {
+  const area = memoryArea(), first = preferences(area);
+  await first.run("setAccessView('compact')");
+  assert.equal(first.context.document.documentElement.dataset.accessView, 'compact');
+  assert.equal(first.context.document.documentElement.dataset.titlesOnly, 'false');
+  const reopened=preferences(area);await reopened.run('restoreTitlesOnly()');
+  assert.equal(reopened.context.document.documentElement.dataset.accessView,'compact');
+  await reopened.run('setTitlesOnly(true)');
+  assert.equal(reopened.context.document.documentElement.dataset.accessView,'titles');
+  await reopened.run("setAccessView('cards')");
+  assert.equal(reopened.context.document.documentElement.dataset.accessView,'cards');
+  const stored=await area.get(null);
+  assert.deepEqual(Object.keys(stored).sort(),['nexb.accessView','nexb.titlesOnly']);
+});
+test('vista inválida recupera preferencia anterior y un fallo de disco conserva la vista activa', async () => {
+  const area=memoryArea({'nexb.accessView':'invalid','nexb.titlesOnly':true}),session=preferences(area);
+  await session.run('restoreTitlesOnly()');assert.equal(session.context.document.documentElement.dataset.accessView,'titles');
+  area.fail=true;await assert.rejects(session.run("setAccessView('compact')"),/Disk failure/);
+  assert.equal(session.context.document.documentElement.dataset.accessView,'titles');
 });
