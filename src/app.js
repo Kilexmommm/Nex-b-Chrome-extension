@@ -40,7 +40,7 @@ let duplicateCounts = new Map();
 let draggedAccess = null, draggedWorkspaceId = '';
 let localThumbnailPreference = null;
 let collapsedSections = new Set();
-let titlesOnly = false;
+let titlesOnly = false, compactView = false;
 let narrowColumns = 1;
 const narrowMedia = window.matchMedia('(max-width: 600px)');
 let syncEnabled = false, syncBusy = false, syncTimer = null, syncDirty = false, syncLastRevision = '';
@@ -186,18 +186,35 @@ async function setSectionCollapsed(id, collapsed) {
   render();
 }
 function applyTitlesOnly() {
+  const mode = titlesOnly ? 'titles' : compactView ? 'compact' : 'cards';
   document.documentElement.dataset.titlesOnly = String(titlesOnly);
-  document.querySelectorAll('[data-main-action="titlesOnly"]').forEach(item => item.setAttribute('aria-pressed', String(titlesOnly)));
+  document.documentElement.dataset.accessView = mode;
+  for (const [action, selected] of [['cards', mode === 'cards'], ['compact', compactView], ['titlesOnly', titlesOnly]]) {
+    document.querySelectorAll('[data-main-action="' + action + '"]').forEach(item => item.setAttribute('aria-pressed', String(selected)));
+  }
+  const toggle = document.getElementById?.('accessViewToggle');
+  if (toggle) {
+    const labels = { cards: 'Miniaturas', compact: 'Compacta', titles: 'Solo títulos' };
+    const next = mode === 'cards' ? 'compact' : mode === 'compact' ? 'titles' : 'cards';
+    toggle.textContent = mode === 'cards' ? '▦' : mode === 'compact' ? '☷' : '☰';
+    toggle.title = 'Vista: ' + labels[mode] + '. Cambiar a ' + labels[next];
+    toggle.setAttribute('aria-label', toggle.title);
+  }
 }
 async function restoreTitlesOnly() {
-  const stored = await chrome.storage.local.get('nexb.titlesOnly');
-  titlesOnly = stored['nexb.titlesOnly'] === true;
+  const stored = await chrome.storage.local.get(['nexb.titlesOnly', 'nexb.accessView']);
+  const mode = ['cards', 'compact', 'titles'].includes(stored['nexb.accessView']) ? stored['nexb.accessView'] : stored['nexb.titlesOnly'] === true ? 'titles' : 'cards';
+  titlesOnly = mode === 'titles'; compactView = mode === 'compact';
+  applyTitlesOnly();
+}
+async function setAccessView(mode) {
+  if (!['cards', 'compact', 'titles'].includes(mode)) return;
+  await chrome.storage.local.set({ 'nexb.accessView': mode, 'nexb.titlesOnly': mode === 'titles' });
+  titlesOnly = mode === 'titles'; compactView = mode === 'compact';
   applyTitlesOnly();
 }
 async function setTitlesOnly(value) {
-  titlesOnly = value === true;
-  await chrome.storage.local.set({ 'nexb.titlesOnly': titlesOnly });
-  applyTitlesOnly();
+  await setAccessView(value === true ? 'titles' : 'cards');
 }
 function closeMainMenu(restoreFocus = false) {
   const menu = $('mainMenu');
@@ -683,6 +700,7 @@ function makeCard(access, categoryId, inPinned = false) {
   const open = button('', 'Abrir o enfocar: ' + access.title, () => openAccess(access), 'card-open');
   const thumb = node('div', 'thumb');
   thumb.title = access.url;
+  thumb.append(node('span', 'compact-initial', Array.from(access.title.trim())[0]?.toUpperCase() || '↗'));
   thumb.draggable = viewMode === 'workspace' && !inPinned;
   if (access.thumbnail) {
     thumb.classList.add('has-thumbnail');
@@ -731,7 +749,14 @@ function makeCard(access, categoryId, inPinned = false) {
   open.append(thumb);
   cardStatuses.push({ access, status, duplicateBadge });
   const edit = button('✎', 'Editar ' + access.title, () => openAccessDialog(categoryId, access), 'card-edit');
-  card.append(open, footer, edit);
+  const summary = node('div', 'card-summary');
+  const compactTags = node('div', 'tags compact-tags');
+  compactTags.append(...[...overlay.querySelectorAll('.tag')].map(tag => tag.cloneNode(true)));
+  compactTags.hidden = compactTags.childElementCount === 0;
+  const location = node('span', 'compact-location', access.url.startsWith('file:') ? filePathLabel(access.url) : new URL(access.url).host + new URL(access.url).pathname.replace(/\/$/, ''));
+  location.title = access.url;
+  summary.append(compactTags, location);
+  card.append(open, footer, summary, edit);
   thumb.ondragstart = event => {
     if (viewMode !== 'workspace' || inPinned) { event.preventDefault(); return; }
     draggedAccess = { categoryId, accessId: access.id };
@@ -1419,6 +1444,7 @@ onClick('openWindowsSubmit', async () => {
     scheduleTabRefresh(); showMessage(messages.join('. ') || 'No hay enlaces compatibles.', failed);
   } finally { windowsBusy = false; }
 });
+onClick('accessViewToggle', () => setAccessView(titlesOnly ? 'cards' : compactView ? 'titles' : 'compact'));
 onClick('mainMenuToggle', () => {
   const menu = $('mainMenu');
   const open = menu.hidden;
@@ -1431,6 +1457,7 @@ document.querySelectorAll('[data-main-action]').forEach(item => {
   item.onclick = () => run(async () => {
     const action = item.dataset.mainAction;
     closeMainMenu();
+    if (action === 'cards' || action === 'compact') { await setAccessView(action); return; }
     if (action === 'titlesOnly') { await setTitlesOnly(!titlesOnly); return; }
     if (action === 'sync') {
       $('openSettings').click();

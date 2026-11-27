@@ -447,3 +447,21 @@ html[data-narrow="true"] .signature > :not(.signature-author) { display: none; }
 .card-pin[aria-pressed="true"] { color: var(--accent-color); }
 .card-pin:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 html[data-narrow="true"] .top-actions > #openInWindows { display: none; }
+
+/* Vista adicional: miniatura pequeña, título, etiquetas y dirección legible. */
+.card-summary, .compact-initial { display: none; }
+html[data-access-view="compact"] .cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 8px; }
+html[data-access-view="compact"] .card { display: grid; grid-template-columns: 72px minmax(0, 1fr) 24px; grid-template-rows: auto 1fr; gap: 4px 10px; align-items: start; padding: 8px; border-radius: 8px; background: color-mix(in srgb, currentColor 4%, transparent); }
+html[data-access-view="compact"] .card .card-open { display: block; grid-column: 1; grid-row: 1 / 3; min-width: 0; width: 72px; align-self: start; }
+html[data-access-view="compact"] .card .thumb { width: 72px; height: 58px; aspect-ratio: auto; }
+html[data-access-view="compact"] .thumb :is(.card-overlay, .file-path) { display: none; }
+html[data-access-view="compact"] .thumb:not(.has-thumbnail) .compact-initial { display: grid; place-items: center; position: absolute; inset: 0; font-size: 22px; opacity: .6; }
+html[data-access-view="compact"] .card > .card-footer { grid-column: 2 / 4; grid-row: 1; order: 0; min-width: 0; gap: 6px; padding: 0 29px 0 0; }
+html[data-access-view="compact"] .card-footer .card-title { font-size: 13px; font-weight: 500; -webkit-line-clamp: 2; max-height: 2.8em; color: inherit; }
+html[data-access-view="compact"] .card-footer .status { margin-top: calc((13px * 1.4 - 9px) / 2); }
+html[data-access-view="compact"] .card > .card-summary { display: flex; flex-direction: column; grid-column: 2 / 4; grid-row: 2; min-width: 0; gap: 4px; }
+html[data-access-view="compact"] .compact-tags { justify-content: flex-start; flex-wrap: wrap; margin: 0; gap: 3px; max-height: 40px; overflow: hidden; }
+html[data-access-view="compact"] .compact-tags .tag { max-width: 100%; font-size: 10px; padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-access-view="compact"] .compact-location { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; opacity: .65; }
+html[data-access-view="compact"] .card .card-edit { grid-column: 3; grid-row: 1; position: static; justify-self: end; align-self: start; padding: 2px 5px; font-size: 12px; }
+html[data-narrow="true"] .top-actions > #accessViewToggle { display: none; }
