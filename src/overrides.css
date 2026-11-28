@@ -31,12 +31,12 @@ body { min-height: 100vh; }
 .card-open { display: block; width: 100%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; }
 .thumbnail-image { display: block; width: 100%; height: 100%; object-fit: cover; min-height: 0; }
 .image-error { position: absolute; top: 38%; }
-.card-edit { position: absolute; right: 8px; top: 9px; border: 1px solid #ffffff30; border-radius: 5px; background: #10182066; color: #fff; padding: 4px 7px; cursor: pointer; opacity: .65; backdrop-filter: blur(4px); transition: opacity .15s, background .15s; }
+.card-edit { position: absolute; right: 8px; top: 9px; border: 1px solid #ffffff30; border-radius: 5px; background: #10182066; color: #fff; padding: 4px 7px; cursor: pointer; opacity: 0; pointer-events: none; backdrop-filter: blur(4px); transition: opacity .15s, background .15s; }
 .light-theme .card-edit { background: #fffaf080; border-color: #514a3e30; color: #302d28; }
-.card:hover .card-edit, .card:focus-within .card-edit { opacity: 1; }
+.card:hover .card-edit, .card:focus-within .card-edit { opacity: 1; pointer-events: auto; }
 .card-edit:hover, .card-edit:focus-visible { background: #101820cc; color: #fff; }
 .light-theme .card-edit:hover, .light-theme .card-edit:focus-visible { background: #fffaf0e6; color: #302d28; }
-@media (hover: none) { .card-edit { opacity: .9; } }
+@media (hover: none) { .card-edit { opacity: .9; pointer-events: auto; } }
 @media (prefers-reduced-motion: reduce) { .card-edit { transition: none; } }
 .status { pointer-events: none; }
 .card-footer { display: flex; align-items: flex-start; gap: 9px; padding: 10px 2px; background: transparent; color: #eef2ff; }
@@ -447,3 +447,29 @@ html[data-narrow="true"] .signature > :not(.signature-author) { display: none; }
 .card-pin[aria-pressed="true"] { color: var(--accent-color); }
 .card-pin:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 html[data-narrow="true"] .top-actions > #openInWindows { display: none; }
+
+/* Iconos SVG: tamaño uniforme que hereda el color del texto */
+.ui-icon { width: 16px; height: 16px; display: block; margin: auto; flex: none; }
+.icon-button .ui-icon { width: 18px; height: 18px; }
+.category-icon .ui-icon { width: 15px; height: 15px; }
+.card-edit .ui-icon { width: 14px; height: 14px; }
+.card-pin .ui-icon { width: 17px; height: 17px; }
+.card-menu .menu-icon .ui-icon, .main-menu .menu-icon .ui-icon { width: 16px; height: 16px; }
+.dialog-close { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+.dialog-close .ui-icon { width: 18px; height: 18px; }
+
+/* Acciones de sección: ocultas hasta pasar el puntero (o enfocar con teclado) */
+@media (hover: hover) {
+  .category-heading > .category-actions { opacity: 0; transition: opacity .15s; }
+  .category-heading:hover > .category-actions,
+  .category-heading:focus-within > .category-actions { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .category-heading > .category-actions { transition: none; } }
+
+/* Lápiz de la tarjeta: solo el icono, sin fondo ni borde */
+.card-edit, .light-theme .card-edit,
+[data-icon-style="filled"] .card-edit { background: transparent; border-color: transparent; backdrop-filter: none; box-shadow: none; }
+.card-edit:hover, .card-edit:focus-visible,
+.light-theme .card-edit:hover, .light-theme .card-edit:focus-visible { background: transparent; border-color: transparent; opacity: 1; }
+.card-edit .ui-icon { filter: drop-shadow(0 1px 2px #000a); }
+.light-theme .card-edit .ui-icon { filter: drop-shadow(0 1px 2px #fffc); }

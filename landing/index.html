@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title data-en="nex.b — your new tab, organized by project">nex.b — tu nueva pestaña, organizada por proyectos</title>
+<meta name="description" content="nex.b es una extensión de Chrome que convierte la nueva pestaña en un panel visual de Workspaces, accesos con miniatura, tags y reutilización de pestañas." data-en="nex.b is a Chrome extension that turns the new tab into a visual dashboard of Workspaces, thumbnail shortcuts, tags and tab reuse.">
+<link rel="icon" href="img/icon-128.png">
+<style>
+:root{--bg:#f6f6f5;--surface:#fff;--surface2:#ededeb;--text:#1f1f1f;--muted:#5f5f5c;--line:#dcdcd8;--accent:#fc730c;--accent-ink:#1a0b00;--shadow:0 18px 50px rgba(0,0,0,.14)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1b1b1b;--surface:#242424;--surface2:#2e2e2e;--text:#f1f1ef;--muted:#a7a7a2;--line:#3a3a3a;--shadow:0 18px 50px rgba(0,0,0,.5)}}
+:root[data-theme=dark]{--bg:#1b1b1b;--surface:#242424;--surface2:#2e2e2e;--text:#f1f1ef;--muted:#a7a7a2;--line:#3a3a3a;--shadow:0 18px 50px rgba(0,0,0,.5)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+img{max-width:100%;height:auto;display:block}a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+header.top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:16px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;text-decoration:none}
+.brand img{width:30px;height:30px;border-radius:7px}
+nav.links{margin-left:auto;display:flex;gap:20px;font-size:14px;color:var(--muted)}
+nav.links a{text-decoration:none}nav.links a:hover{color:var(--text)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:700;text-decoration:none;border:0;cursor:pointer;font-size:16px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.langBtn{background:var(--surface2);border:1px solid var(--line);color:var(--text);border-radius:8px;height:36px;padding:0 10px;cursor:pointer;font-size:13px;font-weight:700}
+.btn.small{padding:8px 14px;font-size:14px}
+#themeBtn{background:var(--surface2);border:1px solid var(--line);color:var(--text);border-radius:8px;width:36px;height:36px;cursor:pointer;font-size:16px}
+.hero{padding:72px 0 40px;text-align:center}
+.eyebrow{display:inline-block;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase}
+h1{font-size:clamp(34px,6vw,60px);line-height:1.08;margin:12px auto 18px;max-width:18ch;letter-spacing:-.02em}
+.lead{max-width:62ch;margin:0 auto 28px;color:var(--muted);font-size:clamp(17px,2.2vw,20px)}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.note{font-size:13px;color:var(--muted);margin-top:14px}
+.shot{border-radius:14px;border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden;background:var(--surface)}
+.hero .shot{margin-top:44px}
+section{padding:72px 0}
+section.alt{background:var(--surface);border-block:1px solid var(--line)}
+h2{font-size:clamp(26px,4vw,38px);line-height:1.15;margin:0 0 12px;letter-spacing:-.01em}
+.sub{color:var(--muted);max-width:62ch;margin:0 0 36px}
+.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+section.alt .card{background:var(--bg)}
+.card h3{margin:0 0 6px;font-size:18px}.card p{margin:0;color:var(--muted);font-size:15px}
+.ico{width:38px;height:38px;border-radius:10px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);display:grid;place-items:center;font-weight:800;margin-bottom:12px}
+.feat{display:grid;gap:36px;grid-template-columns:1fr 1fr;align-items:center;margin-bottom:72px}
+.feat:last-child{margin-bottom:0}
+.feat.rev .txt{order:2}
+.feat h3{font-size:26px;margin:0 0 10px;line-height:1.2}
+.feat p{color:var(--muted);margin:0 0 12px}
+.feat ul{margin:0;padding-left:20px;color:var(--muted)}.feat li{margin:6px 0}
+.feat .use{margin-top:14px;padding:12px 14px;border-left:3px solid var(--accent);background:var(--surface2);border-radius:0 10px 10px 0;font-size:15px;color:var(--text)}
+.steps{counter-reset:s;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.step{counter-increment:s;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px}
+.step:before{content:counter(s);display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:800;margin-bottom:12px}
+.step h3{margin:0 0 6px}.step p{margin:0;color:var(--muted);font-size:15px}
+.mini{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:36px}
+.mini figure{margin:0}.mini figcaption{font-size:13px;color:var(--muted);padding:8px 2px}
+ul.check{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+ul.check li{padding-left:30px;position:relative;color:var(--muted)}
+ul.check li:before{content:"✓";position:absolute;left:0;color:var(--accent);font-weight:800}
+ul.check b{color:var(--text)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::after{content:"+";color:var(--accent);font-size:22px;line-height:1}
+details[open] summary::after{content:"−"}
+details p{margin:12px 0 0;color:var(--muted)}
+.final{text-align:center}
+footer{border-top:1px solid var(--line);padding:32px 0;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between}
+@media(max-width:820px){.feat{grid-template-columns:1fr}.feat.rev .txt{order:0}nav.links{display:none}#langBtn{margin-left:auto}.hero{padding-top:44px}section{padding:52px 0}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+<a class="brand" href="#"><img src="img/icon-128.png" alt="">nex.b</a>
+<nav class="links"><a href="#beneficios" data-en="Benefits">Beneficios</a><a href="#funciones" data-en="Features">Funciones</a><a href="#como" data-en="How it works">Cómo funciona</a><a href="#privacidad" data-en="Privacy">Privacidad</a><a href="#faq" data-en="FAQ">FAQ</a></nav>
+<button id="langBtn" class="langBtn" type="button" aria-label="Cambiar idioma / Change language" title="English / Español">EN</button>
+<button id="themeBtn" type="button" aria-label="Cambiar entre modo claro y oscuro" title="Cambiar tema" data-en-title="Toggle theme" data-en-label="Switch between light and dark mode">◐</button>
+<a class="btn small" href="#" data-en="Add to Chrome">Añadir a Chrome</a>
+</div></header>
+
+<main>
+<div class="wrap hero">
+<span class="eyebrow" data-en="Chrome extension · v2.2.1">Extensión para Chrome · v2.2.1</span>
+<h1 data-en="Your new tab, organized by project.">Tu nueva pestaña, organizada por proyectos.</h1>
+<p class="lead" data-en="A visual dashboard to find your work resources, group them by Workspace and go back to the tabs you already have open instead of opening another one.">Un panel visual para encontrar tus recursos de trabajo, agruparlos por Workspace y volver a las pestañas que ya tienes abiertas, en lugar de abrir otra.</p>
+<div class="cta"><a class="btn" href="#" data-en="Add to Chrome">Añadir a Chrome</a><a class="btn ghost" href="#funciones" data-en="See features">Ver funciones</a></div>
+<p class="note" data-en="Requires Chrome 123 or later. No nex.b account.">Requiere Chrome 123 o posterior. Sin cuenta de nex.b.</p>
+<div class="shot"><img src="img/01-workspace-oscuro.png" width="1360" height="900" alt="Panel de nex.b con el Workspace Lanzamiento: sección Fijados y secciones con accesos con miniatura y tags" data-en-alt="nex.b dashboard with the Launch Workspace: Pinned section and sections with thumbnail shortcuts and tags"></div>
+<p class="note" data-en="Real screenshots of the extension with a demo Workspace.">Capturas reales de la extensión con un Workspace de demostración.</p>
+</div>
+
+<section id="tour" class="alt"><div class="wrap">
+<h2 data-en="Watch the tour">Mira el recorrido</h2>
+<p class="sub" data-en="42 seconds through Workspaces, tags, tab reuse, grouping and backups.">42 segundos por los Workspaces, tags, reutilización de pestañas, agrupar y respaldos.</p>
+<div class="shot"><video id="tourVideo" controls preload="metadata" playsinline poster="web/poster.jpg" width="1280" height="720" style="width:100%;height:auto;display:block" src="web/nexb-tour-es.mp4"></video></div>
+</div></section>
+
+<section id="beneficios"><div class="wrap">
+<h2 data-en="Less chaos, more focus">Menos caos, más foco</h2>
+<p class="sub" data-en="Everything you do daily in the browser, organized by project and one click away.">Todo lo que haces a diario en el navegador, ordenado por proyecto y a un clic.</p>
+<div class="grid">
+<div class="card"><div class="ico">▦</div><h3 data-en="Organized by project">Organización por proyecto</h3><p data-en="Workspaces, sections and subcategories to keep work, study and personal projects apart.">Workspaces, secciones y subcategorías para separar trabajo, estudio y proyectos personales.</p></div>
+<div class="card"><div class="ico">⧉</div><h3 data-en="Fewer duplicate tabs">Menos pestañas duplicadas</h3><p data-en="Before opening a shortcut, nex.b looks for a matching tab and focuses its window.">Antes de abrir un acceso, nex.b busca una pestaña coincidente y enfoca su ventana.</p></div>
+<div class="card"><div class="ico">◩</div><h3 data-en="Recognizable shortcuts">Accesos reconocibles</h3><p data-en="Each shortcut has its thumbnail; the name and status sit below without covering the image.">Cada acceso tiene su miniatura; el nombre y el estado quedan debajo, sin tapar la imagen.</p></div>
+<div class="card"><div class="ico">#</div><h3 data-en="Tags that connect everything">Tags que conectan todo</h3><p data-en="Your own tags, suggestions as you type and automatic rules by domain.">Etiquetas propias, sugerencias al escribir y reglas automáticas por dominio.</p></div>
+<div class="card"><div class="ico">☾</div><h3 data-en="Your space, your way">Tu espacio, a tu gusto</h3><p data-en="Ten styles, backgrounds, colors and thumbnail sizes.">Diez estilos, fondos, colores y tamaños de miniatura.</p></div>
+<div class="card"><div class="ico">⛁</div><h3 data-en="Your data, in your control">Datos bajo tu control</h3><p data-en="Local storage, ZIP backup and optional sync.">Guardado local, respaldo ZIP y sincronización opcional.</p></div>
+</div></div></section>
+
+<section id="funciones"><div class="wrap">
+<h2 data-en="Features built for everyday use">Funciones pensadas para el día a día</h2>
+<p class="sub" data-en="This is what nex.b does today.">Esto es lo que hace nex.b hoy.</p>
+
+<div class="feat">
+<div class="txt"><h3 data-en="Visual Workspaces and thumbnail shortcuts">Workspaces visuales y accesos con miniatura</h3>
+<p data-en="Create a Workspace per project and, inside it, sections with your shortcuts. Each shortcut shows a screenshot as its thumbnail; if you prefer, the extension can capture the page when you add it, and you decide whether to keep it.">Crea un Workspace por proyecto y dentro, secciones con tus accesos. Cada acceso muestra una captura como miniatura; si lo prefieres, la extensión puede capturar la página al añadirlo, y tú decides si la conservas.</p>
+<ul><li data-en="Paste a screenshot from the clipboard or use an image by URL.">Pega una captura desde el portapapeles o usa una imagen por URL.</li><li data-en="“Capture missing images” fills in any thumbnails you don’t have.">«Capturar imágenes faltantes» completa las miniaturas que no tengas.</li><li data-en="Ten styles, backgrounds, colors, font and thumbnail size, adjustable in Settings → Design.">Diez estilos, fondos, colores, fuente y tamaño de miniatura ajustables en Configuración → Diseño.</li></ul>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; a “Launch” Workspace with Design, Development and Calendar sections, each with its documents and boards in view."><b>Caso de uso:</b> un Workspace «Lanzamiento» con secciones Diseño, Desarrollo y Calendario, cada una con sus documentos y tableros a la vista.</div></div>
+<div class="shot"><img src="img/06-nuevo-acceso.png" loading="lazy" width="1360" height="900" alt="Diálogo para crear un nuevo acceso con nombre, URL, miniatura, Workspace, categoría y tags" data-en-alt="Dialog to create a new shortcut with name, URL, thumbnail, Workspace, category and tags"></div>
+</div>
+
+<div class="feat rev">
+<div class="txt"><h3 data-en="Tags and automatic rules by domain">Tags y reglas automáticas por dominio</h3>
+<p data-en="Add your own tags with suggestions as you type. “domain = Tag” rules also label shortcuts automatically: for example, &lt;code&gt;figma.com = Figma&lt;/code&gt;. The Tags view gathers shortcuts from all your Workspaces by label.">Añade tags propios con sugerencias mientras escribes. Además, las reglas «dominio = Tag» etiquetan solas: por ejemplo, <code>figma.com = Figma</code>. La vista Tags reúne los accesos de todos tus Workspaces por etiqueta.</p>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; see everything tagged “Docs” or “GitHub” at once, even when it’s spread across different Workspaces."><b>Caso de uso:</b> ver de una vez todo lo etiquetado «Docs» o «GitHub», aunque esté repartido en distintos Workspaces.</div></div>
+<div class="shot"><img src="img/07-tags.png" loading="lazy" width="1360" height="900" alt="Vista Tags agrupando accesos por etiqueta" data-en-alt="Tags view grouping shortcuts by label"></div>
+</div>
+
+<div class="feat">
+<div class="txt"><h3 data-en="Reuse and focus tabs">Reutiliza y enfoca pestañas</h3>
+<p data-en="When you click a shortcut, nex.b first looks for a matching tab and focuses its window before opening another. You choose how to match it: the same document, the exact URL or any page of the site.">Al pulsar un acceso, nex.b busca primero una pestaña que coincida y enfoca su ventana antes de abrir otra. Tú eliges cómo reconocerla: el mismo documento, la URL exacta o cualquier página del sitio.</p>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; you open “Weekly report” ten times a day and always land on the same tab."><b>Caso de uso:</b> abres «Informe semanal» diez veces al día y siempre vuelves a la misma pestaña.</div></div>
+<div class="shot"><img src="img/03-workspace-claro.png" loading="lazy" width="1360" height="900" alt="nex.b en estilo Claro: accesos reutilizando pestañas abiertas" data-en-alt="nex.b in the Light style: shortcuts reusing open tabs"></div>
+</div>
+
+<div class="feat rev">
+<div class="txt"><h3 data-en="Side Panel and pinned shortcuts">Side Panel y fijados</h3>
+<p data-en="Use nex.b in Chrome’s Side Panel too, with a Workspace selector, search, collapsible sections and a titles-only view. Mark your key shortcuts with ★: they appear in a &lt;b&gt;Pinned&lt;/b&gt; section at the top of the Workspace without being duplicated.">Usa nex.b también en el Side Panel de Chrome, con selector de Workspace, búsqueda, secciones plegables y vista de solo títulos. Marca con ★ tus accesos clave: aparecen en una sección <b>Fijados</b> al principio del Workspace sin duplicarse.</p>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; keep the three shortcuts you use most at hand, right next to the page you’re reading."><b>Caso de uso:</b> mantener a mano, junto a la página que lees, los tres accesos que más usas.</div></div>
+<div class="shot"><img src="img/02-side-panel.png" loading="lazy" width="400" height="860" alt="nex.b en el Side Panel de Chrome con selector de Workspace, lupa y sección Fijados" data-en-alt="nex.b in Chrome’s Side Panel with Workspace selector, search and Pinned section" style="margin-inline:auto;max-height:640px;width:auto"></div>
+</div>
+
+<div class="feat">
+<div class="txt"><h3 data-en="Group all your tabs by category, in Chrome">Agrupa todas tus pestañas por categoría, en Chrome</h3>
+<p data-en="One click turns a messy tab bar into native Chrome tab groups. nex.b proposes the groups using the same logic as your automatic tags: 4 Gmail tabs become one “Gmail” group, and if there’s no rule it groups by domain.">Con un clic, una barra de pestañas desordenada se convierte en grupos nativos de Chrome. nex.b propone los grupos con la misma lógica que tus tags automáticos: 4 pestañas de Gmail pasan a ser un grupo «Gmail» y, si no hay regla, agrupa por dominio.</p>
+<ul><li data-en="Group all tabs or only the ones you select; names are editable.">Agrupa todas las pestañas o solo las que elijas; los nombres son editables.</li><li data-en="Reuses groups that already have the same name, and never touches pinned tabs.">Reutiliza grupos que ya tienen el mismo nombre y no toca las pestañas fijadas.</li><li data-en="Optionally gathers everything into the current window first.">Opcionalmente reúne todo antes en la ventana actual.</li></ul>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; end a research session with 30 open tabs and leave them neatly grouped as Gmail, Figma, Docs and GitHub."><b>Caso de uso:</b> terminas una sesión de investigación con 30 pestañas abiertas y las dejas ordenadas en grupos Gmail, Figma, Docs y GitHub.</div></div>
+<div class="shot"><img src="img/04b-agrupar.png" loading="lazy" width="1360" height="900" alt="Inventario, pestaña Agrupar proponiendo grupos nativos de Chrome por categoría" data-en-alt="Inventory, Group tab proposing native Chrome tab groups by category"></div>
+</div>
+
+<div class="feat rev">
+<div class="txt"><h3 data-en="Open a whole section in its own window to focus on one topic">Abre una sección completa en su propia ventana para enfocarte en un tema</h3>
+<p data-en="Each section is a context. Open all of its shortcuts in a new window, grouped under a native “Workspace · section” tab group, and work on that single topic without the rest of your tabs getting in the way. Shortcuts that are already open are focused instead of duplicated.">Cada sección es un contexto. Abre todos sus accesos en una ventana nueva, reunidos en un grupo nativo «Workspace · sección», y trabaja en ese único tema sin que se mezcle con el resto de tus pestañas. Los accesos que ya estaban abiertos se enfocan en lugar de duplicarse.</p>
+<ul><li data-en="A button on every section opens its shortcuts in a new window with a group.">Un botón en cada sección abre sus accesos en una ventana nueva con grupo.</li><li data-en="Another button opens the section’s shortcuts here, focusing the ones already open.">Otro botón abre los accesos de la sección en esta ventana y enfoca los que ya están abiertos.</li><li data-en="Also available from the Side Panel menu.">También disponible desde el menú del Side Panel.</li></ul>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; open only the “Design” section of your Launch Workspace in a separate window, with every Figma board and doc one click away."><b>Caso de uso:</b> abrir solo la sección «Diseño» de tu Workspace de lanzamiento en otra ventana, con todos los tableros y documentos de Figma a un clic.</div></div>
+<div class="shot"><img src="img/01-workspace-oscuro.png" loading="lazy" width="1360" height="900" alt="Secciones del Workspace, cada una con botones para abrir todos sus accesos o abrirlos en una ventana nueva" data-en-alt="Workspace sections, each with buttons to open all its shortcuts or open them in a new window"></div>
+</div>
+
+<div class="feat">
+<div class="txt"><h3 data-en="Tab inventory and freeing memory">Inventario de pestañas y liberar memoria</h3>
+<p data-en="The Inventory lists your open web tabs, with a filter, a duplicates tab and multi-select: add them to a Workspace, close them or free memory from the selected ones.">El Inventario lista tus pestañas web abiertas, con filtro, pestaña de repetidas y selección múltiple: añádelas a un Workspace, ciérralas o libera memoria de las seleccionadas.</p>
+<p style="font-size:14px" data-en="Freeing memory discards tabs that stay in the tab bar and reload when you return; it doesn’t promise zero usage.">Liberar memoria descarga pestañas que siguen en la barra y se recargan al volver; no promete consumo cero.</p>
+<div class="use" data-en="&lt;b&gt;Use case:&lt;/b&gt; gather a project’s loose tabs into a “Gmail” or “Figma” group with one click."><b>Caso de uso:</b> reunir las pestañas sueltas de un proyecto en un grupo «Gmail» o «Figma» con un clic.</div></div>
+<div class="shot"><img src="img/04b-agrupar.png" loading="lazy" width="1360" height="900" alt="Inventario de pestañas, pestaña Agrupar con un grupo propuesto" data-en-alt="Tab inventory, Group tab with a suggested group"></div>
+</div>
+
+<div class="feat rev">
+<div class="txt"><h3 data-en="Sync and back up">Sincroniza y respalda</h3>
+<p data-en="Small data (Workspaces, categories, names, URLs, tags and preferences) can sync through Chrome Sync. Images can be uploaded to a private Google Drive folder with one button. And you always have the ZIP backup, with import of settings and images.">Los datos pequeños (Workspaces, categorías, nombres, URLs, tags y preferencias) pueden sincronizarse con Chrome Sync. Las imágenes pueden subirse a una carpeta privada de Google Drive con un botón. Y siempre tienes el respaldo en ZIP, con importación de configuración e imágenes.</p>
+<p style="font-size:14px" data-en="Shortcuts marked “Only on this device” are not sent to Chrome Sync or Drive. Drive sync requires setting up OAuth; see the project README.">Los accesos marcados «Solo en este dispositivo» no se envían a Chrome Sync ni a Drive. La sincronización con Drive requiere configurar OAuth; consulta el README del proyecto.</p></div>
+<div class="shot"><img src="img/05c-sincronizar.png" loading="lazy" width="1360" height="900" alt="Configuración, pestaña Sincronizar: Chrome Sync e imágenes en Google Drive" data-en-alt="Settings, Sync tab: Chrome Sync and images in Google Drive"></div>
+</div>
+</div></section>
+
+<section id="como" class="alt"><div class="wrap">
+<h2 data-en="How it works">Cómo funciona</h2>
+<p class="sub" data-en="Three steps and your dashboard is ready.">Tres pasos y ya tienes tu panel.</p>
+<div class="steps">
+<div class="step"><h3 data-en="Install nex.b">Instala nex.b</h3><p data-en="Add it to Chrome 123 or later. When you open a new tab, you land on your dashboard.">Añádela a Chrome 123 o posterior. Al abrir una pestaña nueva, entras a tu panel.</p></div>
+<div class="step"><h3 data-en="Create Workspaces and shortcuts">Crea Workspaces y accesos</h3><p data-en="One Workspace per project, sections inside, and shortcuts with thumbnails and tags.">Un Workspace por proyecto, secciones dentro y accesos con miniatura y tags.</p></div>
+<div class="step"><h3 data-en="Go back to what you already have open">Vuelve a lo que ya tienes abierto</h3><p data-en="Click a shortcut: nex.b focuses the existing tab or opens a new one. Use the Inventory to tidy up the rest.">Pulsa un acceso: nex.b enfoca la pestaña existente o abre una nueva. Usa el Inventario para ordenar el resto.</p></div>
+</div>
+<div class="mini">
+<figure class="shot"><img src="img/04-inventario.png" loading="lazy" width="1360" height="900" alt="Inventario de pestañas" data-en-alt="Tab inventory"><figcaption data-en="Tab inventory">Inventario de pestañas</figcaption></figure>
+<figure class="shot"><img src="img/05-ajustes.png" loading="lazy" width="1360" height="900" alt="Configuración general con tags automáticos por URL" data-en-alt="General settings with automatic tags by URL"><figcaption data-en="Automatic tag rules by URL">Reglas de tags automáticos por URL</figcaption></figure>
+<figure class="shot"><img src="img/05d-respaldo.png" loading="lazy" width="1360" height="900" alt="Datos y respaldo ZIP" data-en-alt="Data and ZIP backup"><figcaption data-en="Data and ZIP backup">Datos y respaldo ZIP</figcaption></figure>
+</div>
+</div></section>
+
+<section id="privacidad"><div class="wrap">
+<h2 data-en="Your data, on your computer">Tus datos, en tu equipo</h2>
+<p class="sub" data-en="nex.b stores your library locally and lets you decide what gets shared.">nex.b guarda tu biblioteca localmente y te deja decidir qué se comparte.</p>
+<ul class="check">
+<li data-en="&lt;b&gt;Local storage by default.&lt;/b&gt; Syncing with Chrome Sync and Google Drive is optional."><b>Guardado local por defecto.</b> La sincronización con Chrome Sync y Google Drive es opcional.</li>
+<li data-en="&lt;b&gt;Optional permissions when needed.&lt;/b&gt; Bookmarks, clipboard, account email and bulk capture are requested when you use those features."><b>Permisos opcionales cuando hacen falta.</b> Favoritos, portapapeles, correo de la cuenta y captura masiva se solicitan al usar esas funciones.</li>
+<li data-en="&lt;b&gt;Remote images off by default.&lt;/b&gt; Local ones don’t need that option."><b>Imágenes remotas desactivadas por defecto.</b> Las locales no requieren esa opción.</li>
+<li data-en="&lt;b&gt;“Only on this device” shortcuts.&lt;/b&gt; They are not sent to Chrome Sync or Drive."><b>Accesos «Solo en este dispositivo».</b> No se envían a Chrome Sync ni a Drive.</li>
+<li data-en="&lt;b&gt;No nex.b account.&lt;/b&gt; Your ZIP backup is yours, to export and import."><b>Sin cuenta de nex.b.</b> Tu respaldo ZIP es tuyo, para exportar e importar.</li>
+</ul>
+</div></section>
+
+<section id="faq" class="alt"><div class="wrap">
+<h2 data-en="Frequently asked questions">Preguntas frecuentes</h2><p class="sub"></p>
+<details><summary data-en="Do I need an account?">¿Necesito una cuenta?</summary><p data-en="No. nex.b works without a nex.b account. Sync is optional and uses your Chrome account.">No. nex.b funciona sin cuenta de NEX.B. La sincronización es opcional y usa tu cuenta de Chrome.</p></details>
+<details><summary data-en="Which Chrome version do I need?">¿Qué versión de Chrome necesito?</summary><p data-en="Chrome 123 or later (Manifest V3).">Chrome 123 o posterior (Manifest V3).</p></details>
+<details><summary data-en="Can I open files or folders from my computer?">¿Puedo abrir archivos o carpetas de mi equipo?</summary><p data-en="Yes, with &lt;code&gt;file:///&lt;/code&gt; addresses. You must manually enable “Allow access to file URLs” in nex.b’s details in Chrome. Backups store the paths; they don’t copy the files.">Sí, con direcciones <code>file:///</code>. Hay que activar manualmente «Permitir acceso a URLs de archivo» en los detalles de nex.b en Chrome. Los respaldos guardan las rutas, no copian los archivos.</p></details>
+<details><summary data-en="Does “Free memory” close my tabs?">¿«Liberar memoria» cierra mis pestañas?</summary><p data-en="No: it discards them. They stay in the tab bar and reload when you return. Save forms and editors before using it. Zero usage is not promised.">No: las descarga. Siguen en la barra y se recargan al volver. Guarda formularios y editores antes de usarlo. No se promete consumo cero.</p></details>
+<details><summary data-en="Does everything sync between computers?">¿Se sincroniza todo entre equipos?</summary><p data-en="Chrome Sync carries the small data (without thumbnails). Images can be uploaded to Google Drive, which requires setting up OAuth. The ZIP backup is always available.">Chrome Sync lleva los datos pequeños (sin miniaturas). Las imágenes pueden subirse a Google Drive, que requiere configurar OAuth. El respaldo ZIP siempre está disponible.</p></details>
+<details><summary data-en="How do I install it?">¿Cómo la instalo?</summary><p data-en="The “Add to Chrome” button on this page is a placeholder. Meanwhile, the project README explains how to load it unpacked from GitHub.">El botón «Añadir a Chrome» de esta página es un marcador de posición. Mientras tanto, el README del proyecto explica cómo cargarla descomprimida desde GitHub.</p></details>
+</div></section>
+
+<section class="final"><div class="wrap">
+<h2 data-en="Bring order to your new tab">Pon orden en tu nueva pestaña</h2>
+<p class="sub" style="margin-inline:auto" data-en="Workspaces, thumbnail shortcuts and tabs that don’t duplicate.">Workspaces, accesos con miniatura y pestañas que no se duplican.</p>
+<a class="btn" href="#" data-en="Add to Chrome">Añadir a Chrome</a>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+<span><b>nex.b</b> v2.2.1 · By.kilex</span>
+<span><a href="https://github.com/Kilexmommm/Nex-b-Chrome-extension/issues" data-en="Feedback" data-es="Comentarios">Feedback</a> · <a href="https://ko-fi.com/G5A528GFJQ" data-en="Support me on Ko-fi">Apóyame en Ko-fi</a></span>
+</div></footer>
+
+<script>
+(function(){var r=document.documentElement,b=document.getElementById('themeBtn'),lb=document.getElementById('langBtn');
+try{var s=localStorage.getItem('theme');if(s)r.dataset.theme=s}catch(e){}
+b.addEventListener('click',function(){var dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches;var n=dark?'light':'dark';r.dataset.theme=n;try{localStorage.setItem('theme',n)}catch(e){}});
+var els=[].slice.call(document.querySelectorAll('[data-en],[data-en-alt],[data-en-title]'));
+els.forEach(function(e){if(e.hasAttribute('data-en')&&!e.hasAttribute('data-es'))e.setAttribute('data-es',e.tagName==='META'?e.content:e.innerHTML);if(e.hasAttribute('data-en-alt'))e.setAttribute('data-es-alt',e.alt);if(e.hasAttribute('data-en-title')){e.setAttribute('data-es-title',e.title);e.setAttribute('data-es-label',e.getAttribute('aria-label'))}});
+function setLang(l){r.lang=l;var en=l==='en';
+els.forEach(function(e){if(e.hasAttribute('data-en')){var v=e.getAttribute(en?'data-en':'data-es');if(e.tagName==='META')e.content=v;else if(e.tagName==='TITLE')document.title=v;else e.innerHTML=v}
+if(e.hasAttribute('data-en-alt'))e.alt=e.getAttribute(en?'data-en-alt':'data-es-alt');
+if(e.hasAttribute('data-en-title')){e.title=e.getAttribute(en?'data-en-title':'data-es-title');e.setAttribute('aria-label',e.getAttribute(en?'data-en-label':'data-es-label'))}});
+var tv=document.getElementById('tourVideo');if(tv){var ns='web/nexb-tour-'+(en?'en':'es')+'.mp4';if(tv.getAttribute('src')!==ns){var t=tv.currentTime,pl=!tv.paused;tv.src=ns;tv.load();if(t>0){tv.currentTime=t;if(pl)tv.play()}}}lb.textContent=en?'ES':'EN';lb.title=en?'Español':'English';try{localStorage.setItem('lang',l)}catch(x){}}
+var saved=null;try{saved=localStorage.getItem('lang')}catch(e){}
+setLang(saved||((navigator.language||'en').slice(0,2)==='es'?'es':'en'));
+lb.addEventListener('click',function(){setLang(r.lang==='en'?'es':'en')});})();
+</script>
+</body>
+</html>
